@@ -8,15 +8,96 @@ Eine moderne Azure-Webapp für Kegelclubs zur Verwaltung von Strafen, Mitglieder
 
 ---
 
-## Design-Philosophie
+## Design-Konzept: Bowling Atmosphere
 
-Kein generisches KI-Design. Stattdessen:
-- Dunkles, mattes Farbschema mit einem starken Akzent (z.B. tiefes Orange oder Bernstein — Kegelkugel-Ästhetik)
-- Karten-basiertes Layout mit großzügigem Weißraum und feinen Trennlinien
-- Typografie: moderne Groteskschrift (z.B. Inter oder DM Sans via Google Fonts)
-- Micro-Animationen über CSS-Transitions (kein träges JavaScript)
-- Mobile-first: Touch-optimierte Buttons, Bottom-Navigation auf Mobilgeräten
-- Glassmorphism-Elemente sparsam eingesetzt (nur für Overlays und Modals)
+Das Design transportiert die Atmosphäre einer modernen Kegelanlage — gedämpftes Licht, lackierte Holzbahnen, das Schimmern der Kegelkugel. Kein generisches SaaS-Dashboard, sondern eine App, die sich nach Kegelclub anfühlt.
+
+### Farbpalette
+
+| Token | Wert | Verwendung |
+|---|---|---|
+| `--color-bg` | `#0D0D0F` | Haupt-Hintergrund |
+| `--color-surface` | `#1A1A1F` | Karten, Panels |
+| `--color-surface-elevated` | `#242430` | Hover-State, aktive Karten |
+| `--color-accent` | `#E08020` | Amber-Orange — Kegelkugel-Farbe, CTAs, Highlights |
+| `--color-accent-muted` | `#7A4510` | Deaktivierte Akzente, Hintergrundtönung |
+| `--color-text-primary` | `#F0EEE8` | Haupttext (warm-weiß, kein hartes #FFFFFF) |
+| `--color-text-secondary` | `#8A8880` | Untertitel, Metadaten |
+| `--color-danger` | `#C84040` | Schulden-Rot |
+| `--color-success` | `#4A9060` | Bezahlt-Grün |
+| `--color-border` | `rgba(255,255,255,0.06)` | Subtile Trennlinien |
+
+### Typografie
+
+- **Headings:** `Syne` (Google Fonts) — markante Groteskschrift mit eigenem Charakter
+- **Body / UI:** `Inter` — maximale Lesbarkeit auf allen Screens
+- **Mono / Beträge:** `JetBrains Mono` — Zahlen in Kassenbuch und Schuldenübersicht tabellarisch ausgerichtet (`font-variant-numeric: tabular-nums`)
+- Schriftgrößen: 6-stufige Skala (12 / 14 / 16 / 20 / 28 / 40 px)
+
+### Hintergrundbilder — Atmosphäre durch Kontext
+
+Strategisch eingesetzte Hero-Bilder schaffen Wiedererkennungswert und emotionale Tiefe, ohne den Content zu überwältigen. Alle Fotos werden mit einem dunklen Gradient-Overlay abgedeckt (`rgba(13,13,15,0.72) → rgba(13,13,15,0.95)`), sodass Text immer lesbar bleibt.
+
+**Bildquellen:** Unsplash (kostenlos, lizenzfrei) oder eigene Fotos der Kegelanlage. Empfohlene Suchbegriffe: *bowling alley*, *bowling pins*, *bowling ball*, *kegelbahn*.
+
+| Screen / Bereich | Bildmotiv | Behandlung |
+|---|---|---|
+| **Login & Register** | Nahaufnahme glänzender Kegelkugeln auf dem Gestell, Kegelanlage im Abendlicht | Split-Layout: links 55 % Bild (full-bleed), rechts Form-Panel mit `backdrop-blur`; auf Mobile: Bild-Banner oben (30 vh), Form darunter |
+| **Dashboard Hero** | Kegelanlage-Vogelperspektive, aufgestellte Pins, Unschärfe an den Rändern | Schmales Hero-Banner (18 vh) mit subtiler Parallax beim Scrollen; Kassenstand-Kachel und Vereinsname als Overlay |
+| **Kalender-Header** | Kegelball rollt auf Pins zu — Bewegungsunschärfe | Breites Hero-Banner oben im Kalender (20 vh); nächster Termin als prominente Card davor |
+| **Kegelabend erfassen** | Totale einer beleuchteten Kegelbahn, Seitenlichter, Holzstruktur | Fixiertes Bild-Banner (22 vh) oben; Erfassungs-UI scrollt darunter; Bottom Sheet über dem Bild |
+| **Awards & Ewige Tabelle** | Siegerpodest, Trophäe oder Pins in einer Reihe | Vollbreites Banner hinter dem Seitentitel |
+| **Leer-Zustände** | Einzelner Kegelpin als SVG-Illustration (kein Foto) | Zentriert, lockerer Ton bei "noch keine Daten" |
+
+> **Performance auf Mobile (`< 640px`):** Hero-Bilder werden auf `12vh` reduziert oder durch einen einfachen Farbgradienten aus der Farbpalette ersetzt — kein Laden großer Bilder auf schmalem Datenvolumen.
+
+### Komponentendesign
+
+**Cards:**
+- `border-radius: 12px`, kein harter Drop-Shadow — stattdessen `border: 1px solid var(--color-border)` + `box-shadow: 0 1px 3px rgba(0,0,0,0.4)`
+- Hover: Background wechselt auf `--color-surface-elevated`, keine Translation
+- Amber-Akzentlinie links (`3px solid var(--color-accent)`) für hervorgehobene Cards (offene Schulden, nächster Termin)
+
+**Buttons:**
+- Primary: `bg-accent text-black font-semibold` — klarer CTA
+- Secondary: `bg-surface border border-color-border text-primary` — zurückhaltend
+- Destructive: `bg-danger/10 text-danger border border-danger/30` — erkennbar, ohne zu schreien
+- Mindest-Touch-Fläche: 44×44 px auf allen Geräten (iOS HIG-konform)
+
+**Navigation:**
+- Desktop: Linke Sidebar (240 px), collapsible auf Icon-Only-Modus (64 px)
+- Mobile: Bottom Tab Bar mit 5 Icons: Dashboard · Kalender · Abend erfassen (zentraler FAB in Amber) · Schulden · Mehr
+- Active State: Amber-Unterstrich + subtiler Glow-Effekt
+
+**Strafen-Erfassung (Touch-optimiert):**
+- Mitglied-Kacheln: 80×80 px Avatar, Name darunter, Strafensumme als Badge
+- **Mobile:** Bottom Sheet (Swipe-to-dismiss) mit Strafenkatalog als großem Icon-Grid
+- Erfasste Strafen erscheinen als Chips unterhalb des Avatars — Tap zum Stornieren
+- Floating Action Button (amber, 56 px) unten rechts: „Abend einreichen"
+
+**Glassmorphism (sparsam, nur für Overlays):**
+- Modals, Drawers, Floating-Panels: `backdrop-filter: blur(16px)` + `background: rgba(26,26,31,0.85)`
+- Nicht für reguläre Cards — Glassmorphism verliert seine Wirkung bei Übernutzung
+
+**Micro-Animationen (ausschließlich CSS):**
+- Neue Strafe eingetragen: kurzes `scale(1.05)` auf dem Avatar, Badge-Zahl zählt hoch
+- Award erhalten: einmalige `@keyframes glow` Puls-Animation auf der Badge
+- Schuldenbetrag beim Seitenlade: Zähler-Animation via `@property --num` (CSS Houdini)
+- Übergänge: 150 ms `ease-out` — schnell, nie träge
+
+### Seiten-spezifisches Design
+
+**Login / Register:**
+Split-Screen. Links: Bowling-Foto mit dunklem Overlay, Logo und Claim *„Dein Kegelclub. Digital."* zentriert im Bild. Rechts: Form-Card mit `backdrop-blur`, schwebend über dem Hintergrund. Mobile: Bild-Banner (30 vh) + Form scrollbar darunter.
+
+**Dashboard:**
+Oben: schmaler Hero mit Vereinsname und aktuellem Datum. Darunter: 3-spaltige Kachelreihe (Meine Schulden | Nächster Termin | Letzter Abend). Dann: Aktivitätsfeed und Awards-Preview-Strip. Kassenstand als dezenter Chip (sichtbar für alle Mitglieder): *„Vereinskasse: 142,50 €"*.
+
+**Kegelabend erfassen:**
+Focus-Mode: schmale Topbar mit Termin-Datum und Fortschritts-Indikator (*„7 von 12 Mitgliedern erfasst"*). Mitglieder-Grid dominiert den Viewport. FAB (amber) unten rechts. Kein ablenkender Sidebar-Kontext.
+
+**Schulden-Übersicht (Kassenwart):**
+Tabelle mit Zebra-Striping in `--color-surface` / `--color-surface-elevated`. Beträge rechtsbündig in JetBrains Mono. Farbige Status-Badges (grün / gelb / rot). Bulk-Select-Checkbox für „alle als bezahlt markieren".
 
 ---
 
@@ -71,24 +152,33 @@ kegelkasse/
 {
   "id": "uuid",
   "email": "...",
+  "first_name": "Noah",
+  "last_name": "Roosen",
   "password_hash": "bcrypt",
   "email_verified": false,
   "verification_token": "...",
   "group_ids": ["..."],
   "notification_settings": {
-    "new_penalty": true,
-    "monthly_summary": true,
-    "session_reminder": false,
-    "debt_reminder": true,
-    "event_invitation": true,
-    "rsvp_reminder": true,
-    "deadline_warning": true,
-    "payment_received": true,
-    "late_payment_fee": true
+    "group_id_1": {
+      "new_penalty": true,
+      "monthly_summary": true,
+      "session_reminder": false,
+      "debt_reminder": true,
+      "event_invitation": true,
+      "rsvp_reminder": true,
+      "deadline_warning": true,
+      "payment_received": true,
+      "late_payment_fee": true,
+      "new_poll": true,
+      "poll_closing_soon": true,
+      "poll_closed": false
+    }
   },
   "created_at": "iso8601"
 }
 ```
+
+> `first_name` und `last_name` sind bei der Registrierung **Pflichtfelder**. Der vollständige Name (`first_name + " " + last_name`) wird im CSV-Import als sekundärer Matching-Schlüssel verwendet, wenn keine IBAN hinterlegt ist. Matching ist case-insensitiv und normalisiert (Umlaute, Satzzeichen).
 
 **Container: `groups`**
 ```json
@@ -110,14 +200,31 @@ kegelkasse/
   "treasury": {
     "opening_balance": 150.00,
     "opening_balance_date": "iso8601",
-    "late_payment_fee": 2.00,
-    "late_payment_days": 14
+    "payment_deadline": {
+      "type": "days_before_next_event",
+      "days": 2
+    },
+    "late_payment_fee": 2.00
   },
   "members": [
-    { "user_id": "...", "role": "admin|präsident|kassenwart|mitglied", "joined_at": "..." }
+    {
+      "user_id": "...",
+      "role": "admin|präsident|kassenwart|mitglied",
+      "joined_at": "...",
+      "iban": "DE81320500000002802569"
+    }
   ]
 }
 ```
+
+> **`payment_deadline`-Typen:**
+> | Typ | Beschreibung | Standard |
+> |---|---|:---:|
+> | `days_before_next_event` | Frist = N Tage vor dem nächsten wiederkehrenden Regeltermin. Bei „Jeden 4. Samstag" und `days: 2` → immer der **Donnerstag davor** | ✓ Standard |
+> | `days_after_booking` | Klassisch: N Tage ab dem Buchungsdatum der Schuld | — |
+> | `fixed_day_of_month` | Immer am gleichen Tag des Monats fällig (z.B. 15.) | — |
+>
+> Der Standard (`days_before_next_event, days: 2`) ist im Setup-Wizard vorausgewählt, aber in Schritt 2 „Finanzen" frei konfigurierbar. `calendar_service.py` berechnet das konkrete Fälligkeitsdatum dynamisch beim Buchen einer Schuld.
 
 > **Rollenübersicht:**
 > | Rolle | Strafen erfassen | Termin einreichen | Termin genehmigen | Schulden verwalten | Kassenbuch verwalten | Events anlegen | Regelwerk bearbeiten | Einst. (org.) | Einst. (fin.) |
@@ -356,16 +463,28 @@ ENVIRONMENT=development   # "production" auf Azure setzen
 
 ## Phase 2 — Authentifizierung & Gruppen
 
-**Ziel:** Registrierung, Login, E-Mail-Verifizierung, Gruppenanlage mit Setup-Wizard, Einladungslink, Rollenverwaltung.
+**Ziel:** Registrierung, Login, E-Mail-Verifizierung, Gruppenanlage mit Setup-Wizard, Einladungslink, Rollenverwaltung — und volle Unterstützung für Mitgliedschaft in mehreren Clubs.
 
 ### Features
-- Registrierung mit E-Mail + Passwort (`bcrypt` via `passlib`)
+- Registrierung mit E-Mail, **Vorname, Nachname** + Passwort (`bcrypt` via `passlib`) — Pflichtfelder
 - E-Mail-Verifizierung per Token-Link (Ablauf: 24h)
 - Login per E-Mail/Passwort → JWT-Session-Cookie (httpOnly, SameSite=Strict)
 - Passwort-Reset-Flow (Token-Link per E-Mail)
 - Gruppe erstellen → Ersteller wird automatisch Admin → **Setup-Wizard startet automatisch**
 - Eindeutiger Einladungslink (`/join/{invite_token}`) — Token reset-fähig durch Admin/Präsident
 - **Rollenverwaltung:** Admin kann Kassenwarte und Präsidenten ernennen/absetzen
+
+### Multi-Club-Unterstützung
+
+Ein Account kann Mitglied in beliebig vielen Clubs sein (Betriebs- und Privatclub, mehrere Kegelvereine etc.).
+
+- `users.group_ids` ist ein Array — beim Beitreten über `/join/{token}` wird die neue `group_id` angehängt
+- Nach dem Login landet der Nutzer auf `/dashboard` — dort wird **entweder** direkt der einzige Club angezeigt **oder** eine Club-Auswahlseite, wenn mehrere vorhanden
+- **Club-Switcher** in der Navigation (Sidebar Desktop / Kopfzeile Mobile): Dropdown mit allen Club-Namen und Avataren; schnelles Wechseln ohne erneuten Login
+- Alle gruppenspezifischen URLs bleiben unter `/group/{id}/...` — kein Kontext-Chaos beim Wechsel
+- Einstellungen und Profil (`/profile`) sind account-weit; Benachrichtigungs-Toggles sind **pro Gruppe** konfigurierbar
+
+> Das `group_ids`-Array im `users`-Container ist bereits im Datenmodell angelegt — Multi-Club ist keine Erweiterung, sondern von Anfang an das vorgesehene Modell.
 
 ### Setup-Wizard (beim Erstellen einer Gruppe)
 
@@ -374,7 +493,7 @@ Mehrstufiger Einrichtungsflow direkt nach Gruppenanlage. Jeder Schritt kann übe
 | Schritt | Inhalt | Pflicht |
 |---|---|---|
 | 1 · Clubname | Vereinsname, optionales Club-Bild/Avatar | Ja |
-| 2 · Finanzen | Monatsbeitrag (Betrag + Buchungstag), IBAN, PayPal-Link, Eröffnungssaldo + Datum, Zahlungsfrist & Verspätungsstrafe | Nein |
+| 2 · Finanzen | Monatsbeitrag (Betrag + Buchungstag), IBAN, PayPal-Link, Eröffnungssaldo + Datum, **Zahlungsfrist** (Standard: 2 Tage vor nächstem Kegeltermin — Typ und Anzahl Tage konfigurierbar), Verspätungsstrafe | Nein |
 | 3 · Strafenkatalog | Vorbefüllt mit gängigen Strafen (Pudel, Rinnenwurf, Verspätung …), bearbeitbar, weitere hinzufügbar | Nein |
 | 4 · Regeltermine | Wiederkehrende Termine konfigurieren (z.B. "Jeden 4. Samstag") | Nein |
 | 5 · Vereinsregelwerk | Optionaler Starter-Text für Satzung und Strafendefinitionen | Nein |
@@ -397,10 +516,11 @@ Alle Wizard-Inhalte sind nach dem Setup jederzeit hier erreichbar und bearbeitba
 Nicht berechtigte Sektionen werden ausgeblendet, nicht nur gesperrt — Kassenwarte sehen z.B. keinen "Regeltermine"-Tab.
 
 ### UI-Screens
-- `/register` — Registrierungsseite
+- `/register` — Registrierungsseite (mit Vorname/Nachname-Feldern)
 - `/login` — Loginseite
 - `/verify-email` — Bestätigungsseite
 - `/forgot-password` — Passwort vergessen
+- `/dashboard` — Club-Auswahl bei mehreren Clubs / Direktweiterleitung bei einem Club
 - `/groups/new` — Gruppe erstellen (startet Wizard)
 - `/groups/setup/{step}` — Wizard-Schritte 1–6
 - `/group/{id}/settings` — Einstellungs-Hub (rollenabhängig gefiltert)
@@ -418,7 +538,11 @@ Nicht berechtigte Sektionen werden ausgeblendet, nicht nur gesperrt — Kassenwa
 - Monatsbeitrag konfigurieren (Betrag + Buchungstag)
 - APScheduler (in-process): Monatsbeitrag automatisch zum konfigurierten Tag in `debts` buchen
 - IBAN und PayPal-Link in Gruppeneinstellungen hinterlegen — wird auf Schuldenübersicht angezeigt
-- **Zahlungsfristen & Verspätungsstrafe:** In den Gruppeneinstellungen konfigurierbar: Zahlungsfrist in Tagen (z.B. 14 Tage ab Buchungsdatum) und Betrag der Verspätungsstrafe (z.B. 2,00€); wird bei Zahlungseingang automatisch geprüft und gegebenenfalls ausgelöst
+- **Zahlungsfristen & Verspätungsstrafe:** In den Gruppeneinstellungen (und im Setup-Wizard) konfigurierbar. Drei Frist-Modi:
+  - **Standard (vorausgewählt): `days_before_next_event`** — `calendar_service.py` ermittelt beim Buchen den nächsten wiederkehrenden Regeltermin und setzt die Frist auf N Tage davor. Bei „Jeden 4. Samstag" und `days: 2` ist das immer der Donnerstag vor dem Kegelabend.
+  - `days_after_booking` — klassisch: N Tage ab Buchungsdatum
+  - `fixed_day_of_month` — Immer am konfigurierten Tag des Monats
+  - Der berechnete Fälligkeitstag wird beim Anlegen jedes `debts`-Eintrags als `due_date` gespeichert. Bei Zahlungseingang prüft `treasury_service.py` das `due_date` gegen das Buchungsdatum der Zahlung — bei Überschreitung wird automatisch eine Verspätungsstrafe gebucht.
 - **Kassenkonto-Eröffnungssaldo:** Einmalige Eingabe des aktuellen Kontostands zum Startdatum, damit der berechnete Kassenstand sofort stimmt
 - **Vereinsregelwerk:** Präsident und Admin können eine Markdown-Seite mit Vereinssatzung, Strafendefinitionen und Verhaltensregeln pflegen; für alle Mitglieder jederzeit lesbar unter `/group/{id}/rulebook`; Änderungen werden im Log festgehalten
 
@@ -529,12 +653,49 @@ Nicht berechtigte Sektionen werden ausgeblendet, nicht nur gesperrt — Kassenwa
 - **Staleness-Indikator:** Die App prüft, ob für den aktuellen Monat bereits ein CSV-Import vorliegt. Fehlt er, erscheint eine sichtbare Warnung — z.B. *"Kassenstand möglicherweise veraltet — letzter Import: 15.03.2026"* bzw. *"Zahlungsstatus April 2026 noch nicht bestätigt"*. Gleiches gilt für Mitglieder-Schulden: offene `debts`-Einträge ohne zugehörigen `transaction_id` im aktuellen Zeitraum werden als "noch nicht per CSV bestätigt" markiert. Die Zahlen sind damit immer ehrlich — keine falsche Gewissheit bei fehlendem Import.
 
 **CSV-Import (Sparkasse-Format):**
-- Kassenwart lädt einen CSV-Kontoauszug vom Sparkassen-Online-Banking hoch
-- `csv_import_service.py` parst das Sparkassen-Format (Semikolon-getrennt, Spalten: Buchungstag, Betrag, Beguenstigter/Zahlungspflichtiger, Verwendungszweck, IBAN)
-- Jede Zeile wird mit einem SHA-256-Hash dedupliziert — bereits importierte Buchungen werden übersprungen, beliebig häufige Re-Imports möglich
-- **Auto-Matching:** Buchungen werden automatisch einem Mitglied zugeordnet, wenn Name oder IBAN im Verwendungszweck erkannt wird; unsichere Matches werden zur manuellen Bestätigung markiert
-- Nicht zuordenbare Einträge (z.B. Kegelbahnmiete) können manuell als Ausgabe kategorisiert werden
-- Nach Import: Übersicht aller neuen Buchungen mit Match-Status → Kassenwart bestätigt oder korrigiert
+
+Basis ist die reale Exportdatei des Vereinskontos. Das Format ist dokumentiert und bleibt stabil.
+
+*Technische Format-Details:*
+- Trennzeichen: `;`, Felder in `"` eingeschlossen
+- Encoding: **Latin-1 / ISO-8859-1** — beim Einlesen zwingend `encoding="iso-8859-1"` angeben (Umlaute sonst korrumpiert)
+- Datum (`Buchungstag`): Format `DD.MM.YY` (zweistelliges Jahr) → `datetime.strptime(d, "%d.%m.%y")`
+- Betrag: Komma als Dezimalzeichen (`"25,00"`) → `float(betrag.replace(",", "."))`
+- Negative Beträge = Ausgaben des Kassenwarts (Bahnmiete, Events, Anschaffungen)
+
+*Relevante Spalten (0-indiziert):*
+
+| # | Spaltenname | Verwendung |
+|---|---|---|
+| 1 | `Buchungstag` | Buchungsdatum (für Fristenprüfung) |
+| 3 | `Buchungstext` | Transaktionstyp (s.u.) |
+| 4 | `Verwendungszweck` | Freitext des Überweisenden |
+| 11 | `Beguenstigter/Zahlungspflichtiger` | **Name** — primär für Matching |
+| 12 | `Kontonummer/IBAN` | **IBAN** — primär für Matching |
+| 14 | `Betrag` | Betrag (positiv = Eingang, negativ = Ausgang) |
+
+*Buchungstext-Typen und Behandlung:*
+
+| Buchungstext | Kategorie | Hinweis |
+|---|---|---|
+| `GUTSCHR. UEBERW. DAUERAUFTR` | income | Dauerauftrag Monatsbeitrag |
+| `GUTSCHR. UEBERWEISUNG` | income | Manuelle Überweisung |
+| `ECHTZEIT-GUTSCHRIFT` | income | Echtzeit-Eingang |
+| `UEBERTRAG (UEBERWEISUNG)` | expense (wenn negativ) | Kassenwart zahlt z.B. Bahnmiete |
+| `ECHTZEIT-UEBERWEISUNG` | expense (wenn negativ) | Kassenwart-Ausgabe |
+| `ABSCHLUSS` | other_income | Quartalszinsen — kein Mitglied-Match; automatisch als `Kontozinsen` kategorisiert |
+
+*Matching-Strategie (Priorität):*
+1. **IBAN-Match (sicher):** `groups.members[].iban` gegen Spalte `Kontonummer/IBAN` — identisch → automatisch zugeordnet. Mitglieder können ihre IBAN im Profil hinterlegen oder der Kassenwart trägt sie nach dem ersten Import ein.
+2. **Name-Match (unsicher):** Spalte `Beguenstigter/Zahlungspflichtiger` (case-insensitiv, normalisiert) gegen `users.first_name + " " + users.last_name`. Normalisierung: Großschreibung angleichen, Sonderzeichen strippen. Beispiel: `"NOAH ROOSEN"` → `"noah roosen"` trifft `"Noah Roosen"`. Match wird zur manuellen Bestätigung markiert.
+3. **Kein Match:** Eintrag bleibt offen für manuelle Zuordnung oder manuelle Kategorisierung als Ausgabe.
+
+*Sonderfälle aus realen Daten:*
+- Tippvarianten im Namen (`Verhoelsdonk` / `Verholsdonk`) → IBAN-Priorität löst das zuverlässig
+- Leerer `Verwendungszweck` → kein Einfluss auf Matching (Spalte 11/12 zählt)
+- Mehrere Buchungen vom gleichen Mitglied am gleichen Tag → kein Problem durch SHA-256-Hash der gesamten CSV-Zeile
+
+*Deduplizierung:* Jede Zeile wird mit `sha256(csv_row_raw_bytes)` gehasht und als `csv_row_hash` in `transactions` gespeichert — beliebig häufige Re-Imports, bereits erfasste Zeilen werden übersprungen.
 
 **Manuelle Buchungen:**
 - Einzelne Einnahmen oder Ausgaben mit Datum, Betrag, Kategorie und Beschreibung erfassen (z.B. Kegelabend-Unkosten, Sondereinnahmen)
@@ -589,7 +750,67 @@ Nicht berechtigte Sektionen werden ausgeblendet, nicht nur gesperrt — Kassenwa
 
 ---
 
-## Phase 7 — Benachrichtigungen
+## Phase 7 — Abstimmungen & Umfragen
+
+**Ziel:** Clubentscheidungen direkt in der App treffen — ohne WhatsApp-Runden.
+
+### Features
+
+- **Abstimmung erstellen** (Admin & Präsident): Frage + 2–6 Antwortoptionen, optionale Beschreibung
+- **Abstimmungstypen:**
+  - Einfache Auswahl (eine Option wählbar)
+  - Mehrfachauswahl (mehrere Optionen wählbar, konfigurierbare Max-Anzahl)
+  - Ja / Nein / Enthaltung (Sonderfall für formelle Beschlüsse)
+- **Sichtbarkeit der Zwischenstände:** Konfigurierbar — offen (alle sehen Ergebnisse sofort) oder verdeckt (erst nach Ablauf der Frist sichtbar)
+- **Abstimmungsfrist:** Optional. Ohne Frist: offen bis Admin schließt. Mit Frist: automatisches Schließen via APScheduler
+- **Anonyme Abstimmung:** Optional pro Abstimmung konfigurierbar. Bei anonymer Abstimmung: nur Gesamtergebnis sichtbar, kein Rückschluss auf einzelne Stimmen möglich
+- **Abschluss:** Nach Ablauf/manuell → Ergebnis eingefroren → im Aktivitätslog sichtbar mit Endstand
+- **E-Mail-Benachrichtigung** bei neuer Abstimmung (neuer Benachrichtigungstyp `new_poll`) und Erinnerung vor Fristende
+
+### Datenmodell
+
+**Container: `polls`**
+```json
+{
+  "id": "uuid",
+  "group_id": "...",
+  "title": "Monatsbeitrag auf 6€ erhöhen?",
+  "description": "Optionaler Erklärungstext",
+  "type": "single_choice|multi_choice|yes_no",
+  "max_choices": 1,
+  "options": [
+    { "id": "opt_1", "label": "Ja" },
+    { "id": "opt_2", "label": "Nein" },
+    { "id": "opt_3", "label": "Enthaltung" }
+  ],
+  "anonymous": false,
+  "results_visible_before_close": true,
+  "deadline": "iso8601",
+  "closed": false,
+  "closed_at": "iso8601",
+  "created_by": "user_id",
+  "created_at": "iso8601",
+  "votes": [
+    {
+      "user_id": "...",
+      "option_ids": ["opt_1"],
+      "voted_at": "iso8601"
+    }
+  ]
+}
+```
+
+> Bei `anonymous: true` werden `user_id`-Einträge in `votes` nicht über die API zurückgegeben — nur Gesamtzählungen je Option. Das `user_id`-Feld bleibt serverseitig gespeichert, um Doppelabstimmungen zu verhindern.
+
+### UI-Screens
+- `/group/{id}/polls` — Übersicht aller offenen und abgeschlossenen Abstimmungen
+- `/group/{id}/polls/new` — Neue Abstimmung erstellen
+- `/group/{id}/polls/{pid}` — Abstimmung ansehen & abstimmen
+- Ergebnis-Visualisierung: horizontale Balkendiagramme (reines CSS, kein Chart.js-Overhead)
+
+---
+
+## Phase 8 — Benachrichtigungen *(vormals Phase 7)*
 
 **Ziel:** E-Mail-Benachrichtigungen mit Opt-in-Kontrolle für alle relevanten Ereignisse.
 
@@ -608,6 +829,9 @@ Nicht berechtigte Sektionen werden ausgeblendet, nicht nur gesperrt — Kassenwa
 | `late_rsvp_kassenwart` | Mitglied hat nach Deadline abgesagt | Kassenwart & Admin |
 | `payment_received` | Zahlung wurde dem Mitglied zugeordnet und Schulden abgehakt | Betroffenes Mitglied |
 | `late_payment_fee` | Verspätungsstrafe automatisch gebucht (Zahlungsfrist überschritten) | Betroffenes Mitglied + Kassenwart |
+| `new_poll` | Neue Abstimmung wurde erstellt | Alle Mitglieder |
+| `poll_closing_soon` | Abstimmungsfrist läuft in 24h ab | Mitglieder, die noch nicht abgestimmt haben |
+| `poll_closed` | Abstimmung abgeschlossen, Ergebnis steht fest | Alle Mitglieder |
 
 ### Implementierung
 - SendGrid (Free Tier, Single Sender Verification)
@@ -617,7 +841,7 @@ Nicht berechtigte Sektionen werden ausgeblendet, nicht nur gesperrt — Kassenwa
 
 ---
 
-## Phase 8 — Feinschliff, Sicherheit & Deployment
+## Phase 9 — Feinschliff, Sicherheit & Deployment *(vormals Phase 8)*
 
 **Ziel:** Production-ready, sicher, performant.
 
@@ -650,14 +874,48 @@ Nicht berechtigte Sektionen werden ausgeblendet, nicht nur gesperrt — Kassenwa
 
 ```
 Phase 1  →  Grundgerüst, Datenmodell, Azure-Setup
-Phase 2  →  Auth + Gruppen (Login-Schutz für alles Weitere; Präsident-Rolle)
+Phase 2  →  Auth + Gruppen (Login-Schutz; Multi-Club-Unterstützung; Setup-Wizard)
 Phase 3  →  Strafenkatalog, Beiträge & Vereinsregelwerk (Voraussetzung für Termin-Erfassung)
 Phase 4  →  Kegeltermin erfassen + Gastkegler (Kernfunktion)
 Phase 5  →  Kegelkalender & Event-Management (RSVP, Absagefristen)
-Phase 6  →  Schulden, Dashboard & Gamification (sichtbares Ergebnis + Awards)
-Phase 7  →  Benachrichtigungen (Enhancement; kalenderbedingte Typen jetzt vollständig)
-Phase 8  →  Hardening, Tests, CI/CD
+Phase 6  →  Schulden, Dashboard & Gamification (sichtbares Ergebnis + Awards + CSV-Import)
+Phase 7  →  Abstimmungen & Umfragen
+Phase 8  →  Benachrichtigungen (alle Typen inkl. Poll-Notifications vollständig)
+Phase 9  →  Hardening, Tests, CI/CD
 ```
+
+---
+
+## Ideen & mögliche Erweiterungen
+
+Folgende Features sind nicht im initialen Scope, wären aber sinnvolle Ergänzungen:
+
+### Hoher Mehrwert, relativ einfach umzusetzen
+
+| Feature | Beschreibung |
+|---|---|
+| **PWA (Progressive Web App)** | `manifest.json` + Service Worker → App auf Homescreen installierbar; Schulden-Ansicht und Kalender offline verfügbar |
+| **QR-Code für Einladungslink** | QR-Code als SVG serverseitig generieren (`qrcode`-Library) — beim nächsten Treffen vorzeigen, fertig |
+| **Jahresabschluss-PDF** | Kassenwart exportiert Jahresbericht: Kassenstand-Verlauf, Buchungsübersicht, Top-Strafen, Anwesenheitsstatistik (`WeasyPrint` oder `ReportLab`) |
+| **Bulk-Einladung per CSV** | Admin lädt CSV mit E-Mail-Adressen hoch — mehrere Mitglieder auf einmal einladen |
+
+### Mittlerer Aufwand, hoher Club-Nutzen
+
+| Feature | Beschreibung |
+|---|---|
+| **Event-Fotos** | Fotos pro Kalender-Event (Azure Blob Storage, max. 10 Bilder, automatische Größenoptimierung) |
+| **Dark/Light Mode Toggle** | CSS-Custom-Properties + `prefers-color-scheme`-Fallback; Light Mode: helles Holz-Beige, gleiche Amber-Akzente |
+| **Digitaler Mitgliedsausweis** | Profilseite zeigt „Ausweis" mit Vereinsname, Avatar, Beitrittsdate, aktuellen Titeln — als Screenshot teilbar |
+
+### Größerer Aufwand, hoher Langzeit-Nutzen
+
+| Feature | Beschreibung |
+|---|---|
+| **Push-Benachrichtigungen (Web Push)** | Browser-Push via `pywebpush` — Echtzeit-Alerts ohne E-Mail |
+| **Kommentarfunktion** | Kurze Kommentare unter Sessions und Events (max. 500 Zeichen, kein vollständiger Chat) |
+| **Budget-Planung für Events** | Kassenwart definiert Budget pro Event — Ausgaben dagegen buchen, Fortschrittsbalken |
+| **Offene Vereinsseite** | Öffentliche Landingpage mit Vereinsname, Spieltag, Beitreten-Button |
+| **Multi-Bank CSV-Import** | DKB- und ING-Format zusätzlich unterstützen; Bank-Erkennung per Header-Analyse |
 
 ---
 

@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}{{ group_name }} — Kegelkasse{% endblock %}
+
+{% block content %}
+<!-- Hero Banner -->
+<div class="hero" style="background: linear-gradient(135deg, #0D0D0F 0%, #1a120a 60%, #0D0D0F 100%);">
+    <div class="hero__overlay"></div>
+    <div class="hero__content">
+        <h1 style="font-family: 'Syne', sans-serif; font-size: 1.5rem; margin: 0 0 0.125rem;">{{ group_name }}</h1>
+        <p style="color: var(--color-text-secondary); font-size: 0.75rem; margin: 0;">{{ member_count }} Mitglieder · {{ role }}</p>
+    </div>
+</div>
+
+<!-- Setup wizard banner -->
+{% if group.setup_step and group.setup_step > 0 %}
+<div style="background: rgba(224,128,32,0.08); border-left: 3px solid var(--color-accent); padding: 1rem 1.5rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem;">
+    <div>
+        <div style="font-weight: 600; font-size: 0.875rem; margin-bottom: 0.125rem;">Einrichtung fortsetzen</div>
+        <div class="text-secondary" style="font-size: 0.75rem;">Schritt {{ group.setup_step }} von 6</div>
+    </div>
+    <a href="/groups/setup/{{ group.setup_step }}?group_id={{ group_id }}" class="btn btn-primary" style="font-size: 0.75rem; padding: 0.5rem 1rem; min-height: auto;">Weiter →</a>
+</div>
+{% endif %}
+
+<div style="padding: 1.5rem; max-width: 1000px;">
+    <!-- Quick stats -->
+    <div class="grid grid-cols-3 gap-4" style="margin-bottom: 2rem;">
+        <div class="card card--accent">
+            <div class="text-secondary" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Meine Schulden</div>
+            <div class="font-mono text-danger" style="font-size: 1.5rem; font-weight: 600;">0,00 €</div>
+        </div>
+        <div class="card">
+            <div class="text-secondary" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Nächster Termin</div>
+            <div style="font-size: 0.875rem; font-weight: 600;">—</div>
+        </div>
+        <div class="card">
+            <div class="text-secondary" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Vereinskasse</div>
+            <div class="font-mono" style="font-size: 1rem; font-weight: 600;">
+                {{ '%.2f' | format(group.treasury.opening_balance | default(0)) }} €
+            </div>
+        </div>
+    </div>
+
+    <!-- Placeholder activity feed -->
+    <h2 style="font-size: 1rem; font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1rem;">Aktivitäten</h2>
+    <div class="card" style="padding: 2rem; text-align: center;">
+        <div style="font-size: 2rem; margin-bottom: 0.75rem;">🎳</div>
+        <p class="text-secondary" style="font-size: 0.875rem; margin: 0;">Noch keine Aktivitäten — starte den ersten Kegelabend!</p>
+    </div>
+</div>
+{% endblock %}

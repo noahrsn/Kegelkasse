@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Registrieren — Kegelkasse{% endblock %}
+
+{% block body %}
+<div class="split-layout">
+    <div class="split-layout__image" style="background: linear-gradient(135deg, #0D0D0F 0%, #1a120a 50%, #0D0D0F 100%);">
+        <div class="split-layout__image-overlay">
+            <div style="text-align: center; padding: 2rem;">
+                <div style="font-size: 4rem; margin-bottom: 1rem;">🎳</div>
+                <h1 style="font-family: 'Syne', sans-serif; font-size: 2rem; color: #E08020; margin: 0 0 0.5rem;">Kegelkasse</h1>
+                <p style="color: #8A8880; margin: 0;">Dein Kegelclub. Digital.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="split-layout__form">
+        <div style="width: 100%; max-width: 400px;">
+            <h2 style="font-family: 'Syne', sans-serif; font-size: 1.5rem; margin-bottom: 0.25rem;">Konto erstellen</h2>
+            <p class="text-secondary" style="margin-bottom: 2rem; font-size: 0.875rem;">Kostenlos registrieren und deinen Club verwalten.</p>
+
+            {% if error %}
+            <div class="badge badge--danger" style="display: block; padding: 0.75rem 1rem; border-radius: 8px; margin-bottom: 1.5rem; font-size: 0.875rem;">
+                {{ error }}
+            </div>
+            {% endif %}
+
+            <form method="post" action="/register" style="display: flex; flex-direction: column; gap: 1.25rem;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div>
+                        <label for="first_name">Vorname</label>
+                        <input class="input" type="text" id="first_name" name="first_name" placeholder="Max" required autocomplete="given-name">
+                    </div>
+                    <div>
+                        <label for="last_name">Nachname</label>
+                        <input class="input" type="text" id="last_name" name="last_name" placeholder="Mustermann" required autocomplete="family-name">
+                    </div>
+                </div>
+                <div>
+                    <label for="email">E-Mail</label>
+                    <input class="input" type="email" id="email" name="email" placeholder="deine@email.de" required autocomplete="email">
+                </div>
+                <div>
+                    <label for="password">Passwort</label>
+                    <input class="input" type="password" id="password" name="password" placeholder="Mindestens 8 Zeichen" required autocomplete="new-password" minlength="8">
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">Konto erstellen</button>
+            </form>
+
+            <p style="text-align: center; margin-top: 1.5rem; font-size: 0.875rem; color: var(--color-text-secondary);">
+                Bereits registriert?
+                <a href="/login" style="color: var(--color-accent); text-decoration: none; font-weight: 600;">Anmelden</a>
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

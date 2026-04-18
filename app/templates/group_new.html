@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Neuen Club erstellen — Kegelkasse{% endblock %}
+
+{% block body %}
+<div style="min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem; background: var(--color-bg);">
+    <div style="width: 100%; max-width: 440px;">
+        <div style="text-align: center; margin-bottom: 2rem;">
+            <div style="font-size: 2.5rem; margin-bottom: 0.75rem;">🎳</div>
+            <h1 style="font-family: 'Syne', sans-serif; font-size: 1.5rem; margin-bottom: 0.25rem;">Neuen Club erstellen</h1>
+            <p class="text-secondary" style="font-size: 0.875rem;">Du wirst automatisch zum Admin ernannt.</p>
+        </div>
+
+        {% if error %}
+        <div class="badge badge--danger" style="display: block; padding: 0.75rem 1rem; border-radius: 8px; margin-bottom: 1.5rem; font-size: 0.875rem;">
+            {{ error }}
+        </div>
+        {% endif %}
+
+        <form method="post" action="/groups/new" style="display: flex; flex-direction: column; gap: 1.25rem;">
+            <div>
+                <label for="name">Clubname</label>
+                <input class="input" type="text" id="name" name="name" placeholder="z.B. Kegelclub Adler 1984" required autofocus>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width: 100%;">Club erstellen & Einrichtung starten</button>
+        </form>
+
+        <p style="text-align: center; margin-top: 1.5rem; font-size: 0.875rem; color: var(--color-text-secondary);">
+            <a href="/dashboard" style="color: var(--color-accent); text-decoration: none; font-weight: 600;">← Zurück</a>
+        </p>
+    </div>
+</div>
+{% endblock %}

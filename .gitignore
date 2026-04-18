@@ -54,4 +54,4 @@ logs/
 local.settings.json
 
 # Tailwind (generated output, not source)
-static/css/output.css
+app/static/css/output.css

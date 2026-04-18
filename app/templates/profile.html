@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Profil — Kegelkasse{% endblock %}
+
+{% block body %}
+<div style="min-height: 100vh; background: var(--color-bg); padding: 2rem 1rem;">
+    <div style="max-width: 480px; margin: 0 auto;">
+        <div style="text-align: center; margin-bottom: 2.5rem;">
+            <div style="width: 80px; height: 80px; border-radius: 50%; background: var(--color-accent-muted); display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; font-size: 2rem;">
+                {{ user.first_name[0] | upper }}
+            </div>
+            <h1 style="font-family: 'Syne', sans-serif; font-size: 1.5rem; margin-bottom: 0.125rem;">{{ user.first_name }} {{ user.last_name }}</h1>
+            <p class="text-secondary" style="font-size: 0.875rem;">{{ user.email }}</p>
+        </div>
+
+        {% set success = request.query_params.get('success') %}
+        {% if success == 'saved' %}
+        <div class="badge badge--success" style="display: block; padding: 0.75rem 1rem; border-radius: 8px; margin-bottom: 1.5rem; font-size: 0.875rem;">
+            Profil gespeichert.
+        </div>
+        {% endif %}
+
+        <div class="card" style="padding: 1.5rem; margin-bottom: 1.5rem;">
+            <h2 style="font-size: 1rem; font-family: 'Syne', sans-serif; margin-bottom: 1.25rem;">Profil bearbeiten</h2>
+            <form method="post" action="/profile" style="display: flex; flex-direction: column; gap: 1.25rem;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div>
+                        <label>Vorname</label>
+                        <input class="input" type="text" name="first_name" value="{{ user.first_name }}" required>
+                    </div>
+                    <div>
+                        <label>Nachname</label>
+                        <input class="input" type="text" name="last_name" value="{{ user.last_name }}" required>
+                    </div>
+                </div>
+                <div>
+                    <label>E-Mail</label>
+                    <input class="input" type="email" value="{{ user.email }}" disabled style="opacity: 0.5; cursor: not-allowed;">
+                </div>
+                <button type="submit" class="btn btn-primary" style="align-self: flex-start;">Speichern</button>
+            </form>
+        </div>
+
+        {% if user.group_ids %}
+        <div class="card" style="padding: 1.5rem; margin-bottom: 1.5rem;">
+            <h2 style="font-size: 1rem; font-family: 'Syne', sans-serif; margin-bottom: 1rem;">Meine Clubs</h2>
+            <a href="/dashboard" class="btn btn-secondary" style="font-size: 0.875rem;">Alle Clubs anzeigen →</a>
+        </div>
+        {% endif %}
+
+        <div style="text-align: center;">
+            <form method="post" action="/logout">
+                <button type="submit" class="btn btn-danger" style="width: 100%;">Abmelden</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
