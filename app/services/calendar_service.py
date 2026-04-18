@@ -26,6 +26,53 @@ def nth_weekday_of_month(year: int, month: int, weekday: int, nth: int) -> date:
     return first_occurrence + timedelta(weeks=nth - 1)
 
 
+def next_occurrence(event_doc: dict, after) -> Optional[date]:
+    """Return the next occurrence date for a recurring event document (dict form).
+
+    `after` can be a date or datetime.
+    Used by scheduler_service to compute due dates without constructing a full Event model.
+    """
+    from datetime import datetime as _dt
+
+    after_date: date = after.date() if isinstance(after, _dt) else after
+    rec = event_doc.get("recurrence")
+    if not rec:
+        return None
+    pattern = rec.get("pattern")
+    weekday = rec.get("weekday", 0)
+    nth = rec.get("nth")
+    until_str = rec.get("until")
+    until_date = None
+    if until_str:
+        try:
+            until_date = _dt.fromisoformat(until_str.replace("Z", "+00:00")).date()
+        except Exception:
+            pass
+
+    if pattern == "monthly_nth_weekday" and nth is not None:
+        year, month = after_date.year, after_date.month
+        for _ in range(13):
+            candidate = nth_weekday_of_month(year, month, weekday, nth)
+            if candidate > after_date:
+                if until_date and candidate > until_date:
+                    return None
+                return candidate
+            month += 1
+            if month > 12:
+                month = 1
+                year += 1
+        return None
+
+    if pattern == "weekly":
+        days_ahead = (weekday - after_date.weekday()) % 7 or 7
+        candidate = after_date + timedelta(days=days_ahead)
+        if until_date and candidate > until_date:
+            return None
+        return candidate
+
+    return None
+
+
 def next_recurring_date(event: Event, after: date) -> Optional[date]:
     """Calculate the next occurrence of a recurring event after a given date."""
     if not event.recurrence:

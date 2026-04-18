@@ -35,11 +35,18 @@ class CosmosDB:
 
     def __init__(self) -> None:
         settings = get_settings()
-        self._client = CosmosClient(settings.cosmos_endpoint, settings.cosmos_key)
-        self._db: DatabaseProxy = self._client.get_database_client(
-            settings.cosmos_database
-        )
+        self._endpoint = settings.cosmos_endpoint
+        self._key = settings.cosmos_key
+        self._database_name = settings.cosmos_database
+        # Lazy: client/db created on first actual operation
+        self._client: Optional[CosmosClient] = None
+        self._db: Optional[DatabaseProxy] = None
         self._containers: dict[str, ContainerProxy] = {}
+
+    def _ensure_client(self) -> None:
+        if self._client is None:
+            self._client = CosmosClient(self._endpoint, self._key)
+            self._db = self._client.get_database_client(self._database_name)
 
     @classmethod
     def get(cls) -> CosmosDB:
@@ -54,7 +61,8 @@ class CosmosDB:
 
     def ensure_containers(self) -> None:
         """Create database and containers if they don't exist yet."""
-        self._client.create_database_if_not_exists(get_settings().cosmos_database)
+        self._ensure_client()
+        self._client.create_database_if_not_exists(self._database_name)
         for name, pk_path in CONTAINERS.items():
             self._db.create_container_if_not_exists(
                 id=name,
@@ -62,6 +70,7 @@ class CosmosDB:
             )
 
     def container(self, name: str) -> ContainerProxy:
+        self._ensure_client()
         if name not in self._containers:
             self._containers[name] = self._db.get_container_client(name)
         return self._containers[name]

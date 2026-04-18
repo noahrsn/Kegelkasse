@@ -464,9 +464,19 @@ async def update_settings(
         group_doc["payment_info"]["paypal"] = str(form.get("paypal", "")).strip()
         group_doc.setdefault("treasury", {})
         try:
+            group_doc["treasury"]["opening_balance"] = float(str(form.get("opening_balance", "0")).replace(",", "."))
+        except ValueError:
+            pass
+        try:
             group_doc["treasury"]["late_payment_fee"] = float(str(form.get("late_payment_fee", "2")).replace(",", "."))
         except ValueError:
             pass
+        deadline_type = str(form.get("deadline_type", "days_before_next_event"))
+        try:
+            deadline_days = int(form.get("deadline_days", 2))
+        except ValueError:
+            deadline_days = 2
+        group_doc["treasury"]["payment_deadline"] = {"type": deadline_type, "days": deadline_days}
         db.upsert_item("groups", group_doc)
 
     elif section == "catalog" and role in (Role.admin, Role.kassenwart):
