@@ -38,8 +38,8 @@
         }
     </script>
 
-    <!-- Custom CSS -->
-    <link rel="stylesheet" href="{{ url_for('static', path='css/style.css') }}">
+    <!-- Custom CSS (relative path to avoid mixed-content issues behind proxies) -->
+    <link rel="stylesheet" href="/static/css/style.css">
 
     <!-- HTMX -->
     <script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
@@ -142,8 +142,8 @@
     </main>
     {% endblock %}
 
-    <!-- App JS -->
-    <script src="{{ url_for('static', path='js/app.js') }}"></script>
+    <!-- App JS (relative path to avoid mixed-content issues behind proxies) -->
+    <script src="/static/js/app.js"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

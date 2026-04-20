@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -90,11 +91,11 @@ app = FastAPI(
 async def not_authenticated_handler(request, exc):
     return RedirectResponse("/login", status_code=302)
 
-# Static files
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
+# Static files + templates (use absolute paths so it works on Azure regardless of cwd)
+_BASE_DIR = Path(__file__).resolve().parent
+app.mount("/static", StaticFiles(directory=str(_BASE_DIR / "static")), name="static")
 
-# Jinja2 templates
-templates = Jinja2Templates(directory="app/templates")
+templates = Jinja2Templates(directory=str(_BASE_DIR / "templates"))
 
 # Register routers
 app.include_router(auth.router)
