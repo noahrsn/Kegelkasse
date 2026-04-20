@@ -241,6 +241,36 @@ async def new_session_page(
         for m in group_doc.get("members", [])
     ]
 
+    # Upcoming unlinked events for optional session–event linking
+    all_events = db.query_items(
+        "events",
+        "SELECT * FROM c WHERE c.group_id = @gid",
+        parameters=[{"name": "@gid", "value": group_id}],
+        partition_key=group_id,
+    )
+    from datetime import timedelta
+    from app.services.calendar_service import next_occurrence as _next_occ
+    today_d = datetime.now(tz=UTC).date()
+    upcoming_events = []
+    for ev in all_events:
+        if ev.get("linked_session_id"):
+            continue
+        etype = ev.get("type", "single")
+        start_str = ev.get("start_date", "")
+        try:
+            start_d = datetime.fromisoformat(start_str.replace("Z", "+00:00")).date()
+        except Exception:
+            continue
+        if etype == "recurring":
+            occ = _next_occ(ev, today_d - timedelta(days=1))
+            if occ and occ <= today_d + timedelta(days=60):
+                ev["_date_display"] = occ.strftime("%d.%m.%Y")
+                upcoming_events.append(ev)
+        elif today_d - timedelta(days=1) <= start_d <= today_d + timedelta(days=60):
+            ev["_date_display"] = start_d.strftime("%d.%m.%Y")
+            upcoming_events.append(ev)
+    upcoming_events.sort(key=lambda e: e.get("_date_display", ""))
+
     return _render(
         request, "session_new.html",
         group_id=group_id,
@@ -249,6 +279,7 @@ async def new_session_page(
         today=today,
         active="session",
         role=_user_role(group_doc, current_user.id),
+        upcoming_events=upcoming_events,
     )
 
 
@@ -256,6 +287,7 @@ async def new_session_page(
 async def create_session(
     group_id: str,
     session_date: str = Form(...),
+    event_id: Optional[str] = Form(None),
     current_user: User = Depends(require_auth),
     db: CosmosDB = Depends(get_db),
 ):
@@ -272,14 +304,23 @@ async def create_session(
         SessionEntry(user_id=m["user_id"]).model_dump(mode="json")
         for m in group_doc.get("members", [])
     ]
+    linked_event_id = event_id if event_id else None
     session = Session(
         group_id=group_id,
+        event_id=linked_event_id,
         date=date_parsed,
         status=SessionStatus.draft,
         recorded_by=current_user.id,
         entries=entries,
     )
     db.upsert_item("sessions", session.model_dump(mode="json"))
+
+    if linked_event_id:
+        event_doc = db.read_item("events", linked_event_id, group_id)
+        if event_doc and event_doc.get("group_id") == group_id:
+            event_doc["linked_session_id"] = session.id
+            db.upsert_item("events", event_doc)
+
     return RedirectResponse(f"/group/{group_id}/sessions/{session.id}", status_code=302)
 
 

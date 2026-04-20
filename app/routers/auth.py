@@ -239,8 +239,32 @@ async def logout():
 # ── Profile ───────────────────────────────────────────────────────────────────
 
 @router.get("/profile")
-async def profile_page(request: Request, current_user: User = Depends(require_auth)):
-    return _render(request, "profile.html", user=current_user)
+async def profile_page(
+    request: Request,
+    current_user: User = Depends(require_auth),
+    db: CosmosDB = Depends(get_db),
+):
+    from datetime import UTC, datetime
+    now = datetime.now(UTC)
+    current_month = now.strftime("%Y-%m")
+
+    # Collect active awards across all groups for the current user
+    active_awards: list[dict] = []
+    for gid in current_user.group_ids:
+        group_doc = db.read_item("groups", gid, gid)
+        group_name = group_doc.get("name", gid) if group_doc else gid
+        award_docs = db.query_items(
+            "awards",
+            "SELECT * FROM c WHERE c.group_id = @gid AND c.period_ref = @ref",
+            parameters=[{"name": "@gid", "value": gid}, {"name": "@ref", "value": current_month}],
+            partition_key=gid,
+        )
+        for doc in award_docs:
+            for ae in doc.get("awards", []):
+                if ae.get("user_id") == current_user.id:
+                    active_awards.append({**ae, "group_name": group_name})
+
+    return _render(request, "profile.html", user=current_user, active_awards=active_awards)
 
 
 @router.post("/profile")

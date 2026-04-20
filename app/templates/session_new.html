@@ -42,6 +42,19 @@
             </div>
         </div>
 
+        {% if upcoming_events %}
+        <div class="card" style="margin-bottom: 1.5rem;">
+            <h2 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.375rem;">Kalender-Event verknüpfen</h2>
+            <p class="text-secondary" style="font-size: 0.8125rem; margin: 0 0 1rem;">Optional: diesen Kegelabend mit einem geplanten Termin verknüpfen.</p>
+            <select class="input" name="event_id">
+                <option value="">— Kein Event verknüpfen —</option>
+                {% for ev in upcoming_events %}
+                <option value="{{ ev.id }}">{{ ev._date_display }} — {{ ev.title }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+
         <div style="display: flex; gap: 1rem;">
             <a href="/group/{{ group_id }}/dashboard" class="btn btn-secondary" style="flex: 1; text-align: center;">Abbrechen</a>
             <button type="submit" class="btn btn-primary" style="flex: 2;">🎳 Kegelabend starten</button>

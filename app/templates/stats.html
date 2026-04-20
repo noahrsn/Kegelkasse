@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block title %}Statistiken — {{ group_name }}{% endblock %}
+
+{% block content %}
+<div class="hero" style="background: linear-gradient(135deg, #0D0D0F 0%, #0a0a1a 60%, #0D0D0F 100%);">
+    <div class="hero__overlay"></div>
+    <div class="hero__content">
+        <h1 style="font-family: 'Syne', sans-serif; font-size: 1.5rem; margin: 0 0 0.25rem;">Statistiken & Awards</h1>
+        <p style="color: var(--color-text-secondary); font-size: 0.75rem; margin: 0;">{{ group_name }} · {{ month_session_count }} Abend{{ 'e' if month_session_count != 1 else '' }} diesen Monat · {{ session_count }} gesamt</p>
+    </div>
+</div>
+
+<div style="padding: 1.5rem; max-width: 900px;">
+
+    <div style="display: flex; gap: 0.75rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+        <a href="/group/{{ group_id }}/stats/alltime" class="btn btn-secondary" style="font-size: 0.875rem;">🏆 Ewige Tabelle</a>
+    </div>
+
+    <!-- Current month awards -->
+    <h2 style="font-size: 0.875rem; font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1rem;">Awards — {{ current_month }}</h2>
+
+    {% set awards = saved_award_entries if saved_award_entries else month_award_entries %}
+    {% if awards %}
+    <div class="grid grid-cols-3 gap-4" style="margin-bottom: 2rem;">
+        {% for award in awards[:6] %}
+        <div class="card" style="padding: 1.25rem; text-align: center;">
+            <div style="font-size: 2rem; margin-bottom: 0.5rem;">
+                {% if award.type == 'pudelkoenig' %}🎳
+                {% elif award.type == 'goldesel' %}🤑
+                {% elif award.type == 'streber' %}📚
+                {% elif award.type == 'eisenmann' %}💪
+                {% elif award.type == 'spaetzuender' %}⏰
+                {% else %}🏆{% endif %}
+            </div>
+            <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-accent); margin-bottom: 0.375rem;">
+                {% if award.type == 'pudelkoenig' %}Pudelkönig
+                {% elif award.type == 'goldesel' %}Goldesel
+                {% elif award.type == 'streber' %}Streber
+                {% elif award.type == 'eisenmann' %}Eisenmann
+                {% elif award.type == 'spaetzuender' %}Spätzünder
+                {% else %}{{ award.type }}{% endif %}
+            </div>
+            <div style="font-weight: 600; font-size: 0.9375rem;">{{ award.user_name }}</div>
+            <div class="text-secondary" style="font-size: 0.75rem; margin-top: 0.25rem;">{{ award.label }}</div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="card" style="padding: 2rem; text-align: center; margin-bottom: 2rem;">
+        <p class="text-secondary" style="font-size: 0.875rem; margin: 0;">Noch keine genehmigten Kegelabende diesen Monat.</p>
+    </div>
+    {% endif %}
+
+    <!-- Top this month -->
+    {% if top_this_month %}
+    <h2 style="font-size: 0.875rem; font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1rem;">Höchste Strafen diesen Monat</h2>
+    <div class="card" style="padding: 0; overflow: hidden; margin-bottom: 2rem;">
+        {% for item in top_this_month %}
+        <div style="padding: 0.875rem 1.25rem; border-bottom: 1px solid var(--color-border); display: flex; align-items: center; justify-content: space-between; gap: 1rem; {% if loop.last %}border-bottom: none;{% endif %}">
+            <div style="display: flex; align-items: center; gap: 0.875rem;">
+                <div style="width: 28px; height: 28px; border-radius: 50%; background: var(--color-accent-muted); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; color: var(--color-accent);">{{ loop.index }}</div>
+                <span style="font-size: 0.9375rem;">{{ item.name }}</span>
+            </div>
+            <div class="font-mono text-danger" style="font-size: 1rem; font-weight: 600;">{{ '%.2f'|format(item.amount) }} €</div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Monthly trend -->
+    {% if monthly_totals %}
+    <h2 style="font-size: 0.875rem; font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1rem;">Strafenentwicklung (letzte 6 Monate)</h2>
+    <div class="card" style="padding: 1.25rem; margin-bottom: 2rem;">
+        {% set max_total = monthly_totals | map(attribute='total') | max %}
+        {% for item in monthly_totals %}
+        <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem; {% if loop.last %}margin-bottom: 0;{% endif %}">
+            <div class="font-mono text-secondary" style="font-size: 0.75rem; width: 55px; flex-shrink: 0;">{{ item.month }}</div>
+            <div style="flex: 1; background: var(--color-surface-elevated); border-radius: 4px; height: 20px; overflow: hidden;">
+                <div style="height: 100%; background: var(--color-accent); border-radius: 4px; width: {{ ((item.total / max_total) * 100) | int if max_total > 0 else 0 }}%; transition: width 0.3s;"></div>
+            </div>
+            <div class="font-mono" style="font-size: 0.8125rem; font-weight: 600; min-width: 70px; text-align: right;">{{ '%.2f'|format(item.total) }} €</div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Attendance -->
+    {% if attendance %}
+    <h2 style="font-size: 0.875rem; font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1rem;">Anwesenheitsraten</h2>
+    <div class="card" style="padding: 0; overflow: hidden;">
+        {% for row in attendance %}
+        <div style="padding: 0.875rem 1.25rem; border-bottom: 1px solid var(--color-border); display: flex; align-items: center; gap: 1rem; {% if loop.last %}border-bottom: none;{% endif %}">
+            <div style="flex: 1; min-width: 0;">
+                <div style="font-size: 0.875rem; font-weight: {% if row.is_me %}600{% else %}400{% endif %};">
+                    {{ row.name }}{% if row.is_me %} <span style="color: var(--color-accent); font-size: 0.75rem;">(Ich)</span>{% endif %}
+                </div>
+                <div class="text-secondary" style="font-size: 0.75rem;">{{ row.attended }} / {{ row.total }} Abende</div>
+            </div>
+            <div style="width: 120px;">
+                {% if row.rate is not none %}
+                <div style="background: var(--color-surface-elevated); border-radius: 4px; height: 8px; overflow: hidden; margin-bottom: 0.25rem;">
+                    <div style="height: 100%; background: {% if row.rate >= 80 %}var(--color-success){% elif row.rate >= 50 %}#d4a017{% else %}var(--color-danger){% endif %}; width: {{ row.rate }}%;"></div>
+                </div>
+                <div class="font-mono text-secondary" style="font-size: 0.75rem; text-align: right;">{{ row.rate }}%</div>
+                {% else %}
+                <div class="text-secondary" style="font-size: 0.75rem; text-align: right;">—</div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

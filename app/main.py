@@ -19,6 +19,7 @@ from app.routers import (
     auth,
     awards,
     calendar,
+    debts,
     groups,
     members,
     notifications,
@@ -104,6 +105,7 @@ app.include_router(members.router)
 app.include_router(penalties.router)
 app.include_router(sessions.router)
 app.include_router(calendar.router)
+app.include_router(debts.router)
 app.include_router(treasury.router)
 app.include_router(awards.router)
 app.include_router(rulebook.router)

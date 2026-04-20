@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}Ewige Tabelle — {{ group_name }}{% endblock %}
+
+{% block content %}
+<div class="hero" style="background: linear-gradient(135deg, #0D0D0F 0%, #0a0a1a 60%, #0D0D0F 100%);">
+    <div class="hero__overlay"></div>
+    <div class="hero__content">
+        <h1 style="font-family: 'Syne', sans-serif; font-size: 1.5rem; margin: 0 0 0.25rem;">Ewige Tabelle</h1>
+        <p style="color: var(--color-text-secondary); font-size: 0.75rem; margin: 0;">{{ group_name }} · {{ session_count }} genehmigte Abende gesamt</p>
+    </div>
+</div>
+
+<div style="padding: 1.5rem; max-width: 1000px;">
+
+    <div style="display: flex; gap: 0.75rem; margin-bottom: 1.5rem; flex-wrap: wrap; align-items: center;">
+        <a href="/group/{{ group_id }}/stats" class="btn btn-secondary" style="font-size: 0.875rem;">← Statistiken</a>
+        <span class="text-secondary" style="font-size: 0.875rem;">Sortieren:</span>
+        <a href="?sort=penalty_amount" class="btn {% if sort_by == 'penalty_amount' %}btn-primary{% else %}btn-secondary{% endif %}" style="font-size: 0.8125rem; padding: 0.375rem 0.875rem; min-height: auto;">Strafenbetrag</a>
+        <a href="?sort=penalty_count" class="btn {% if sort_by == 'penalty_count' %}btn-primary{% else %}btn-secondary{% endif %}" style="font-size: 0.8125rem; padding: 0.375rem 0.875rem; min-height: auto;">Strafenanzahl</a>
+        <a href="?sort=sessions_attended" class="btn {% if sort_by == 'sessions_attended' %}btn-primary{% else %}btn-secondary{% endif %}" style="font-size: 0.8125rem; padding: 0.375rem 0.875rem; min-height: auto;">Anwesenheit</a>
+        <a href="?sort=total_paid" class="btn {% if sort_by == 'total_paid' %}btn-primary{% else %}btn-secondary{% endif %}" style="font-size: 0.8125rem; padding: 0.375rem 0.875rem; min-height: auto;">Eingezahlt</a>
+    </div>
+
+    {% if rows %}
+    <div class="card" style="padding: 0; overflow: hidden;">
+        <div style="padding: 0.875rem 1.25rem; border-bottom: 1px solid var(--color-border); display: grid; grid-template-columns: 40px 1fr 100px 100px 100px 80px 80px; gap: 0.75rem; align-items: center;">
+            <div class="text-secondary" style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em;">#</div>
+            <div class="text-secondary" style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em;">Mitglied</div>
+            <div class="text-secondary" style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; text-align: right;">Strafen €</div>
+            <div class="text-secondary" style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; text-align: right;">Strafen Σ</div>
+            <div class="text-secondary" style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; text-align: right;">Anwesen.</div>
+            <div class="text-secondary" style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; text-align: right;">Quote</div>
+            <div class="text-secondary" style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; text-align: right;">Gezahlt</div>
+        </div>
+
+        {% for row in rows %}
+        <div style="padding: 0.875rem 1.25rem; border-bottom: 1px solid var(--color-border); display: grid; grid-template-columns: 40px 1fr 100px 100px 100px 80px 80px; gap: 0.75rem; align-items: center; {% if loop.last %}border-bottom: none;{% endif %}
+            {% if row.is_me %}background: rgba(224,128,32,0.05);{% endif %}">
+            <div class="font-mono text-secondary" style="font-size: 0.875rem;">{{ loop.index }}</div>
+            <div>
+                <span style="font-size: 0.9375rem; font-weight: {% if row.is_me %}600{% else %}400{% endif %};">
+                    {{ row.name }}{% if row.is_me %} <span style="color: var(--color-accent); font-size: 0.75rem;">(Ich)</span>{% endif %}
+                </span>
+                {% if row.late_arrivals > 0 %}
+                <span class="text-secondary" style="font-size: 0.75rem; margin-left: 0.5rem;">⏰ {{ row.late_arrivals }}×</span>
+                {% endif %}
+            </div>
+            <div class="font-mono text-danger" style="font-size: 0.9375rem; font-weight: 600; text-align: right;">{{ '%.2f'|format(row.penalty_amount) }} €</div>
+            <div class="font-mono" style="font-size: 0.9375rem; text-align: right;">{{ row.penalty_count }}</div>
+            <div class="font-mono text-secondary" style="font-size: 0.875rem; text-align: right;">{{ row.sessions_attended }} / {{ row.sessions_total }}</div>
+            <div class="font-mono" style="font-size: 0.875rem; text-align: right;
+                {% if row.attendance_rate is not none %}
+                    {% if row.attendance_rate >= 80 %}color: var(--color-success);
+                    {% elif row.attendance_rate >= 50 %}color: #d4a017;
+                    {% else %}color: var(--color-danger);{% endif %}
+                {% endif %}">
+                {% if row.attendance_rate is not none %}{{ row.attendance_rate }}%{% else %}—{% endif %}
+            </div>
+            <div class="font-mono text-success" style="font-size: 0.875rem; text-align: right;">{{ '%.2f'|format(row.total_paid) }} €</div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="card" style="padding: 2rem; text-align: center;">
+        <div style="font-size: 2rem; margin-bottom: 0.75rem;">🏆</div>
+        <p class="text-secondary" style="font-size: 0.875rem; margin: 0;">Noch keine Daten vorhanden.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

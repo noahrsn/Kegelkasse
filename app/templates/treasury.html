@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}Kassenbuch — {{ group_name }}{% endblock %}
+
+{% block content %}
+<div class="hero" style="background: linear-gradient(135deg, #0D0D0F 0%, #0a1610 60%, #0D0D0F 100%);">
+    <div class="hero__overlay"></div>
+    <div class="hero__content">
+        <h1 style="font-family: 'Syne', sans-serif; font-size: 1.5rem; margin: 0 0 0.25rem;">Kassenbuch</h1>
+        <p style="color: var(--color-text-secondary); font-size: 0.75rem; margin: 0;">{{ group_name }}</p>
+    </div>
+</div>
+
+{% if not has_import_this_month %}
+<div style="background: rgba(212,160,23,0.1); border-left: 3px solid #d4a017; padding: 1rem 1.5rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem;">
+    <div>
+        <div style="font-weight: 600; font-size: 0.875rem; color: #d4a017;">Kassenstand möglicherweise veraltet</div>
+        <div class="text-secondary" style="font-size: 0.75rem;">
+            {% if last_import_date %}Letzter Import: {{ last_import_date }}{% else %}Noch kein CSV-Import vorhanden{% endif %}
+        </div>
+    </div>
+    <a href="/group/{{ group_id }}/treasury/import" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.5rem 1rem; min-height: auto;">Importieren →</a>
+</div>
+{% endif %}
+
+{% if success == 'import' %}
+<div class="badge badge--success" style="display: block; padding: 0.75rem 1.5rem; font-size: 0.875rem;">CSV-Import erfolgreich.</div>
+{% elif success == 'tx' %}
+<div class="badge badge--success" style="display: block; padding: 0.75rem 1.5rem; font-size: 0.875rem;">Buchung wurde erfasst.</div>
+{% endif %}
+
+<div style="padding: 1.5rem; max-width: 1000px;">
+
+    <!-- Balance cards -->
+    <div class="grid grid-cols-3 gap-4" style="margin-bottom: 1.5rem;">
+        <div class="card card--accent">
+            <div class="text-secondary" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Kassenstand</div>
+            <div class="font-mono {% if balance >= 0 %}text-success{% else %}text-danger{% endif %}" style="font-size: 2rem; font-weight: 700;">{{ '%.2f'|format(balance) }} €</div>
+        </div>
+        <div class="card">
+            <div class="text-secondary" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Eröffnungssaldo</div>
+            <div class="font-mono" style="font-size: 1.25rem; font-weight: 600;">{{ '%.2f'|format(opening_balance) }} €</div>
+        </div>
+        <div class="card">
+            <div class="text-secondary" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Buchungen</div>
+            <div class="font-mono" style="font-size: 1.25rem; font-weight: 600;">{{ transactions | length }}</div>
+        </div>
+    </div>
+
+    <!-- Actions -->
+    <div style="display: flex; gap: 0.75rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+        <a href="/group/{{ group_id }}/treasury/import" class="btn btn-primary" style="font-size: 0.875rem;">📥 CSV importieren</a>
+        <a href="/group/{{ group_id }}/treasury/transactions/new" class="btn btn-secondary" style="font-size: 0.875rem;">➕ Manuelle Buchung</a>
+        <a href="/group/{{ group_id }}/debts/all" class="btn btn-secondary" style="font-size: 0.875rem;">💸 Schuldenübersicht</a>
+    </div>
+
+    <!-- Transaction list -->
+    <h2 style="font-size: 0.875rem; font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1rem;">Buchungen</h2>
+
+    {% if transactions %}
+    <div class="card" style="padding: 0; overflow: hidden;">
+        <div style="padding: 0.875rem 1.25rem; border-bottom: 1px solid var(--color-border); display: grid; grid-template-columns: 100px 1fr auto auto; gap: 1rem; align-items: center;">
+            <div class="text-secondary" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">Datum</div>
+            <div class="text-secondary" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">Beschreibung</div>
+            <div class="text-secondary" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; text-align: right;">Betrag</div>
+            <div class="text-secondary" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; text-align: right; min-width: 90px;">Saldo</div>
+        </div>
+
+        {% for tx in transactions %}
+        <div style="padding: 0.875rem 1.25rem; border-bottom: 1px solid var(--color-border); display: grid; grid-template-columns: 100px 1fr auto auto; gap: 1rem; align-items: center; {% if loop.last %}border-bottom: none;{% endif %}">
+            <div class="font-mono text-secondary" style="font-size: 0.8125rem;">
+                {% set d = tx.get('date', '')[:10] %}
+                {% if d %}{{ d[8:10] }}.{{ d[5:7] }}.{{ d[:4] }}{% endif %}
+            </div>
+            <div>
+                <div style="font-size: 0.875rem;">{{ tx.get('description', '') or tx.get('category', '') }}</div>
+                <div class="text-secondary" style="font-size: 0.75rem; display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.125rem;">
+                    <span>{{ tx.get('category', '').replace('_', ' ') }}</span>
+                    {% if tx.get('source') == 'csv_import' %}<span>· CSV-Import</span>{% endif %}
+                    {% if tx.get('matched_user_id') and user_names.get(tx.get('matched_user_id')) %}
+                    <span>· {{ user_names[tx.matched_user_id] }}</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="font-mono {% if tx.get('type') == 'income' %}text-success{% else %}text-danger{% endif %}" style="font-size: 0.9375rem; font-weight: 600; text-align: right; white-space: nowrap;">
+                {% if tx.get('type') == 'income' %}+{% else %}−{% endif %}{{ '%.2f'|format(tx.get('amount', 0)) }} €
+            </div>
+            <div class="font-mono text-secondary" style="font-size: 0.8125rem; text-align: right; min-width: 90px;">
+                {% if running_balances.get(tx['id']) is not none %}{{ '%.2f'|format(running_balances[tx['id']]) }} €{% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="card" style="padding: 2rem; text-align: center;">
+        <div style="font-size: 2rem; margin-bottom: 0.75rem;">📊</div>
+        <p class="text-secondary" style="font-size: 0.875rem; margin: 0 0 1rem;">Noch keine Buchungen vorhanden.</p>
+        <a href="/group/{{ group_id }}/treasury/import" class="btn btn-primary" style="font-size: 0.875rem;">CSV importieren</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

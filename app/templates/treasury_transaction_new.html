@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}Manuelle Buchung — {{ group_name }}{% endblock %}
+
+{% block content %}
+<div style="padding: 1.5rem; max-width: 600px;">
+
+    <div style="margin-bottom: 1.5rem;">
+        <a href="/group/{{ group_id }}/treasury" style="color: var(--color-text-secondary); text-decoration: none; font-size: 0.875rem;">← Kassenbuch</a>
+    </div>
+
+    <h1 style="font-family: 'Syne', sans-serif; font-size: 1.5rem; margin-bottom: 1.5rem;">Manuelle Buchung</h1>
+
+    {% if error %}
+    <div style="background: rgba(200,64,64,0.1); border-left: 3px solid var(--color-danger); padding: 0.875rem 1.25rem; border-radius: 6px; margin-bottom: 1.5rem; font-size: 0.875rem;">Bitte alle Pflichtfelder ausfüllen.</div>
+    {% endif %}
+
+    <div class="card" style="padding: 1.5rem;">
+        <form method="post" action="/group/{{ group_id }}/treasury/transactions/new" style="display: flex; flex-direction: column; gap: 1.25rem;" x-data="{ txType: 'income' }">
+
+            <div>
+                <label style="font-size: 0.875rem; font-weight: 500; display: block; margin-bottom: 0.5rem;">Typ</label>
+                <div style="display: flex; gap: 0.5rem;">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; padding: 0.625rem 1rem; border-radius: 8px; border: 1px solid var(--color-border); transition: all 0.15s;"
+                           :style="txType === 'income' ? 'border-color: var(--color-accent); background: rgba(224,128,32,0.08)' : ''">
+                        <input type="radio" name="tx_type" value="income" x-model="txType" style="accent-color: var(--color-accent);">
+                        <span style="font-size: 0.875rem;">Einnahme</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; padding: 0.625rem 1rem; border-radius: 8px; border: 1px solid var(--color-border); transition: all 0.15s;"
+                           :style="txType === 'expense' ? 'border-color: var(--color-danger); background: rgba(200,64,64,0.08)' : ''">
+                        <input type="radio" name="tx_type" value="expense" x-model="txType" style="accent-color: var(--color-danger);">
+                        <span style="font-size: 0.875rem;">Ausgabe</span>
+                    </label>
+                </div>
+            </div>
+
+            <div>
+                <label style="font-size: 0.875rem; font-weight: 500; display: block; margin-bottom: 0.5rem;">Datum</label>
+                <input class="input" type="date" name="date_str" value="{{ today | default('') }}" required style="max-width: 180px;">
+            </div>
+
+            <div>
+                <label style="font-size: 0.875rem; font-weight: 500; display: block; margin-bottom: 0.5rem;">Betrag (€)</label>
+                <input class="input" type="number" name="amount" step="0.01" min="0.01" required style="max-width: 140px;">
+            </div>
+
+            <div>
+                <label style="font-size: 0.875rem; font-weight: 500; display: block; margin-bottom: 0.5rem;">Beschreibung</label>
+                <input class="input" type="text" name="description" placeholder="z.B. Bahnmiete April, Überweisung Max Mustermann" required>
+            </div>
+
+            <div>
+                <label style="font-size: 0.875rem; font-weight: 500; display: block; margin-bottom: 0.5rem;">Kategorie</label>
+                <select class="input" name="category">
+                    <option value="member_payment">Mitgliedszahlung</option>
+                    <option value="event_expense">Event-Ausgabe</option>
+                    <option value="equipment_expense">Anschaffung</option>
+                    <option value="other_income">Sonstige Einnahme</option>
+                    <option value="other_expense">Sonstige Ausgabe</option>
+                    <option value="bank_interest">Kontozinsen</option>
+                </select>
+            </div>
+
+            <div x-show="txType === 'income'">
+                <label style="font-size: 0.875rem; font-weight: 500; display: block; margin-bottom: 0.5rem;">Mitglied (optional)</label>
+                <select class="input" name="matched_user_id">
+                    <option value="">— kein Mitglied zuordnen —</option>
+                    {% for member in all_members %}
+                    <option value="{{ member.user_id }}">{{ member.name }}</option>
+                    {% endfor %}
+                </select>
+                <div class="text-secondary" style="font-size: 0.75rem; margin-top: 0.25rem;">Wenn zugeordnet, werden Schulden automatisch abgehakt.</div>
+            </div>
+
+            <div style="display: flex; gap: 0.75rem;">
+                <button type="submit" class="btn btn-primary">Buchung speichern</button>
+                <a href="/group/{{ group_id }}/treasury" class="btn btn-secondary">Abbrechen</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

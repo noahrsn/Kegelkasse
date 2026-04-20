@@ -48,6 +48,25 @@
         </div>
         {% endif %}
 
+        {% if active_awards %}
+        <div class="card" style="padding: 1.5rem; margin-bottom: 1.5rem;">
+            <h2 style="font-size: 1rem; font-family: 'Syne', sans-serif; margin-bottom: 1rem;">🏆 Aktuelle Titel</h2>
+            <div style="display: flex; flex-wrap: wrap; gap: 0.625rem;">
+                {% for award in active_awards %}
+                <div style="background: rgba(224,128,32,0.1); border: 1px solid rgba(224,128,32,0.3); border-radius: 8px; padding: 0.5rem 0.875rem; font-size: 0.8125rem;">
+                    {% if award.type == 'pudelkoenig' %}🎳 Pudelkönig
+                    {% elif award.type == 'goldesel' %}🤑 Goldesel
+                    {% elif award.type == 'streber' %}📚 Streber
+                    {% elif award.type == 'eisenmann' %}💪 Eisenmann
+                    {% elif award.type == 'spaetzuender' %}⏰ Spätzünder
+                    {% else %}🏆 {{ award.type }}{% endif %}
+                    <span class="text-secondary" style="font-size: 0.75rem;">· {{ award.group_name }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
         <div style="text-align: center;">
             <form method="post" action="/logout">
                 <button type="submit" class="btn btn-danger" style="width: 100%;">Abmelden</button>

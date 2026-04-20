@@ -88,8 +88,14 @@
             <a href="/group/{{ group_id }}/rulebook" class="sidebar__link {% if active == 'rulebook' %}sidebar__link--active{% endif %}">
                 <span>📖</span> Regelwerk
             </a>
+            <a href="/group/{{ group_id }}/debts" class="sidebar__link {% if active == 'debts' %}sidebar__link--active{% endif %}">
+                <span>💸</span> Schulden
+            </a>
             <a href="/group/{{ group_id }}/treasury" class="sidebar__link {% if active == 'treasury' %}sidebar__link--active{% endif %}">
                 <span>💰</span> Kassenbuch
+            </a>
+            <a href="/group/{{ group_id }}/log" class="sidebar__link {% if active == 'log' %}sidebar__link--active{% endif %}">
+                <span>📋</span> Aktivitäten
             </a>
             <a href="/group/{{ group_id }}/settings" class="sidebar__link {% if active == 'settings' %}sidebar__link--active{% endif %}">
                 <span>⚙️</span> Einstellungen
@@ -124,13 +130,13 @@
             <a href="/group/{{ group_id }}/sessions/new" class="bottom-nav__fab">
                 <span class="text-2xl">🎳</span>
             </a>
-            <a href="/group/{{ group_id }}/polls" class="bottom-nav__item {% if active == 'polls' %}bottom-nav__item--active{% endif %}">
-                <span class="text-xl">📋</span>
-                <span>Abstimmung</span>
+            <a href="/group/{{ group_id }}/debts" class="bottom-nav__item {% if active == 'debts' %}bottom-nav__item--active{% endif %}">
+                <span class="text-xl">💸</span>
+                <span>Schulden</span>
             </a>
-            <a href="/group/{{ group_id }}/sessions/pending" class="bottom-nav__item {% if active == 'pending' %}bottom-nav__item--active{% endif %}">
-                <span class="text-xl">📥</span>
-                <span>Freigabe</span>
+            <a href="/group/{{ group_id }}/stats" class="bottom-nav__item {% if active == 'stats' %}bottom-nav__item--active{% endif %}">
+                <span class="text-xl">🏆</span>
+                <span>Stats</span>
             </a>
             {% endif %}
         </div>

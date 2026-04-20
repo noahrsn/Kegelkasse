@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}CSV importieren — {{ group_name }}{% endblock %}
+
+{% block content %}
+<div style="padding: 1.5rem; max-width: 700px;">
+
+    <div style="margin-bottom: 1.5rem;">
+        <a href="/group/{{ group_id }}/treasury" style="color: var(--color-text-secondary); text-decoration: none; font-size: 0.875rem;">← Kassenbuch</a>
+    </div>
+
+    <h1 style="font-family: 'Syne', sans-serif; font-size: 1.5rem; margin-bottom: 0.5rem;">CSV importieren</h1>
+    <p class="text-secondary" style="font-size: 0.875rem; margin-bottom: 1.5rem;">Sparkasse-Kontoauszug (CSV) hochladen. Bereits importierte Buchungen werden automatisch übersprungen.</p>
+
+    {% if error %}
+    <div style="background: rgba(200,64,64,0.1); border-left: 3px solid var(--color-danger); padding: 0.875rem 1.25rem; border-radius: 6px; margin-bottom: 1.5rem; font-size: 0.875rem;">
+        {% if error == 'empty' %}Die Datei ist leer.
+        {% elif error == 'parse' %}Fehler beim Einlesen der CSV-Datei. Format korrekt?
+        {% elif error == 'norows' %}Keine Buchungszeilen in der Datei gefunden.
+        {% elif error == 'alldupe' %}Alle Buchungen aus dieser Datei wurden bereits importiert.
+        {% else %}Fehler beim Import.
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <div class="card" style="padding: 1.5rem;">
+        <form method="post" action="/group/{{ group_id }}/treasury/import" enctype="multipart/form-data" style="display: flex; flex-direction: column; gap: 1.25rem;">
+            <div>
+                <label style="font-size: 0.875rem; font-weight: 500; display: block; margin-bottom: 0.5rem;">CSV-Datei (Sparkasse-Export)</label>
+                <input class="input" type="file" name="csv_file" accept=".csv,.txt" required>
+                <div class="text-secondary" style="font-size: 0.75rem; margin-top: 0.375rem;">Encoding: Latin-1 / ISO-8859-1 · Trennzeichen: Semikolon</div>
+            </div>
+            <button type="submit" class="btn btn-primary" style="align-self: flex-start;">Datei hochladen und analysieren</button>
+        </form>
+    </div>
+
+    <div class="card" style="padding: 1.25rem; margin-top: 1.5rem;">
+        <div style="font-size: 0.875rem; font-weight: 600; margin-bottom: 0.75rem;">So wird gematcht</div>
+        <div style="display: flex; flex-direction: column; gap: 0.625rem;">
+            <div style="display: flex; gap: 0.75rem; align-items: flex-start;">
+                <span style="background: var(--color-success); color: #fff; font-size: 0.625rem; font-weight: 700; padding: 0.125rem 0.375rem; border-radius: 3px; flex-shrink: 0; margin-top: 2px;">SICHER</span>
+                <span class="text-secondary" style="font-size: 0.8125rem;">IBAN-Match — Mitglieds-IBAN gegen Kontonummer des Überweisenden</span>
+            </div>
+            <div style="display: flex; gap: 0.75rem; align-items: flex-start;">
+                <span style="background: #d4a017; color: #fff; font-size: 0.625rem; font-weight: 700; padding: 0.125rem 0.375rem; border-radius: 3px; flex-shrink: 0; margin-top: 2px;">NAME</span>
+                <span class="text-secondary" style="font-size: 0.8125rem;">Namens-Match — muss manuell bestätigt werden</span>
+            </div>
+            <div style="display: flex; gap: 0.75rem; align-items: flex-start;">
+                <span style="background: var(--color-surface-elevated); color: var(--color-text-secondary); font-size: 0.625rem; font-weight: 700; padding: 0.125rem 0.375rem; border-radius: 3px; flex-shrink: 0; margin-top: 2px;">OFFEN</span>
+                <span class="text-secondary" style="font-size: 0.8125rem;">Kein Match — manuelle Zuweisung oder Kategorisierung als Ausgabe</span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

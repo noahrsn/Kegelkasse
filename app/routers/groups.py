@@ -3,24 +3,30 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app.database.cosmos import CosmosDB, get_db
 from app.database.models import (
     Group,
     GroupMember,
+    Log,
+    LogVisibility,
     PenaltyCatalog,
     PaymentDeadline,
     PaymentDeadlineType,
     Role,
     Rulebook,
+    Transaction,
+    TransactionType,
     User,
 )
 from app.services.auth_service import require_auth
+from app.services.treasury_service import calculate_balance
 
 router = APIRouter(tags=["groups"])
 templates = Jinja2Templates(directory="app/templates")
@@ -106,6 +112,76 @@ async def group_dashboard(
 
     role = _user_role(group_doc, current_user.id)
     member_count = len(group_doc.get("members", []))
+    can_manage = role in (Role.admin, Role.kassenwart)
+
+    # My open debt total
+    debt_docs = db.query_items(
+        "debts",
+        "SELECT * FROM c WHERE c.user_id = @uid AND c.group_id = @gid",
+        parameters=[{"name": "@uid", "value": current_user.id}, {"name": "@gid", "value": group_id}],
+        partition_key=group_id,
+    )
+    my_open_debt = 0.0
+    if debt_docs:
+        my_open_debt = round(sum(
+            e.get("amount", 0)
+            for e in debt_docs[0].get("entries", [])
+            if not e.get("paid") and not e.get("cancelled")
+        ), 2)
+
+    # Next upcoming event
+    now = datetime.now(UTC)
+    upcoming_events = db.query_items(
+        "events",
+        "SELECT * FROM c WHERE c.group_id = @gid",
+        parameters=[{"name": "@gid", "value": group_id}],
+        partition_key=group_id,
+    )
+    next_event = None
+    for ev in upcoming_events:
+        try:
+            start = datetime.fromisoformat(ev["start_date"].replace("Z", "+00:00"))
+            if start >= now and (next_event is None or start < datetime.fromisoformat(next_event["start_date"].replace("Z", "+00:00"))):
+                next_event = ev
+        except (KeyError, ValueError):
+            pass
+
+    # Live Kassenbuch balance
+    transactions = db.query_items(
+        "transactions",
+        "SELECT * FROM c WHERE c.group_id = @gid",
+        parameters=[{"name": "@gid", "value": group_id}],
+        partition_key=group_id,
+    )
+    opening_balance = group_doc.get("treasury", {}).get("opening_balance", 0.0)
+    try:
+        tx_objects = [Transaction(**t) for t in transactions]
+    except Exception:
+        tx_objects = []
+    balance = calculate_balance(opening_balance, tx_objects)
+
+    # Pending sessions (for kassenwart/admin)
+    pending_sessions = []
+    if can_manage:
+        pending_sessions = db.query_items(
+            "sessions",
+            "SELECT * FROM c WHERE c.group_id = @gid AND c.status = 'submitted'",
+            parameters=[{"name": "@gid", "value": group_id}],
+            partition_key=group_id,
+        )
+
+    # Recent log entries (visible to current role)
+    log_query = (
+        "SELECT TOP 10 * FROM c WHERE c.group_id = @gid ORDER BY c.timestamp DESC"
+        if can_manage
+        else "SELECT TOP 10 * FROM c WHERE c.group_id = @gid AND c.visible_to = 'all' ORDER BY c.timestamp DESC"
+    )
+    recent_logs = db.query_items(
+        "logs",
+        log_query,
+        parameters=[{"name": "@gid", "value": group_id}],
+        partition_key=group_id,
+    )
 
     return _render(
         request,
@@ -117,6 +193,53 @@ async def group_dashboard(
         role=role,
         member_count=member_count,
         active="dashboard",
+        my_open_debt=my_open_debt,
+        next_event=next_event,
+        balance=balance,
+        can_manage=can_manage,
+        pending_sessions=pending_sessions,
+        recent_logs=recent_logs,
+        current_user=current_user,
+    )
+
+
+# ── Activity log ──────────────────────────────────────────────────────────────
+
+@router.get("/group/{group_id}/log", response_class=HTMLResponse)
+async def activity_log(
+    request: Request,
+    group_id: str,
+    current_user: User = Depends(require_auth),
+    db: CosmosDB = Depends(get_db),
+):
+    group_doc = _get_group_as_member(group_id, current_user, db)
+    if not group_doc:
+        return RedirectResponse("/dashboard", status_code=302)
+
+    role = _user_role(group_doc, current_user.id)
+    can_manage = role in (Role.admin, Role.kassenwart)
+
+    log_query = (
+        "SELECT * FROM c WHERE c.group_id = @gid ORDER BY c.timestamp DESC"
+        if can_manage
+        else "SELECT * FROM c WHERE c.group_id = @gid AND c.visible_to = 'all' ORDER BY c.timestamp DESC"
+    )
+    logs = db.query_items(
+        "logs",
+        log_query,
+        parameters=[{"name": "@gid", "value": group_id}],
+        partition_key=group_id,
+    )
+
+    return _render(
+        request, "log.html",
+        group_id=group_id,
+        group_name=group_doc.get("name", ""),
+        active="log",
+        role=role.value if role else "mitglied",
+        can_manage=can_manage,
+        logs=logs,
+        current_user=current_user,
     )
 
 
