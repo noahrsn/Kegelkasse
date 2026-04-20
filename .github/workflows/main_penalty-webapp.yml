@@ -10,11 +10,9 @@ on:
   workflow_dispatch:
 
 # Hinweis:
-# In diesem Repository gibt es bereits einen Container-Deploy-Workflow (`deploy.yml`),
-# der ein Docker-Image baut und auf die Web App deployed.
-# Dieser Workflow wurde vom Azure Portal (Code-Deploy/Oryx) generiert und kann mit
-# dem Container-Deploy kollidieren. Daher ist er standardmäßig deaktiviert und
-# nur manuell startbar.
+# Dieser Workflow deployt "Code" (Zip/Oryx) auf Azure App Service.
+# Falls du alternativ einen Container-Deploy verwendest (Docker/ACR), sollten nicht
+# beide Varianten gleichzeitig auf denselben App Service deployen.
 
 jobs:
   build:
@@ -72,6 +70,27 @@ jobs:
           client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_06C8C531F33040B8B50DB5340B26A361 }}
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_8F6747E0BD8044A5A74970FF4E78DAA2 }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_C0262DA0A6E641079E39F4B79FA584F2 }}
+
+      # Azure App Service (Linux) braucht für FastAPI/ASGI einen expliziten Startup Command.
+      # Ohne den startet die App häufig nicht korrekt -> "Application Error".
+      - name: Configure startup command (FastAPI)
+        uses: azure/cli@v2
+        with:
+          inlineScript: |
+            set -euo pipefail
+
+            APP_NAME='penalty-webapp'
+            # Parameter expansion soll erst zur Laufzeit in Azure passieren.
+            STARTUP_CMD='gunicorn -k uvicorn.workers.UvicornWorker app.main:app --bind 0.0.0.0:${PORT:-8000} --access-logfile - --error-logfile -'
+
+            RG=$(az webapp list --query "[?name=='${APP_NAME}'].resourceGroup" -o tsv)
+            if [ -z "$RG" ]; then
+              echo "Resource group for webapp '$APP_NAME' not found in subscription." >&2
+              exit 1
+            fi
+
+            echo "Setting startup command for $APP_NAME in resource group $RG"
+            az webapp config set --name "$APP_NAME" --resource-group "$RG" --startup-file "$STARTUP_CMD"
 
       - name: 'Deploy to Azure Web App'
         uses: azure/webapps-deploy@v3
