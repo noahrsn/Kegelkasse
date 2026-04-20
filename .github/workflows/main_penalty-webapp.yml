@@ -78,4 +78,3 @@ jobs:
           app-name: 'penalty-webapp'
           slot-name: 'Production'
           package: .
-          
