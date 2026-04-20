@@ -25,7 +25,7 @@
             </div>
             {% endif %}
 
-            <form method="post" action="/register" style="display: flex; flex-direction: column; gap: 1.25rem;">
+            <form method="post" action="/register" hx-boost="false" style="display: flex; flex-direction: column; gap: 1.25rem;">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                     <div>
                         <label for="first_name">Vorname</label>

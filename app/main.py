@@ -59,9 +59,13 @@ async def lifespan(app: FastAPI):
             db.ensure_containers()
             logger.info("Cosmos DB containers ready")
         except Exception as exc:
-            if settings.is_production:
+            if settings.is_production and settings.cosmos_strict_startup:
                 raise
-            logger.warning("Cosmos DB init failed (dev mode, continuing without DB): %s", exc)
+            logger.warning(
+                "Cosmos DB init failed (continuing without DB). "
+                "Set COSMOS_STRICT_STARTUP=true to fail startup on DB errors. Error: %s",
+                exc,
+            )
     else:
         logger.warning("Cosmos DB not configured — running without database (set COSMOS_ENDPOINT and COSMOS_KEY in .env)")
 
@@ -112,6 +116,16 @@ async def index():
     from fastapi.responses import RedirectResponse
 
     return RedirectResponse(url="/login")
+
+
+@app.get("/health")
+async def health():
+    """Lightweight health endpoint (no DB calls).
+
+    Configure Azure App Service 'Health check path' to `/health`.
+    """
+
+    return {"status": "ok"}
 
 
 if __name__ == "__main__":

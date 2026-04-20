@@ -5,16 +5,15 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Optional
 
+import bcrypt as _bcrypt
+
 from fastapi import Depends, Request
 from fastapi.responses import RedirectResponse
 from jose import jwt
-from passlib.context import CryptContext
 
 from app.config import get_settings
 from app.database.cosmos import CosmosDB, get_db
 from app.database.models import User
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 class NotAuthenticatedError(Exception):
@@ -22,11 +21,11 @@ class NotAuthenticatedError(Exception):
 
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    return _bcrypt.hashpw(password.encode("utf-8"), _bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    return _bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
 
 
 def create_access_token(user_id: str, expires_delta: Optional[timedelta] = None) -> str:

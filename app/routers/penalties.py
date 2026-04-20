@@ -95,9 +95,9 @@ async def add_catalog_item(
         amt = 0.10
 
     item = PenaltyCatalog(group_id=group_id, name=name.strip(), amount=amt, icon=icon.strip() or "🎳")
-    db.upsert_item("penalties_catalog", item.model_dump())
+    db.upsert_item("penalties_catalog", item.model_dump(mode="json"))
 
-    return HTMLResponse(_catalog_row_html(item.model_dump()))
+    return HTMLResponse(_catalog_row_html(item.model_dump(mode="json")))
 
 
 # ── Edit item (HTMX) ──────────────────────────────────────────────────────────

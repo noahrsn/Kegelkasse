@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -27,9 +28,17 @@ class Settings(BaseSettings):
     # Environment
     environment: str = "development"
 
+    # Cosmos startup behavior
+    # If true, a Cosmos connectivity/init error will fail the app startup.
+    cosmos_strict_startup: bool = False
+
     # App
     app_host: str = "0.0.0.0"
-    app_port: int = 8000
+    # Azure App Service (Linux) commonly injects PORT or WEBSITES_PORT.
+    app_port: int = Field(
+        default=8000,
+        validation_alias=AliasChoices("APP_PORT", "PORT", "WEBSITES_PORT"),
+    )
     app_base_url: str = "http://localhost:8000"
 
     @property

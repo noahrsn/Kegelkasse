@@ -5,10 +5,14 @@
 name: Build and deploy Python app to Azure Web App - penalty-webapp
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
+
+# Hinweis:
+# In diesem Repository gibt es bereits einen Container-Deploy-Workflow (`deploy.yml`),
+# der ein Docker-Image baut und auf die Web App deployed.
+# Dieser Workflow wurde vom Azure Portal (Code-Deploy/Oryx) generiert und kann mit
+# dem Container-Deploy kollidieren. Daher ist er standardmäßig deaktiviert und
+# nur manuell startbar.
 
 jobs:
   build:
@@ -73,4 +77,5 @@ jobs:
         with:
           app-name: 'penalty-webapp'
           slot-name: 'Production'
+          package: .
           

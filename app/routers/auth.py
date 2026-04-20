@@ -52,7 +52,13 @@ async def register(
     if len(password) < 8:
         return _render(request, "register.html", error="Das Passwort muss mindestens 8 Zeichen lang sein.")
 
-    existing = db.query_items("users", "SELECT * FROM c WHERE c.email = @e", [{"name": "@e", "value": email}])
+    try:
+        existing = db.query_items("users", "SELECT * FROM c WHERE c.email = @e", [{"name": "@e", "value": email}])
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).error("DB error on register query: %s", exc)
+        return _render(request, "register.html", error="Datenbankfehler: Verbindung zur Datenbank fehlgeschlagen. Bitte prüfe die Konfiguration.")
+
     if existing:
         return _render(request, "register.html", error="Diese E-Mail-Adresse ist bereits registriert.")
 
@@ -67,11 +73,15 @@ async def register(
     )
     settings = get_settings()
     if not settings.is_production:
-        # Skip email verification in development — auto-verify and log the link
         user.email_verified = True
         user.verification_token = None
         user.verification_token_expires = None
-    db.create_item("users", user.model_dump())
+    try:
+        db.create_item("users", user.model_dump(mode="json"))
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).error("DB error on register create: %s", exc)
+        return _render(request, "register.html", error="Datenbankfehler: Benutzer konnte nicht gespeichert werden.")
     if settings.is_production:
         send_verification_email(email, token)
 
@@ -93,12 +103,24 @@ async def login(
     db: CosmosDB = Depends(get_db),
 ):
     email = email.strip().lower()
-    users = db.query_items("users", "SELECT * FROM c WHERE c.email = @e", [{"name": "@e", "value": email}])
+    try:
+        users = db.query_items("users", "SELECT * FROM c WHERE c.email = @e", [{"name": "@e", "value": email}])
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).error("DB error on login query: %s", exc)
+        return _render(request, "login.html", error="Datenbankfehler: Verbindung zur Datenbank fehlgeschlagen.")
     if not users:
         return _render(request, "login.html", error="E-Mail oder Passwort falsch.")
 
     user_doc = users[0]
-    if not verify_password(password, user_doc.get("password_hash", "")):
+    stored_hash = user_doc.get("password_hash") or ""
+    if not stored_hash:
+        return _render(request, "login.html", error="E-Mail oder Passwort falsch.")
+    try:
+        password_ok = verify_password(password, stored_hash)
+    except Exception:
+        password_ok = False
+    if not password_ok:
         return _render(request, "login.html", error="E-Mail oder Passwort falsch.")
 
     if not user_doc.get("email_verified", False):

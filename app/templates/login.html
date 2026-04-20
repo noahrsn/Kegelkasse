@@ -47,7 +47,7 @@
             </div>
             {% endif %}
 
-            <form method="post" action="/login" style="display: flex; flex-direction: column; gap: 1.25rem;">
+            <form method="post" action="/login" hx-boost="false" style="display: flex; flex-direction: column; gap: 1.25rem;">
                 <div>
                     <label for="email">E-Mail</label>
                     <input class="input" type="email" id="email" name="email" placeholder="deine@email.de" required autocomplete="email">

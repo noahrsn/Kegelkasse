@@ -62,7 +62,7 @@ def _default_penalty_catalog(group_id: str) -> list[dict]:
         ("Fehlen", 1.00, "❌"),
     ]
     return [
-        PenaltyCatalog(group_id=group_id, name=name, amount=amount, icon=icon).model_dump()
+        PenaltyCatalog(group_id=group_id, name=name, amount=amount, icon=icon).model_dump(mode="json")
         for name, amount, icon in items
     ]
 
@@ -140,7 +140,7 @@ async def create_group(
 
     group = Group(name=name, setup_step=1)
     group.members.append(GroupMember(user_id=current_user.id, role=Role.admin))
-    db.create_item("groups", group.model_dump())
+    db.create_item("groups", group.model_dump(mode="json"))
 
     user_doc = db.read_item("users", current_user.id, current_user.id)
     if user_doc:
@@ -279,7 +279,7 @@ async def save_setup_step(
             icon = icons[i] if i < len(icons) else "🎳"
             active = (active_flags[i] if i < len(active_flags) else "on") == "on"
             item = PenaltyCatalog(group_id=group_id, name=name, amount=amount, icon=icon, active=active)
-            db.upsert_item("penalties_catalog", item.model_dump())
+            db.upsert_item("penalties_catalog", item.model_dump(mode="json"))
         group_doc["setup_step"] = max(group_doc.get("setup_step", 1), 4)
         db.upsert_item("groups", group_doc)
 
@@ -368,7 +368,7 @@ async def join_group_confirm(
 
     if current_user.id not in member_ids:
         new_member = GroupMember(user_id=current_user.id, role=Role.mitglied)
-        group_doc.setdefault("members", []).append(new_member.model_dump())
+        group_doc.setdefault("members", []).append(new_member.model_dump(mode="json"))
         db.upsert_item("groups", group_doc)
 
         user_doc = db.read_item("users", current_user.id, current_user.id)
@@ -495,7 +495,7 @@ async def update_settings(
             icon = icons[i] if i < len(icons) else "🎳"
             item_id = catalog_ids[i] if i < len(catalog_ids) else str(uuid.uuid4())
             item = PenaltyCatalog(id=item_id, group_id=group_id, name=name, amount=amount, icon=icon)
-            db.upsert_item("penalties_catalog", item.model_dump())
+            db.upsert_item("penalties_catalog", item.model_dump(mode="json"))
 
     elif section == "rulebook" and role in (Role.admin, Role.praesident):
         from datetime import UTC, datetime

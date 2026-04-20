@@ -130,6 +130,6 @@ async def save_rulebook(
         details="Vereinsregelwerk aktualisiert",
         visible_to=LogVisibility.all,
     )
-    db.create_item("logs", log.model_dump())
+    db.create_item("logs", log.model_dump(mode="json"))
 
     return RedirectResponse(f"/group/{group_id}/rulebook", status_code=303)

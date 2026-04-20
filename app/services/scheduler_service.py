@@ -119,11 +119,11 @@ def book_monthly_fees() -> None:
 
             if existing:
                 debt_doc = existing[0]
-                debt_doc.setdefault("entries", []).append(new_entry.model_dump())
+                debt_doc.setdefault("entries", []).append(new_entry.model_dump(mode="json"))
                 db.upsert_item("debts", debt_doc)
             else:
                 debt = Debt(user_id=user_id, group_id=group_id, entries=[new_entry])
-                db.upsert_item("debts", debt.model_dump())
+                db.upsert_item("debts", debt.model_dump(mode="json"))
 
         log = Log(
             group_id=group_id,
@@ -133,7 +133,7 @@ def book_monthly_fees() -> None:
             details=f"Monatsbeitrag {period} für {len(members)} Mitglieder gebucht ({fee:.2f} €)",
             visible_to=LogVisibility.all,
         )
-        db.create_item("logs", log.model_dump())
+        db.create_item("logs", log.model_dump(mode="json"))
         logger.info("Booked monthly fees for group %s (%s)", group_id, period)
 
 

@@ -76,6 +76,9 @@
             <a href="/group/{{ group_id }}/sessions/new" class="sidebar__link {% if active == 'session' %}sidebar__link--active{% endif %}">
                 <span>🎳</span> Kegelabend
             </a>
+            <a href="/group/{{ group_id }}/sessions/pending" class="sidebar__link {% if active == 'pending' %}sidebar__link--active{% endif %}">
+                <span>📥</span> Einreichungen
+            </a>
             <a href="/group/{{ group_id }}/polls" class="sidebar__link {% if active == 'polls' %}sidebar__link--active{% endif %}">
                 <span>📋</span> Abstimmungen
             </a>
@@ -125,9 +128,9 @@
                 <span class="text-xl">📋</span>
                 <span>Abstimmung</span>
             </a>
-            <a href="/profile" class="bottom-nav__item">
-                <span class="text-xl">👤</span>
-                <span>Mehr</span>
+            <a href="/group/{{ group_id }}/sessions/pending" class="bottom-nav__item {% if active == 'pending' %}bottom-nav__item--active{% endif %}">
+                <span class="text-xl">📥</span>
+                <span>Freigabe</span>
             </a>
             {% endif %}
         </div>
