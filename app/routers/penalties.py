@@ -10,7 +10,6 @@ from app.database.cosmos import CosmosDB, get_db
 from app.database.models import PenaltyCatalog, Role, User
 from app.services.auth_service import require_auth
 
-from app.templates_config import templates
 
 router = APIRouter(prefix="/group/{group_id}", tags=["penalties"])
 
