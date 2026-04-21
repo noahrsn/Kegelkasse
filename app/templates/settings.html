@@ -6,7 +6,7 @@
 <div class="hero" style="background: linear-gradient(135deg, #0D0D0F 0%, #1a120a 60%, #0D0D0F 100%);">
     <div class="hero__overlay"></div>
     <div class="hero__content">
-        <h1 style="font-family: 'Syne', sans-serif; font-size: 1.5rem; margin: 0 0 0.125rem;">Einstellungen</h1>
+        <h1 style="font-family: 'Space Grotesk', sans-serif; font-size: 1.5rem; margin: 0 0 0.125rem;">Einstellungen</h1>
         <p style="color: var(--color-text-secondary); font-size: 0.75rem; margin: 0;">{{ group_name }}</p>
     </div>
 </div>
@@ -44,7 +44,7 @@
 
         <!-- General -->
         {% if active_section == 'general' and role in ['admin', 'präsident'] %}
-        <h2 style="font-size: 1.125rem; font-family: 'Syne', sans-serif; margin-bottom: 1.5rem;">Allgemein</h2>
+        <h2 style="font-size: 1.125rem; font-family: 'Space Grotesk', sans-serif; margin-bottom: 1.5rem;">Allgemein</h2>
         <form method="post" action="/group/{{ group_id }}/settings/general" style="display: flex; flex-direction: column; gap: 1.25rem; max-width: 440px;">
             <div>
                 <label for="name">Clubname</label>
@@ -55,7 +55,7 @@
 
         <!-- Finances -->
         {% elif active_section == 'finances' and role in ['admin', 'kassenwart'] %}
-        <h2 style="font-size: 1.125rem; font-family: 'Syne', sans-serif; margin-bottom: 1.5rem;">Finanzen</h2>
+        <h2 style="font-size: 1.125rem; font-family: 'Space Grotesk', sans-serif; margin-bottom: 1.5rem;">Finanzen</h2>
         <form method="post" action="/group/{{ group_id }}/settings/finances" style="display: flex; flex-direction: column; gap: 1.25rem; max-width: 440px;">
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                 <div>
@@ -112,7 +112,7 @@
 
         <!-- Catalog -->
         {% elif active_section == 'catalog' and role in ['admin', 'kassenwart'] %}
-        <h2 style="font-size: 1.125rem; font-family: 'Syne', sans-serif; margin-bottom: 0.5rem;">Strafenkatalog</h2>
+        <h2 style="font-size: 1.125rem; font-family: 'Space Grotesk', sans-serif; margin-bottom: 0.5rem;">Strafenkatalog</h2>
         <p class="text-secondary" style="font-size: 0.8125rem; margin-bottom: 1.5rem;">Änderungen werden direkt gespeichert. Deaktivierte Strafen bleiben für den Audit-Trail erhalten.</p>
 
         <div id="catalog-items" style="display: flex; flex-direction: column; gap: 0.75rem;">
@@ -165,7 +165,7 @@
 
         <!-- Rulebook -->
         {% elif active_section == 'rulebook' and role in ['admin', 'präsident'] %}
-        <h2 style="font-size: 1.125rem; font-family: 'Syne', sans-serif; margin-bottom: 1.5rem;">Vereinsregelwerk</h2>
+        <h2 style="font-size: 1.125rem; font-family: 'Space Grotesk', sans-serif; margin-bottom: 1.5rem;">Vereinsregelwerk</h2>
         <form method="post" action="/group/{{ group_id }}/settings/rulebook" style="display: flex; flex-direction: column; gap: 1.25rem;">
             <div>
                 <label>Regelwerk (Markdown)</label>
@@ -176,7 +176,7 @@
 
         <!-- Members -->
         {% elif active_section == 'members' and role == 'admin' %}
-        <h2 style="font-size: 1.125rem; font-family: 'Syne', sans-serif; margin-bottom: 1.5rem;">Mitglieder & Rollen</h2>
+        <h2 style="font-size: 1.125rem; font-family: 'Space Grotesk', sans-serif; margin-bottom: 1.5rem;">Mitglieder & Rollen</h2>
         <div style="display: flex; flex-direction: column; gap: 0.75rem;">
             {% for m in members %}
             <div class="card" style="padding: 0.875rem 1.25rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem;">
@@ -213,7 +213,7 @@
 
         <!-- Invite link -->
         {% elif active_section == 'invite' and role in ['admin', 'präsident'] %}
-        <h2 style="font-size: 1.125rem; font-family: 'Syne', sans-serif; margin-bottom: 1.5rem;">Einladungslink</h2>
+        <h2 style="font-size: 1.125rem; font-family: 'Space Grotesk', sans-serif; margin-bottom: 1.5rem;">Einladungslink</h2>
         <div class="card card--accent" style="padding: 1.25rem; margin-bottom: 1.5rem;">
             <label>Aktueller Link</label>
             <div style="display: flex; gap: 0.75rem; align-items: center; margin-top: 0.25rem;">

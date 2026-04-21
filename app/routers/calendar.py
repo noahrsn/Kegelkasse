@@ -25,6 +25,7 @@ from app.database.models import (
 )
 from app.services.auth_service import require_auth
 from app.services.calendar_service import next_occurrence
+import app.services.email_service as _es
 
 router = APIRouter(prefix="/group/{group_id}/calendar", tags=["calendar"])
 templates = Jinja2Templates(directory="app/templates")
@@ -410,6 +411,24 @@ async def create_event(
         details=f"Event '{title.strip()}' ({etype.value}) angelegt",
     )
 
+    try:
+        date_display = _format_date(start_dt.isoformat())
+        for member in group_doc.get("members", []):
+            uid = member["user_id"]
+            if uid == current_user.id:
+                continue
+            user_doc = db.read_item("users", uid, uid)
+            if not user_doc:
+                continue
+            s, h = _es.build_event_invitation(
+                user_doc.get("first_name", ""),
+                group_doc.get("name", ""),
+                title.strip(), date_display, group_id, event.id,
+            )
+            _es.notify_member(db, uid, group_id, "event_invitation", s, h)
+    except Exception:
+        pass
+
     return RedirectResponse(f"/group/{group_id}/calendar/{event.id}", status_code=302)
 
 
@@ -647,6 +666,19 @@ async def rsvp(
     )
     _write_log(db, group_id, current_user, action,
                target_id=event_id, target_name=event_doc.get("title", ""), details=details)
+
+    if late_response:
+        try:
+            s, h = _es.build_late_rsvp_kassenwart(
+                group_doc.get("name", ""), current_user.full_name,
+                event_doc.get("title", ""), group_id, event_id,
+            )
+            _es.notify_group_members(
+                db, group_doc, "late_rsvp_kassenwart", s, h,
+                role_filter=["admin", "kassenwart"],
+            )
+        except Exception:
+            pass
 
     _enrich_event(event_doc, current_user.id)
     member_names = _get_member_names(group_doc, db)

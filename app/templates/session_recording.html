@@ -3,107 +3,118 @@
 {% block title %}Kegelabend {{ date_display }} — Kegelkasse{% endblock %}
 
 {% block content %}
-<div x-data="sessionRecorder('{{ group_id }}', '{{ session_id }}')" style="min-height: 100vh;">
+<div x-data="sessionRecorder('{{ group_id }}', '{{ session_id }}')" style="min-height:100vh;">
 
-<!-- Hero -->
-<div class="hero" style="background: linear-gradient(135deg, #0a0a0f 0%, #12120a 60%, #0a0a0f 100%); height: 22vh;">
-    <div class="hero__overlay"></div>
-    <div class="hero__content" style="width: 100%;">
-        <div style="display: flex; align-items: flex-end; justify-content: space-between; width: 100%;">
-            <div>
-                <h1 style="font-family: 'Syne', sans-serif; font-size: 1.25rem; margin: 0 0 0.25rem;">🎳 {{ date_display }}</h1>
-                <p style="color: var(--color-text-secondary); font-size: 0.75rem; margin: 0;">
-                    {{ present_count }} von {{ total_count }} Mitgliedern anwesend
-                    {% if session.status == 'submitted' %} · <span class="text-accent">Eingereicht</span>{% endif %}
-                    {% if session.status == 'approved' %} · <span class="text-success">Genehmigt</span>{% endif %}
-                </p>
+<!-- Sticky top bar -->
+<div class="topbar">
+    <div style="display:flex;align-items:center;gap:0.75rem;">
+        <a href="/group/{{ group_id }}/dashboard" style="background:none;border:none;cursor:pointer;padding:4px;display:flex;align-items:center;color:var(--text2);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </a>
+        <div>
+            <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.9rem;color:var(--text1);">Kegelabend · {{ date_display }}</div>
+            <div style="font-size:0.65rem;color:var(--text2);margin-top:1px;">
+                {{ present_count }} / {{ total_count }} anwesend
+                {% if session.status == 'submitted' %} · <span style="color:var(--amber);">Eingereicht</span>{% endif %}
+                {% if session.status == 'approved' %} · <span style="color:var(--teal);">Genehmigt</span>{% endif %}
             </div>
-            <a href="/group/{{ group_id }}/sessions/{{ session_id }}/guests"
-               class="btn btn-secondary"
-               style="font-size: 0.75rem; padding: 0.375rem 0.875rem; min-height: auto;">
-                👥 Gäste
-                {% if session.guest_entries %}<span class="badge badge--warning" style="margin-left: 0.25rem;">{{ session.guest_entries | length }}</span>{% endif %}
-            </a>
         </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:0.5rem;">
+        <a href="/group/{{ group_id }}/sessions/{{ session_id }}/guests" class="btn btn-ghost btn-sm">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+            Gäste{% if session.guest_entries %} <span class="badge badge--warning" style="margin-left:2px;">{{ session.guest_entries | length }}</span>{% endif %}
+        </a>
     </div>
 </div>
 
-<!-- Status banner for non-draft -->
+<!-- Progress bar -->
+<div class="progress-bar">
+    <div class="progress-bar__fill" id="session-progress" style="width:0%;"></div>
+</div>
+
+<!-- Status banner -->
 {% if session.status == 'submitted' %}
-<div style="background: rgba(224,128,32,0.08); border-left: 3px solid var(--color-accent); padding: 0.875rem 1.5rem;">
-    <div style="font-weight: 600; font-size: 0.875rem;">Warten auf Freigabe</div>
-    <div class="text-secondary" style="font-size: 0.75rem;">Kassenwart oder Admin muss den Abend genehmigen.</div>
+<div style="background:var(--amber-dim);border-left:3px solid var(--amber);padding:0.875rem 1.25rem;">
+    <div style="font-weight:700;font-size:0.875rem;color:var(--amber);">Warten auf Freigabe</div>
+    <div style="font-size:0.75rem;color:var(--text2);">Kassenwart oder Admin muss den Abend genehmigen.</div>
 </div>
 {% elif session.status == 'approved' %}
-<div style="background: rgba(74,144,96,0.08); border-left: 3px solid var(--color-success); padding: 0.875rem 1.5rem;">
-    <div style="font-weight: 600; font-size: 0.875rem; color: var(--color-success);">Genehmigt ✓</div>
-    <div class="text-secondary" style="font-size: 0.75rem;">Schulden wurden eingebucht.</div>
+<div style="background:var(--teal-dim);border-left:3px solid var(--teal);padding:0.875rem 1.25rem;">
+    <div style="font-weight:700;font-size:0.875rem;color:var(--teal);">Genehmigt ✓</div>
+    <div style="font-size:0.75rem;color:var(--text2);">Schulden wurden eingebucht.</div>
 </div>
 {% endif %}
 
 <!-- Member grid -->
-<div style="padding: 1.25rem; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.875rem;">
+<div style="padding:1rem;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0.75rem;">
     {% for entry in entries %}
     {% include "session_member_card.html" %}
     {% endfor %}
 </div>
 
-<!-- Submit FAB (only for draft) -->
+<!-- Submit FAB -->
 {% if session.status == 'draft' %}
 <form method="post" action="/group/{{ group_id }}/sessions/{{ session_id }}/submit"
-      style="position: fixed; bottom: 5.5rem; right: 1.5rem; z-index: 40;">
+      style="position:fixed;bottom:5.5rem;right:1.5rem;z-index:40;">
     <button type="submit" class="btn btn-primary"
-            style="border-radius: 9999px; padding: 0.875rem 1.5rem; box-shadow: 0 4px 16px rgba(224,128,32,0.35); font-size: 0.9375rem;">
+            style="border-radius:9999px;padding:0.875rem 1.5rem;box-shadow:0 4px 20px var(--amber-glow);font-size:0.9375rem;">
         Einreichen →
     </button>
 </form>
 {% endif %}
 
-<!-- Approve button for admin/kassenwart (submitted sessions) -->
 {% if session.status == 'submitted' and can_approve %}
 <form method="post" action="/group/{{ group_id }}/sessions/{{ session_id }}/approve"
-      style="position: fixed; bottom: 5.5rem; right: 1.5rem; z-index: 40;">
+      style="position:fixed;bottom:5.5rem;right:1.5rem;z-index:40;">
     <button type="submit" class="btn btn-primary"
-            style="border-radius: 9999px; padding: 0.875rem 1.5rem; box-shadow: 0 4px 16px rgba(224,128,32,0.35); font-size: 0.9375rem;">
-        ✓ Genehmigen
+            style="border-radius:9999px;padding:0.875rem 1.5rem;box-shadow:0 4px 20px var(--amber-glow);font-size:0.9375rem;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+        Genehmigen
     </button>
 </form>
 {% endif %}
 
-<!-- Penalty Bottom Sheet (Alpine.js) -->
+<!-- Penalty Bottom Sheet -->
 <div x-show="sheetOpen"
      x-transition:enter="transition ease-out duration-200"
      x-transition:enter-start="opacity-0 translate-y-full"
      x-transition:leave="transition ease-in duration-150"
      x-transition:leave-end="opacity-0 translate-y-full"
      @click.self="closeSheet()"
-     style="position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,0.6); display: flex; align-items: flex-end;"
+     style="position:fixed;inset:0;z-index:60;background:rgba(0,0,0,0.65);backdrop-filter:blur(4px);display:flex;align-items:flex-end;"
      x-cloak>
 
-    <div class="glass" style="width: 100%; border-radius: 16px 16px 0 0; padding: 1.25rem; padding-bottom: calc(1.25rem + env(safe-area-inset-bottom)); max-height: 75vh; overflow-y: auto;">
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
-            <h3 style="font-family: 'Syne', sans-serif; font-size: 1rem; margin: 0;">Strafe wählen</h3>
-            <button @click="closeSheet()" style="background: none; border: none; cursor: pointer; color: var(--color-text-secondary); font-size: 1.25rem; line-height: 1;">✕</button>
+    <div style="width:100%;background:var(--surf);border-radius:22px 22px 0 0;box-shadow:0 -2px 40px rgba(0,0,0,0.8),0 0 0 1px var(--border);padding:1.25rem;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom));max-height:65vh;overflow-y:auto;">
+        <div style="width:36px;height:4px;background:var(--surf3);border-radius:99px;margin:0 auto 1rem;"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+            <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:1rem;color:var(--text1);">Strafe wählen</div>
+            <button @click="closeSheet()" style="background:none;border:none;cursor:pointer;color:var(--text2);padding:4px;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
         </div>
 
         {% if catalog %}
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.75rem;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:0.5rem;">
             {% for cat_item in catalog %}
             <button type="button"
                     @click="addPenalty('{{ cat_item.id }}')"
-                    class="btn btn-secondary"
-                    style="flex-direction: column; gap: 0.375rem; padding: 0.875rem; min-height: 80px; text-align: center;">
-                <span style="font-size: 1.5rem;">{{ cat_item.icon }}</span>
-                <span style="font-size: 0.75rem; font-weight: 600;">{{ cat_item.name }}</span>
-                <span class="font-mono text-accent" style="font-size: 0.6875rem;">{{ '%.2f' | format(cat_item.amount) }} €</span>
+                    style="background:var(--surf2);border:1px solid var(--border);border-radius:var(--radius);padding:1rem 0.75rem;cursor:pointer;text-align:left;display:flex;justify-content:space-between;align-items:center;transition:all 120ms;font-family:'Space Grotesk',sans-serif;"
+                    onmouseover="this.style.borderColor='var(--amber)';this.style.background='var(--amber-dim)'"
+                    onmouseout="this.style.borderColor='var(--border)';this.style.background='var(--surf2)'">
+                <span style="font-weight:600;font-size:0.85rem;color:var(--text1);">{{ cat_item.name }}</span>
+                <span class="font-mono" style="font-size:0.875rem;color:var(--amber);font-weight:600;">{{ '%.2f'|format(cat_item.amount)|replace('.',',') }} €</span>
             </button>
             {% endfor %}
         </div>
         {% else %}
-        <div style="text-align: center; padding: 2rem; color: var(--color-text-secondary); font-size: 0.875rem;">
-            Kein Strafenkatalog vorhanden. Füge Strafen in den <a href="/group/{{ group_id }}/settings?section=catalog" style="color: var(--color-accent);">Einstellungen</a> hinzu.
+        <div style="text-align:center;padding:2rem;color:var(--text2);font-size:0.875rem;">
+            Kein Strafenkatalog vorhanden.
+            <a href="/group/{{ group_id }}/settings?section=catalog" style="color:var(--amber);">In Einstellungen anlegen →</a>
         </div>
         {% endif %}
+
+        <button class="btn btn-ghost" @click="closeSheet()" style="width:100%;margin-top:1rem;color:var(--text3);">Abbrechen</button>
     </div>
 </div>
 
@@ -135,14 +146,9 @@ function sessionRecorder(groupId, sessionId) {
     }
 }
 
-// Re-init Alpine on HTMX swaps so @click bindings work on updated cards
 document.addEventListener('htmx:afterSettle', function(e) {
-    if (window.Alpine && e.detail.elt) {
-        Alpine.initTree(e.detail.elt);
-    }
+    if (window.Alpine && e.detail.elt) Alpine.initTree(e.detail.elt);
 });
 </script>
-<style>
-[x-cloak] { display: none !important; }
-</style>
+<style>[x-cloak] { display: none !important; }</style>
 {% endblock %}

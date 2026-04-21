@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import uuid
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse

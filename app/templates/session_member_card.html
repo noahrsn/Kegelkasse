@@ -11,7 +11,7 @@
 
     <!-- Avatar + name + total -->
     <div style="display: flex; align-items: center; gap: 0.75rem;">
-        <div style="width: 44px; height: 44px; border-radius: 50%; background: {% if entry.absent %}var(--color-danger-muted){% elif entry.late_arrival %}rgba(224,128,32,0.15){% else %}var(--color-accent-muted){% endif %}; display: flex; align-items: center; justify-content: center; font-family: 'Syne', sans-serif; font-size: 1rem; font-weight: 700; color: {% if entry.absent %}var(--color-danger){% elif entry.late_arrival %}var(--color-accent){% else %}var(--color-accent){% endif %}; flex-shrink: 0;">
+        <div style="width: 44px; height: 44px; border-radius: 50%; background: {% if entry.absent %}var(--color-danger-muted){% elif entry.late_arrival %}rgba(224,128,32,0.15){% else %}var(--color-accent-muted){% endif %}; display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk', sans-serif; font-size: 1rem; font-weight: 700; color: {% if entry.absent %}var(--color-danger){% elif entry.late_arrival %}var(--color-accent){% else %}var(--color-accent){% endif %}; flex-shrink: 0;">
             {{ entry._name[:1] | upper }}
         </div>
         <div style="flex: 1; min-width: 0;">

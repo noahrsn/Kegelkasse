@@ -13,8 +13,6 @@ from fastapi.templating import Jinja2Templates
 from app.database.cosmos import CosmosDB, get_db
 from app.database.models import (
     Debt,
-    DebtEntry,
-    DebtType,
     Log,
     LogVisibility,
     Role,
@@ -27,6 +25,7 @@ from app.database.models import (
 from app.services.auth_service import require_auth
 from app.services.csv_import_service import MemberInfo, match_rows, parse_csv
 from app.services.treasury_service import calculate_balance, check_late_payment, match_payment_to_debts
+import app.services.email_service as _es
 
 router = APIRouter(prefix="/group/{group_id}/treasury", tags=["treasury"])
 templates = Jinja2Templates(directory="app/templates")
@@ -212,7 +211,7 @@ async def import_csv(
 
     try:
         rows = parse_csv(content)
-    except Exception as exc:
+    except Exception:
         return RedirectResponse(f"/group/{group_id}/treasury/import?error=parse", status_code=302)
 
     if not rows:
@@ -339,6 +338,7 @@ async def confirm_import(
             payment_date_obj = datetime.fromisoformat(row["date"] + "T00:00:00+00:00").date()
 
             # Check for late fees before matching
+            late_fee_applied = False
             if late_fee > 0:
                 for entry in debt_doc.get("entries", []):
                     if entry.get("paid") or entry.get("cancelled"):
@@ -348,6 +348,7 @@ async def confirm_import(
                     late_entry = check_late_payment(de, payment_date_obj, late_fee)
                     if late_entry:
                         debt_doc["entries"].append(late_entry.model_dump(mode="json"))
+                        late_fee_applied = True
                         _write_log(db, group_id, current_user, "late_payment_fee_applied",
                                    target_id=matched_user_id,
                                    details=f"Verspätungsstrafe {late_fee:.2f} € automatisch gebucht",
@@ -355,8 +356,33 @@ async def confirm_import(
 
             from app.database.models import Debt as DModel
             debt_obj = DModel(**debt_doc)
+            open_before = sum(1 for e in debt_obj.entries if not e.paid and not e.cancelled)
             match_payment_to_debts(debt_obj, amount, tx.id, payment_date_obj)
+            open_after = sum(1 for e in debt_obj.entries if not e.paid and not e.cancelled)
             db.upsert_item("debts", debt_obj.model_dump(mode="json"))
+
+            try:
+                user_doc = db.read_item("users", matched_user_id, matched_user_id)
+                if user_doc:
+                    group_name = group_doc.get("name", "")
+                    paid_count = max(open_before - open_after, 1)
+                    s, h = _es.build_payment_received(
+                        user_doc.get("first_name", ""), group_name, amount, paid_count, group_id,
+                    )
+                    _es.notify_member(db, matched_user_id, group_id, "payment_received", s, h)
+
+                    if late_fee_applied:
+                        s2, h2 = _es.build_late_payment_fee(
+                            user_doc.get("first_name", ""), group_name, late_fee, group_id,
+                        )
+                        _es.notify_member(db, matched_user_id, group_id, "late_payment_fee", s2, h2)
+                        # also notify kassenwart/admin
+                        _es.notify_group_members(
+                            db, group_doc, "late_payment_fee", s2, h2,
+                            role_filter=["admin", "kassenwart"],
+                        )
+            except Exception:
+                pass
 
     _write_log(
         db, group_id, current_user, "csv_import",

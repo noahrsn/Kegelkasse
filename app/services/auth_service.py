@@ -8,7 +8,6 @@ from typing import Optional
 import bcrypt as _bcrypt
 
 from fastapi import Depends, Request
-from fastapi.responses import RedirectResponse
 from jose import jwt
 
 from app.config import get_settings

@@ -3,125 +3,114 @@
 {% block title %}Meine Schulden — {{ group_name }}{% endblock %}
 
 {% block content %}
-<div class="hero" style="background: linear-gradient(135deg, #0D0D0F 0%, #160a0a 60%, #0D0D0F 100%);">
-    <div class="hero__overlay"></div>
-    <div class="hero__content">
-        <h1 style="font-family: 'Syne', sans-serif; font-size: 1.5rem; margin: 0 0 0.25rem;">Meine Schulden</h1>
-        <p style="color: var(--color-text-secondary); font-size: 0.75rem; margin: 0;">{{ group_name }}</p>
+
+<div class="topbar">
+    <div>
+        <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.9rem;color:var(--text1);">Meine Schulden</div>
+        <div style="font-size:0.65rem;color:var(--text3);">{{ group_name }}</div>
     </div>
+    {% if can_manage %}
+    <a href="/group/{{ group_id }}/debts/all" class="btn btn-ghost btn-sm">Alle Mitglieder</a>
+    {% endif %}
 </div>
 
-<div style="padding: 1.5rem; max-width: 800px;">
+<div style="padding:1.25rem;padding-bottom:90px;max-width:800px;">
 
     {% if success == 'paid' %}
-    <div class="badge badge--success" style="display: block; padding: 0.75rem 1rem; border-radius: 8px; margin-bottom: 1.5rem; font-size: 0.875rem;">Zahlung wurde erfasst.</div>
+    <div class="alert alert--success">Zahlung wurde erfasst.</div>
     {% endif %}
 
-    {% if can_manage %}
-    <div style="display: flex; gap: 0.75rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
-        <a href="/group/{{ group_id }}/debts/all" class="btn btn-secondary" style="font-size: 0.875rem;">📋 Alle Mitglieder</a>
-    </div>
-    {% endif %}
+    <!-- Hero amount -->
+    <div style="position:relative;border-radius:var(--radius-lg);overflow:hidden;padding:2rem 1.5rem;margin-bottom:1.1rem;text-align:center;">
+        <div style="position:absolute;inset:0;background:linear-gradient(180deg,#1a0000 0%,var(--surf) 100%);"></div>
+        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:240px;height:160px;border-radius:50%;background:radial-gradient(circle,rgba(255,77,77,0.2) 0%,transparent 70%);filter:blur(30px);"></div>
+        <div style="position:relative;z-index:1;">
+            <div style="font-family:'Space Grotesk',sans-serif;font-size:0.65rem;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:0.12em;margin-bottom:0.6rem;">Offener Betrag</div>
+            {% if open_total > 0 %}
+            <div class="glow-number glow-number--red" style="font-size:5rem;">{{ '%.2f'|format(open_total)|replace('.',',') }} €</div>
+            {% else %}
+            <div class="glow-number" style="font-size:5rem;color:var(--teal);text-shadow:0 0 60px rgba(46,204,154,0.5);">0,00 €</div>
+            {% endif %}
 
-    <!-- Total -->
-    <div class="card card--accent" style="margin-bottom: 1.5rem; padding: 1.5rem;">
-        <div class="text-secondary" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Offene Schulden gesamt</div>
-        <div class="font-mono {% if open_total > 0 %}text-danger{% else %}text-success{% endif %}" style="font-size: 2.5rem; font-weight: 700; margin-bottom: 1rem;">
-            {{ '%.2f'|format(open_total) }} €
-        </div>
-
-        <!-- Breakdown -->
-        {% if breakdown %}
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.75rem; padding-top: 1rem; border-top: 1px solid var(--color-border);">
-            {% if breakdown.get('penalty', 0) > 0 %}
-            <div>
-                <div class="text-secondary" style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em;">Strafen</div>
-                <div class="font-mono text-danger" style="font-size: 1rem; font-weight: 600;">{{ '%.2f'|format(breakdown.penalty) }} €</div>
-            </div>
-            {% endif %}
-            {% if breakdown.get('monthly_fee', 0) > 0 %}
-            <div>
-                <div class="text-secondary" style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em;">Monatsbeiträge</div>
-                <div class="font-mono text-danger" style="font-size: 1rem; font-weight: 600;">{{ '%.2f'|format(breakdown.monthly_fee) }} €</div>
-            </div>
-            {% endif %}
-            {% if breakdown.get('correction', 0) > 0 %}
-            <div>
-                <div class="text-secondary" style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em;">Sonstiges</div>
-                <div class="font-mono text-danger" style="font-size: 1rem; font-weight: 600;">{{ '%.2f'|format(breakdown.correction) }} €</div>
-            </div>
-            {% endif %}
-            {% if breakdown.get('late_payment_fee', 0) > 0 %}
-            <div>
-                <div class="text-secondary" style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em;">Verspätungsstrafe</div>
-                <div class="font-mono text-danger" style="font-size: 1rem; font-weight: 600;">{{ '%.2f'|format(breakdown.late_payment_fee) }} €</div>
+            <!-- Breakdown -->
+            {% if breakdown and open_total > 0 %}
+            <div style="display:flex;gap:1.5rem;justify-content:center;margin-top:0.875rem;flex-wrap:wrap;">
+                {% if breakdown.get('penalty', 0) > 0 %}
+                <div style="text-align:center;">
+                    <div style="font-size:0.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:0.07em;">Strafen</div>
+                    <div class="font-mono" style="font-size:0.875rem;color:var(--red);font-weight:600;">{{ '%.2f'|format(breakdown.penalty)|replace('.',',') }} €</div>
+                </div>
+                {% endif %}
+                {% if breakdown.get('monthly_fee', 0) > 0 %}
+                <div style="text-align:center;">
+                    <div style="font-size:0.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:0.07em;">Beiträge</div>
+                    <div class="font-mono" style="font-size:0.875rem;color:var(--red);font-weight:600;">{{ '%.2f'|format(breakdown.monthly_fee)|replace('.',',') }} €</div>
+                </div>
+                {% endif %}
+                {% if breakdown.get('correction', 0) > 0 %}
+                <div style="text-align:center;">
+                    <div style="font-size:0.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:0.07em;">Sonstiges</div>
+                    <div class="font-mono" style="font-size:0.875rem;color:var(--red);font-weight:600;">{{ '%.2f'|format(breakdown.correction)|replace('.',',') }} €</div>
+                </div>
+                {% endif %}
             </div>
             {% endif %}
         </div>
-        {% endif %}
     </div>
 
     <!-- Payment info -->
     {% if payment_info and (payment_info.get('iban') or payment_info.get('paypal')) %}
-    <div class="card" style="margin-bottom: 1.5rem; padding: 1.25rem;">
-        <div style="font-size: 0.875rem; font-weight: 600; margin-bottom: 0.75rem;">Zahlungsinformationen</div>
+    <div class="card--glass card" style="margin-bottom:1.1rem;border-color:rgba(46,204,154,0.2);">
+        <div style="font-size:0.65rem;font-family:'Space Grotesk',sans-serif;font-weight:700;color:var(--teal);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.5rem;">Überweisen an</div>
         {% if payment_info.get('iban') %}
-        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
-            <span class="text-secondary" style="font-size: 0.75rem; width: 60px;">IBAN</span>
-            <code class="font-mono" style="font-size: 0.875rem; background: var(--color-surface-elevated); padding: 0.25rem 0.5rem; border-radius: 4px;">{{ payment_info.iban }}</code>
-        </div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:0.85rem;color:var(--text1);letter-spacing:0.03em;margin-bottom:0.25rem;">{{ payment_info.iban }}</div>
         {% endif %}
         {% if payment_info.get('paypal') %}
-        <div style="display: flex; align-items: center; gap: 0.75rem;">
-            <span class="text-secondary" style="font-size: 0.75rem; width: 60px;">PayPal</span>
-            <span style="font-size: 0.875rem;">{{ payment_info.paypal }}</span>
-        </div>
+        <div style="font-size:0.75rem;color:var(--text2);">PayPal: {{ payment_info.paypal }}</div>
         {% endif %}
+        <div style="font-size:0.7rem;color:var(--text3);margin-top:0.25rem;">Verwendungszweck: Kegelkasse – {{ user.first_name }} {{ user.last_name }}</div>
     </div>
     {% endif %}
 
     <!-- Timeline -->
-    <h2 style="font-size: 0.875rem; font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1rem;">Buchungshistorie</h2>
+    <div class="section-label">Buchungshistorie</div>
 
     {% if entries %}
-    <div class="card" style="padding: 0; overflow: hidden;">
+    <div class="card" style="padding:0;overflow:hidden;">
         {% for entry in entries %}
-        <div style="padding: 0.875rem 1.25rem; border-bottom: 1px solid var(--color-border); display: flex; align-items: center; justify-content: space-between; gap: 1rem; {% if loop.last %}border-bottom: none;{% endif %}
-            {% if entry.cancelled %}opacity: 0.5;{% endif %}">
-            <div style="flex: 1; min-width: 0;">
-                <div style="font-size: 0.875rem; display: flex; align-items: center; gap: 0.5rem;">
-                    {% if entry.type == 'penalty' %}🎳
-                    {% elif entry.type == 'monthly_fee' %}📅
-                    {% elif entry.type == 'correction' %}✏️
-                    {% elif entry.type == 'storno' %}↩️
-                    {% elif entry.type == 'late_payment_fee' %}⚠️
-                    {% endif %}
-                    <span>{{ entry.description or entry.type }}</span>
-                    {% if entry.cancelled %}<span class="badge" style="font-size: 0.625rem;">Storniert</span>{% endif %}
-                    {% if entry.paid and not entry.cancelled %}<span class="badge badge--success" style="font-size: 0.625rem;">Bezahlt</span>{% endif %}
+        <div style="padding:0.75rem 1rem;border-bottom:{% if not loop.last %}1px solid var(--border){% else %}none{% endif %};display:flex;align-items:center;justify-content:space-between;gap:1rem;{% if entry.cancelled %}opacity:0.45;{% endif %}">
+            <div style="flex:1;min-width:0;">
+                <div style="font-size:0.85rem;color:var(--text1);display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;font-family:'Space Grotesk',sans-serif;font-weight:600;">
+                    {{ entry.description or entry.type }}
+                    {% if entry.cancelled %}<span class="badge">Storniert</span>{% endif %}
+                    {% if entry.paid and not entry.cancelled %}<span class="badge badge--success">Bezahlt</span>{% endif %}
                     {% if not entry.paid and not entry.cancelled %}
                         {% set due = entry.get('due_date', '') %}
                         {% if due and due[:10] < now_date | default('9999-99-99') %}
-                        <span class="badge" style="font-size: 0.625rem; background: rgba(200,64,64,0.15); color: var(--color-danger);">Fällig</span>
+                        <span class="badge badge--danger">Fällig</span>
                         {% endif %}
                     {% endif %}
                 </div>
-                <div class="text-secondary" style="font-size: 0.75rem; margin-top: 0.125rem;">
+                <div style="font-size:0.67rem;color:var(--text3);margin-top:2px;">
                     {% set ts = entry.get('created_at', '')[:10] %}
                     {% if ts %}{{ ts[8:10] }}.{{ ts[5:7] }}.{{ ts[:4] }}{% endif %}
-                    {% if entry.get('due_date') %} · Fällig: {{ entry.due_date[:10] | replace('-', '.') }}{% endif %}
+                    · {{ entry.type }}
+                    {% if entry.get('due_date') %} · Fällig: {{ entry.due_date[:10]|replace('-','.') }}{% endif %}
                 </div>
             </div>
-            <div class="font-mono {% if entry.cancelled or entry.paid %}text-secondary{% elif entry.type == 'storno' %}text-success{% else %}text-danger{% endif %}" style="font-size: 1rem; font-weight: 600; white-space: nowrap;">
-                {% if entry.type == 'storno' %}−{% endif %}{{ '%.2f'|format(entry.amount) }} €
+            <div class="font-mono" style="font-size:0.9rem;font-weight:600;white-space:nowrap;
+                {% if entry.cancelled or entry.paid %}color:var(--text3);
+                {% elif entry.type == 'storno' %}color:var(--teal);
+                {% else %}color:var(--red);{% endif %}">
+                {% if entry.type == 'storno' %}−{% endif %}{{ '%.2f'|format(entry.amount)|replace('.',',') }} €
             </div>
         </div>
         {% endfor %}
     </div>
     {% else %}
-    <div class="card" style="padding: 2rem; text-align: center;">
-        <div style="font-size: 2rem; margin-bottom: 0.75rem;">✅</div>
-        <p class="text-secondary" style="font-size: 0.875rem; margin: 0;">Keine Buchungen vorhanden.</p>
+    <div class="card" style="padding:2rem;text-align:center;">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:1.5rem;color:var(--teal);letter-spacing:0.05em;margin-bottom:0.5rem;">ALLES BEGLICHEN</div>
+        <p style="font-size:0.875rem;color:var(--text2);margin:0;">Keine offenen Buchungen.</p>
     </div>
     {% endif %}
 </div>

@@ -11,7 +11,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app.database.cosmos import CosmosDB, get_db
-from app.database.models import Role, SessionStatus, User
+from app.database.models import Role, User
 from app.services.auth_service import require_auth
 from app.services.awards_service import calculate_session_awards
 

@@ -3,105 +3,138 @@
 {% block title %}{{ group_name }} — Kegelkasse{% endblock %}
 
 {% block content %}
-<!-- Hero -->
-<div class="hero" style="background: linear-gradient(135deg, #0D0D0F 0%, #1a120a 60%, #0D0D0F 100%);">
-    <div class="hero__overlay"></div>
-    <div class="hero__content">
-        <h1 style="font-family: 'Syne', sans-serif; font-size: 1.5rem; margin: 0 0 0.125rem;">{{ group_name }}</h1>
-        <p style="color: var(--color-text-secondary); font-size: 0.75rem; margin: 0;">{{ member_count }} Mitglieder · {{ role }}</p>
+
+<!-- Sticky top bar (mobile) -->
+<div class="topbar">
+    <div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:1.25rem;color:var(--text1);letter-spacing:0.06em;line-height:1;">{{ group_name | upper }}</div>
+        <div style="font-size:0.65rem;color:var(--text3);font-family:'Space Grotesk',sans-serif;margin-top:2px;">{{ member_count }} Mitglieder · {{ role }}</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:0.75rem;">
+        <a href="/profile" style="display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;background:var(--surf2);border:1.5px solid var(--border);color:var(--text2);">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+        </a>
     </div>
 </div>
 
 {% if group.setup_step and group.setup_step > 0 %}
-<div style="background: rgba(224,128,32,0.08); border-left: 3px solid var(--color-accent); padding: 1rem 1.5rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem;">
+<div style="background:var(--amber-dim);border-left:3px solid var(--amber);padding:0.875rem 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;">
     <div>
-        <div style="font-weight: 600; font-size: 0.875rem; margin-bottom: 0.125rem;">Einrichtung fortsetzen</div>
-        <div class="text-secondary" style="font-size: 0.75rem;">Schritt {{ group.setup_step }} von 6</div>
+        <div style="font-weight:700;font-size:0.875rem;color:var(--amber);">Einrichtung fortsetzen</div>
+        <div style="font-size:0.75rem;color:var(--text2);">Schritt {{ group.setup_step }} von 6</div>
     </div>
-    <a href="/groups/setup/{{ group.setup_step }}?group_id={{ group_id }}" class="btn btn-primary" style="font-size: 0.75rem; padding: 0.5rem 1rem; min-height: auto;">Weiter →</a>
+    <a href="/groups/setup/{{ group.setup_step }}?group_id={{ group_id }}" class="btn btn-primary btn-sm">Weiter →</a>
 </div>
 {% endif %}
 
 {% if can_manage and pending_sessions %}
-<div style="background: rgba(200,64,64,0.08); border-left: 3px solid var(--color-danger); padding: 1rem 1.5rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem;">
+<div style="background:var(--red-dim);border-left:3px solid var(--red);padding:0.875rem 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;">
     <div>
-        <div style="font-weight: 600; font-size: 0.875rem; color: var(--color-danger);">{{ pending_sessions | length }} Einreichung{{ 'en' if pending_sessions | length != 1 else '' }} offen</div>
-        <div class="text-secondary" style="font-size: 0.75rem;">Kegelabend{{ 'e' if pending_sessions | length != 1 else '' }} wartet{{ '' if pending_sessions | length != 1 else '' }} auf Genehmigung</div>
+        <div style="font-weight:700;font-size:0.875rem;color:var(--red);">{{ pending_sessions | length }} Einreichung{{ 'en' if pending_sessions | length != 1 else '' }} offen</div>
+        <div style="font-size:0.75rem;color:var(--text2);">Warten auf Genehmigung</div>
     </div>
-    <a href="/group/{{ group_id }}/sessions/pending" class="btn btn-danger" style="font-size: 0.75rem; padding: 0.5rem 1rem; min-height: auto;">Prüfen →</a>
+    <a href="/group/{{ group_id }}/sessions/pending" class="btn btn-danger btn-sm">Prüfen →</a>
 </div>
 {% endif %}
 
-<div style="padding: 1.5rem; max-width: 1000px;">
-    <!-- Quick stats -->
-    <div class="grid grid-cols-3 gap-4" style="margin-bottom: 2rem;">
-        <div class="card card--accent">
-            <div class="text-secondary" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Meine Schulden</div>
+<div style="padding:1.25rem;padding-bottom:90px;max-width:900px;">
+
+    <!-- HERO DEBT CARD -->
+    <div style="position:relative;border-radius:var(--radius-lg);overflow:hidden;margin-bottom:1rem;padding:1.75rem 1.5rem 1.5rem;">
+        <div style="position:absolute;inset:0;background:linear-gradient(135deg,#1a0a00 0%,var(--surf) 60%,#0a0014 100%);z-index:0;"></div>
+        <div style="position:absolute;top:-60px;right:-60px;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,var(--amber-glow) 0%,transparent 70%);z-index:0;"></div>
+        <div style="position:relative;z-index:1;">
+            <div style="font-family:'Space Grotesk',sans-serif;font-size:0.65rem;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:0.12em;margin-bottom:0.5rem;">Meine offenen Schulden</div>
             {% if my_open_debt > 0 %}
-            <div class="font-mono text-danger" style="font-size: 1.5rem; font-weight: 600;">{{ '%.2f'|format(my_open_debt) }} €</div>
+            <div class="glow-number glow-number--red" style="font-size:4.5rem;">{{ '%.2f'|format(my_open_debt)|replace('.',',') }} €</div>
             {% else %}
-            <div class="font-mono text-success" style="font-size: 1.5rem; font-weight: 600;">0,00 €</div>
+            <div class="glow-number" style="font-size:4.5rem;color:var(--teal);text-shadow:0 0 40px rgba(46,204,154,0.5);">0,00 €</div>
             {% endif %}
-            <a href="/group/{{ group_id }}/debts" style="font-size: 0.75rem; color: var(--color-accent); text-decoration: none; margin-top: 0.5rem; display: inline-block;">Details →</a>
-        </div>
-        <div class="card">
-            <div class="text-secondary" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Nächster Termin</div>
-            {% if next_event %}
-            <div style="font-size: 0.875rem; font-weight: 600;">{{ next_event.title }}</div>
-            <div class="text-secondary" style="font-size: 0.75rem; margin-top: 0.25rem;">
-                {% set start = next_event.start_date[:10] %}
-                {{ start[8:10] }}.{{ start[5:7] }}.{{ start[:4] }}
+            <div style="display:flex;gap:0.6rem;margin-top:1.1rem;flex-wrap:wrap;">
+                <a href="/group/{{ group_id }}/debts" class="btn btn-primary btn-sm">Details ansehen</a>
+                {% if payment_info and (payment_info.get('iban') or payment_info.get('paypal')) %}
+                <a href="/group/{{ group_id }}/debts" class="btn btn-ghost btn-sm" style="border-color:rgba(255,255,255,0.12);">Zahlungsinfo</a>
+                {% endif %}
             </div>
-            <a href="/group/{{ group_id }}/calendar/{{ next_event.id }}" style="font-size: 0.75rem; color: var(--color-accent); text-decoration: none; margin-top: 0.5rem; display: inline-block;">Ansehen →</a>
-            {% else %}
-            <div style="font-size: 0.875rem; color: var(--color-text-secondary);">Kein Termin geplant</div>
-            <a href="/group/{{ group_id }}/calendar/new" style="font-size: 0.75rem; color: var(--color-accent); text-decoration: none; margin-top: 0.5rem; display: inline-block;">Anlegen →</a>
-            {% endif %}
-        </div>
-        <div class="card">
-            <div class="text-secondary" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Vereinskasse</div>
-            <div class="font-mono" style="font-size: 1.25rem; font-weight: 600;">{{ '%.2f'|format(balance) }} €</div>
-            {% if can_manage %}
-            <a href="/group/{{ group_id }}/treasury" style="font-size: 0.75rem; color: var(--color-accent); text-decoration: none; margin-top: 0.5rem; display: inline-block;">Kassenbuch →</a>
-            {% endif %}
         </div>
     </div>
 
-    <!-- Quick actions -->
-    <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 2rem;">
-        <a href="/group/{{ group_id }}/sessions/new" class="btn btn-primary" style="font-size: 0.875rem;">🎳 Kegelabend starten</a>
-        <a href="/group/{{ group_id }}/calendar" class="btn btn-secondary" style="font-size: 0.875rem;">📅 Kalender</a>
-        <a href="/group/{{ group_id }}/debts" class="btn btn-secondary" style="font-size: 0.875rem;">💸 Schulden</a>
-        <a href="/group/{{ group_id }}/stats" class="btn btn-secondary" style="font-size: 0.875rem;">🏆 Statistiken</a>
+    <!-- Compact stats row -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.625rem;margin-bottom:1.25rem;">
+        <a href="/group/{{ group_id }}/treasury" style="text-decoration:none;">
+            <div style="background:var(--surf);border:1px solid var(--border);border-radius:var(--radius);padding:0.875rem 0.75rem;transition:border-color 150ms;" onmouseover="this.style.borderColor='var(--border-hi)'" onmouseout="this.style.borderColor='var(--border)'">
+                <div style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.4rem;">Vereinskasse</div>
+                <div class="font-display" style="font-size:1.4rem;color:var(--text1);line-height:1;">{{ '%.2f'|format(balance)|replace('.',',') }} €</div>
+                <div style="font-size:0.62rem;color:var(--text2);margin-top:0.2rem;">Kassenstand</div>
+            </div>
+        </a>
+        {% if next_event %}
+        <a href="/group/{{ group_id }}/calendar/{{ next_event.id }}" style="text-decoration:none;">
+            <div style="background:var(--surf);border:1px solid var(--border);border-radius:var(--radius);padding:0.875rem 0.75rem;transition:border-color 150ms;" onmouseover="this.style.borderColor='var(--border-hi)'" onmouseout="this.style.borderColor='var(--border)'">
+                <div style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.4rem;">Nächster Termin</div>
+                {% set start = next_event.start_date[:10] %}
+                <div class="font-display" style="font-size:1.4rem;color:var(--text1);line-height:1;">{{ start[8:10] }}.{{ start[5:7] }}.</div>
+                <div style="font-size:0.62rem;color:var(--text2);margin-top:0.2rem;">{{ next_event.title[:18] }}</div>
+            </div>
+        </a>
+        {% else %}
+        <a href="/group/{{ group_id }}/calendar/new" style="text-decoration:none;">
+            <div style="background:var(--surf);border:1px solid var(--border);border-radius:var(--radius);padding:0.875rem 0.75rem;">
+                <div style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.4rem;">Nächster Termin</div>
+                <div style="font-size:0.8rem;color:var(--text3);">Kein Termin</div>
+                <div style="font-size:0.62rem;color:var(--amber);margin-top:0.2rem;">Anlegen →</div>
+            </div>
+        </a>
+        {% endif %}
+        <div style="background:var(--surf);border:1px solid var(--border);border-radius:var(--radius);padding:0.875rem 0.75rem;">
+            <div style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.4rem;">Mitglieder</div>
+            <div class="font-display" style="font-size:1.4rem;color:var(--text1);line-height:1;">{{ member_count }}</div>
+            <div style="font-size:0.62rem;color:var(--text2);margin-top:0.2rem;">im Club</div>
+        </div>
     </div>
 
-    <!-- Recent activity -->
-    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
-        <h2 style="font-size: 1rem; font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin: 0;">Aktivitäten</h2>
-        <a href="/group/{{ group_id }}/log" style="font-size: 0.75rem; color: var(--color-accent); text-decoration: none;">Alle anzeigen →</a>
+    <!-- Start session CTA -->
+    <a href="/group/{{ group_id }}/sessions/new" style="text-decoration:none;display:block;margin-bottom:1.25rem;">
+        <div style="background:linear-gradient(135deg,var(--surf) 0%,#1a1008 100%);border:1px solid rgba(240,160,48,0.2);border-radius:var(--radius);padding:1rem 1.25rem;display:flex;align-items:center;justify-content:space-between;box-shadow:inset 0 0 0 1px var(--amber-glow);transition:border-color 150ms;" onmouseover="this.style.borderColor='rgba(240,160,48,0.4)'" onmouseout="this.style.borderColor='rgba(240,160,48,0.2)'">
+            <div>
+                <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.95rem;color:var(--text1);">Kegelabend erfassen</div>
+                <div style="font-size:0.72rem;color:var(--text2);margin-top:0.15rem;">{{ member_count }} Mitglieder{% if next_event %} · {{ next_event.start_date[8:10] }}.{{ next_event.start_date[5:7] }}.{% endif %}</div>
+            </div>
+            <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,var(--amber-hi),var(--amber));display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px var(--amber-glow);flex-shrink:0;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="9.5" cy="9.5" r="1.3" fill="#000" stroke="none"/><circle cx="13.5" cy="8.5" r="1.3" fill="#000" stroke="none"/><circle cx="11" cy="12.5" r="1.3" fill="#000" stroke="none"/></svg>
+            </div>
+        </div>
+    </a>
+
+    <!-- Activity feed -->
+    <div class="section-label">
+        Aktivitäten
+        <a href="/group/{{ group_id }}/log">Alle anzeigen →</a>
     </div>
 
     {% if recent_logs %}
-    <div class="card" style="padding: 0; overflow: hidden;">
+    <div class="card" style="padding:0;overflow:hidden;">
         {% for log in recent_logs %}
-        <div style="padding: 0.875rem 1.25rem; border-bottom: 1px solid var(--color-border); display: flex; align-items: flex-start; gap: 1rem; {% if loop.last %}border-bottom: none;{% endif %}">
-            <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--color-surface-elevated); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 0.875rem;">
-                {% if 'penalty' in log.get('action','') %}💸
-                {% elif 'session' in log.get('action','') %}🎳
-                {% elif 'event' in log.get('action','') or 'calendar' in log.get('action','') %}📅
-                {% elif 'paid' in log.get('action','') %}✅
-                {% elif 'member' in log.get('action','') %}👤
-                {% elif 'rulebook' in log.get('action','') %}📖
-                {% else %}📋{% endif %}
+        <div style="padding:0.75rem 1rem;border-bottom:{% if not loop.last %}1px solid var(--border){% else %}none{% endif %};display:flex;align-items:center;gap:0.875rem;">
+            <div style="width:32px;height:32px;border-radius:50%;background:var(--surf2);display:flex;align-items:center;justify-content:center;flex-shrink:0;border:1px solid var(--border);">
+                {% if 'penalty' in log.get('action','') or 'Strafe' in log.get('details','') %}
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7H4a1 1 0 00-1 1v10a1 1 0 001 1h16a1 1 0 001-1V8a1 1 0 00-1-1z"/><path d="M3 11h18"/></svg>
+                {% elif 'session' in log.get('action','') or 'Kegelabend' in log.get('details','') %}
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="9.5" cy="9.5" r="1.1" fill="var(--text2)" stroke="none"/><circle cx="13.5" cy="8.5" r="1.1" fill="var(--text2)" stroke="none"/><circle cx="11" cy="12.5" r="1.1" fill="var(--text2)" stroke="none"/></svg>
+                {% elif 'event' in log.get('action','') or 'calendar' in log.get('action','') %}
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                {% elif 'paid' in log.get('action','') %}
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                {% else %}
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                {% endif %}
             </div>
-            <div style="flex: 1; min-width: 0;">
-                <div style="font-size: 0.875rem;">
-                    <span style="font-weight: 600;">{{ log.get('actor_name', '') }}</span>
-                    {% if log.get('details') %}
-                    <span class="text-secondary"> — {{ log.get('details', '') }}</span>
-                    {% endif %}
+            <div style="flex:1;min-width:0;">
+                <div style="font-size:0.8rem;color:var(--text1);font-family:'Space Grotesk',sans-serif;">
+                    <strong>{{ log.get('actor_name', '') }}</strong>
+                    {% if log.get('details') %}<span style="color:var(--text2);"> — {{ log.get('details', '') }}</span>{% endif %}
                 </div>
-                <div class="text-secondary" style="font-size: 0.75rem; margin-top: 0.125rem;">
+                <div style="font-size:0.67rem;color:var(--text3);margin-top:2px;">
                     {% set ts = log.get('timestamp', '')[:16] %}
                     {% if ts %}{{ ts[8:10] }}.{{ ts[5:7] }}.{{ ts[:4] }} {{ ts[11:16] }} Uhr{% endif %}
                 </div>
@@ -110,10 +143,11 @@
         {% endfor %}
     </div>
     {% else %}
-    <div class="card" style="padding: 2rem; text-align: center;">
-        <div style="font-size: 2rem; margin-bottom: 0.75rem;">🎳</div>
-        <p class="text-secondary" style="font-size: 0.875rem; margin: 0;">Noch keine Aktivitäten — starte den ersten Kegelabend!</p>
+    <div class="card" style="padding:2rem;text-align:center;">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:1.5rem;color:var(--text3);letter-spacing:0.05em;margin-bottom:0.5rem;">NOCH KEINE AKTIVITÄTEN</div>
+        <p style="font-size:0.875rem;color:var(--text2);margin:0;">Starte den ersten Kegelabend!</p>
     </div>
     {% endif %}
 </div>
+
 {% endblock %}

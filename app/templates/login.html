@@ -4,50 +4,54 @@
 
 {% block body %}
 <div class="split-layout">
-    <div class="split-layout__image" style="background: linear-gradient(135deg, #0D0D0F 0%, #1a120a 50%, #0D0D0F 100%);">
-        <div class="split-layout__image-overlay">
-            <div style="text-align: center; padding: 2rem;">
-                <div style="font-size: 4rem; margin-bottom: 1rem;">🎳</div>
-                <h1 style="font-family: 'Syne', sans-serif; font-size: 2rem; color: #E08020; margin: 0 0 0.5rem;">Kegelkasse</h1>
-                <p style="color: #8A8880; margin: 0;">Dein Kegelclub. Digital.</p>
-            </div>
+
+    <!-- LEFT — brand panel -->
+    <div class="split-layout__image v2-login-left-hide">
+        <div style="position:absolute;top:30%;left:50%;transform:translate(-50%,-50%);width:380px;height:380px;border-radius:50%;background:var(--amber-glow);filter:blur(80px);pointer-events:none;"></div>
+        <!-- Decorative bowling pins -->
+        <svg width="72" height="90" viewBox="0 0 64 80" fill="none" style="position:absolute;right:18%;bottom:22%;opacity:0.16;">
+            <ellipse cx="32" cy="16" rx="13" ry="15" fill="#F0A030"/>
+            <rect x="20" y="30" width="24" height="10" rx="3" fill="#F0A030"/>
+            <ellipse cx="32" cy="60" rx="18" ry="20" fill="#F0A030"/>
+        </svg>
+        <svg width="48" height="60" viewBox="0 0 64 80" fill="none" style="position:absolute;right:8%;bottom:55%;opacity:0.07;">
+            <ellipse cx="32" cy="16" rx="13" ry="15" fill="#F0A030"/>
+            <rect x="20" y="30" width="24" height="10" rx="3" fill="#F0A030"/>
+            <ellipse cx="32" cy="60" rx="18" ry="20" fill="#F0A030"/>
+        </svg>
+        <div style="position:relative;z-index:1;text-align:center;padding:2rem;">
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:3.8rem;color:var(--text1);letter-spacing:0.06em;line-height:1;margin-bottom:0.5rem;">KEGELKASSE</div>
+            <div style="font-family:'Space Grotesk',sans-serif;color:var(--text2);font-size:1rem;line-height:1.7;">Dein Kegelclub. <span style="color:var(--amber);">Digital.</span></div>
         </div>
     </div>
 
+    <!-- RIGHT — form -->
     <div class="split-layout__form">
-        <div style="width: 100%; max-width: 400px;">
-            <h2 style="font-family: 'Syne', sans-serif; font-size: 1.5rem; margin-bottom: 0.25rem;">Willkommen zurück</h2>
-            <p class="text-secondary" style="margin-bottom: 2rem; font-size: 0.875rem;">Melde dich mit deinem Konto an.</p>
+        <div style="width:100%;max-width:380px;">
+
+            <!-- Mobile-only logo -->
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:2rem;color:var(--amber);letter-spacing:0.06em;margin-bottom:2rem;display:none;" class="v2-mobile-logo">KEGELKASSE</div>
+
+            <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:1.6rem;color:var(--text1);margin-bottom:0.25rem;">Willkommen zurück</div>
+            <div style="font-size:0.875rem;color:var(--text2);margin-bottom:2rem;">Meld dich an und los geht's.</div>
 
             {% if error == 'invalid_token' %}
-            <div class="badge badge--danger" style="display: block; padding: 0.75rem 1rem; border-radius: 8px; margin-bottom: 1.5rem; font-size: 0.875rem;">
-                Ungültiger Bestätigungslink.
-            </div>
+            <div class="alert alert--danger">Ungültiger Bestätigungslink.</div>
             {% elif error == 'token_expired' %}
-            <div class="badge badge--danger" style="display: block; padding: 0.75rem 1rem; border-radius: 8px; margin-bottom: 1.5rem; font-size: 0.875rem;">
-                Der Bestätigungslink ist abgelaufen. Bitte registriere dich erneut.
-            </div>
+            <div class="alert alert--danger">Der Bestätigungslink ist abgelaufen. Bitte registriere dich erneut.</div>
             {% elif error %}
-            <div class="badge badge--danger" style="display: block; padding: 0.75rem 1rem; border-radius: 8px; margin-bottom: 1.5rem; font-size: 0.875rem;">
-                {{ error }}
-            </div>
+            <div class="alert alert--danger">{{ error }}</div>
             {% endif %}
 
             {% if success == 'registered' %}
-            <div class="badge badge--success" style="display: block; padding: 0.75rem 1rem; border-radius: 8px; margin-bottom: 1.5rem; font-size: 0.875rem;">
-                Konto erstellt! Bitte bestätige deine E-Mail-Adresse.
-            </div>
+            <div class="alert alert--success">Konto erstellt! Bitte bestätige deine E-Mail-Adresse.</div>
             {% elif success == 'verified' %}
-            <div class="badge badge--success" style="display: block; padding: 0.75rem 1rem; border-radius: 8px; margin-bottom: 1.5rem; font-size: 0.875rem;">
-                E-Mail bestätigt! Du kannst dich jetzt anmelden.
-            </div>
+            <div class="alert alert--success">E-Mail bestätigt! Du kannst dich jetzt anmelden.</div>
             {% elif success == 'password_reset' %}
-            <div class="badge badge--success" style="display: block; padding: 0.75rem 1rem; border-radius: 8px; margin-bottom: 1.5rem; font-size: 0.875rem;">
-                Passwort erfolgreich zurückgesetzt.
-            </div>
+            <div class="alert alert--success">Passwort erfolgreich zurückgesetzt.</div>
             {% endif %}
 
-            <form method="post" action="/login" hx-boost="false" style="display: flex; flex-direction: column; gap: 1.25rem;">
+            <form method="post" action="/login" hx-boost="false" style="display:flex;flex-direction:column;gap:1rem;margin-bottom:1.5rem;">
                 <div>
                     <label for="email">E-Mail</label>
                     <input class="input" type="email" id="email" name="email" placeholder="deine@email.de" required autocomplete="email">
@@ -56,17 +60,23 @@
                     <label for="password">Passwort</label>
                     <input class="input" type="password" id="password" name="password" placeholder="••••••••" required autocomplete="current-password">
                 </div>
-                <div style="text-align: right; margin-top: -0.75rem;">
-                    <a href="/forgot-password" style="font-size: 0.75rem; color: var(--color-accent); text-decoration: none;">Passwort vergessen?</a>
+                <div style="text-align:right;margin-top:-0.5rem;">
+                    <a href="/forgot-password" style="font-size:0.75rem;color:var(--amber);text-decoration:none;">Passwort vergessen?</a>
                 </div>
-                <button type="submit" class="btn btn-primary" style="width: 100%;">Anmelden</button>
+                <button type="submit" class="btn btn-primary" style="width:100%;">Anmelden</button>
             </form>
 
-            <p style="text-align: center; margin-top: 1.5rem; font-size: 0.875rem; color: var(--color-text-secondary);">
+            <p style="text-align:center;font-size:0.8rem;color:var(--text2);">
                 Noch kein Konto?
-                <a href="/register" style="color: var(--color-accent); text-decoration: none; font-weight: 600;">Registrieren</a>
+                <a href="/register" style="color:var(--amber);text-decoration:none;font-weight:700;">Registrieren</a>
             </p>
         </div>
     </div>
 </div>
+
+<style>
+@media (max-width: 768px) {
+    .v2-mobile-logo { display: block !important; }
+}
+</style>
 {% endblock %}

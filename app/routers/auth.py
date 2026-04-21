@@ -12,6 +12,7 @@ from fastapi.templating import Jinja2Templates
 from app.config import get_settings
 from app.database.cosmos import CosmosDB, get_db
 from app.database.models import User
+from app.limiter import limiter
 from app.services.auth_service import (
     create_access_token,
     generate_verification_token,
@@ -37,6 +38,7 @@ async def register_page(request: Request, error: Optional[str] = None, success: 
 
 
 @router.post("/register")
+@limiter.limit("5/minute")
 async def register(
     request: Request,
     email: str = Form(...),
@@ -96,6 +98,7 @@ async def login_page(request: Request, error: Optional[str] = None, success: Opt
 
 
 @router.post("/login")
+@limiter.limit("10/minute")
 async def login(
     request: Request,
     email: str = Form(...),
@@ -126,6 +129,7 @@ async def login(
     if not user_doc.get("email_verified", False):
         return _render(request, "login.html", error="Bitte bestätige zuerst deine E-Mail-Adresse.")
 
+    settings = get_settings()
     token = create_access_token(user_doc["id"])
     response = RedirectResponse("/dashboard", status_code=303)
     response.set_cookie(
@@ -133,6 +137,7 @@ async def login(
         token,
         httponly=True,
         samesite="strict",
+        secure=settings.is_production,
         max_age=86400,
     )
     return response
@@ -171,6 +176,7 @@ async def forgot_password_page(request: Request, error: Optional[str] = None, su
 
 
 @router.post("/forgot-password")
+@limiter.limit("5/minute")
 async def forgot_password(
     request: Request,
     email: str = Form(...),

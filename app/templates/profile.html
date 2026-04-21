@@ -9,7 +9,7 @@
             <div style="width: 80px; height: 80px; border-radius: 50%; background: var(--color-accent-muted); display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; font-size: 2rem;">
                 {{ user.first_name[0] | upper }}
             </div>
-            <h1 style="font-family: 'Syne', sans-serif; font-size: 1.5rem; margin-bottom: 0.125rem;">{{ user.first_name }} {{ user.last_name }}</h1>
+            <h1 style="font-family: 'Space Grotesk', sans-serif; font-size: 1.5rem; margin-bottom: 0.125rem;">{{ user.first_name }} {{ user.last_name }}</h1>
             <p class="text-secondary" style="font-size: 0.875rem;">{{ user.email }}</p>
         </div>
 
@@ -21,7 +21,7 @@
         {% endif %}
 
         <div class="card" style="padding: 1.5rem; margin-bottom: 1.5rem;">
-            <h2 style="font-size: 1rem; font-family: 'Syne', sans-serif; margin-bottom: 1.25rem;">Profil bearbeiten</h2>
+            <h2 style="font-size: 1rem; font-family: 'Space Grotesk', sans-serif; margin-bottom: 1.25rem;">Profil bearbeiten</h2>
             <form method="post" action="/profile" style="display: flex; flex-direction: column; gap: 1.25rem;">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                     <div>
@@ -43,14 +43,20 @@
 
         {% if user.group_ids %}
         <div class="card" style="padding: 1.5rem; margin-bottom: 1.5rem;">
-            <h2 style="font-size: 1rem; font-family: 'Syne', sans-serif; margin-bottom: 1rem;">Meine Clubs</h2>
+            <h2 style="font-size: 1rem; font-family: 'Space Grotesk', sans-serif; margin-bottom: 1rem;">Meine Clubs</h2>
             <a href="/dashboard" class="btn btn-secondary" style="font-size: 0.875rem;">Alle Clubs anzeigen →</a>
         </div>
         {% endif %}
 
+        <div class="card" style="padding: 1.5rem; margin-bottom: 1.5rem;">
+            <h2 style="font-size: 1rem; font-family: 'Space Grotesk', sans-serif; margin-bottom: 0.5rem;">🔔 Benachrichtigungen</h2>
+            <p style="font-size: 0.8125rem; color: var(--text2); margin: 0 0 1rem;">E-Mail-Benachrichtigungen pro Club konfigurieren.</p>
+            <a href="/profile/notifications" class="btn btn-secondary" style="font-size: 0.875rem;">Einstellungen öffnen →</a>
+        </div>
+
         {% if active_awards %}
         <div class="card" style="padding: 1.5rem; margin-bottom: 1.5rem;">
-            <h2 style="font-size: 1rem; font-family: 'Syne', sans-serif; margin-bottom: 1rem;">🏆 Aktuelle Titel</h2>
+            <h2 style="font-size: 1rem; font-family: 'Space Grotesk', sans-serif; margin-bottom: 1rem;">🏆 Aktuelle Titel</h2>
             <div style="display: flex; flex-wrap: wrap; gap: 0.625rem;">
                 {% for award in active_awards %}
                 <div style="background: rgba(224,128,32,0.1); border: 1px solid rgba(224,128,32,0.3); border-radius: 8px; padding: 0.5rem 0.875rem; font-size: 0.8125rem;">

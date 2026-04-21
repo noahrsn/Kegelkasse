@@ -14,15 +14,9 @@ from app.database.cosmos import CosmosDB, get_db
 from app.database.models import (
     Group,
     GroupMember,
-    Log,
-    LogVisibility,
     PenaltyCatalog,
-    PaymentDeadline,
-    PaymentDeadlineType,
     Role,
-    Rulebook,
     Transaction,
-    TransactionType,
     User,
 )
 from app.services.auth_service import require_auth

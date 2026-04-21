@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, time as dt_time
+from datetime import UTC, date, datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Form, Request
@@ -28,6 +28,7 @@ from app.database.models import (
 )
 from app.services.auth_service import require_auth
 from app.services.calendar_service import calculate_due_date, next_occurrence
+import app.services.email_service as _es
 
 router = APIRouter(prefix="/group/{group_id}/sessions", tags=["sessions"])
 templates = Jinja2Templates(directory="app/templates")
@@ -530,6 +531,19 @@ async def submit_session(
         target_name=f"Kegelabend {date_display}",
         details=f"Kegelabend vom {date_display} zur Freigabe eingereicht",
     )
+
+    try:
+        subj, html = _es.build_pending_session(
+            group_doc.get("name", ""), current_user.full_name,
+            date_display, group_id, session_id,
+        )
+        _es.notify_group_members(
+            db, group_doc, "pending_session", subj, html,
+            role_filter=["admin", "kassenwart"],
+        )
+    except Exception:
+        pass
+
     return RedirectResponse(f"/group/{group_id}/dashboard", status_code=302)
 
 
@@ -604,6 +618,46 @@ async def approve_session(
         target_name=f"Kegelabend {date_display}",
         details=f"Kegelabend vom {date_display} genehmigt — Schulden für {len(entries)} Mitglieder eingebucht",
     )
+
+    try:
+        group_name = group_doc.get("name", "")
+        # session_approved to all members
+        subj_all, html_all = _es.build_session_approved("", group_name, date_display, group_id)
+        for member in group_doc.get("members", []):
+            uid = member["user_id"]
+            user_doc = db.read_item("users", uid, uid)
+            if not user_doc:
+                continue
+            s, h = _es.build_session_approved(
+                user_doc.get("first_name", ""), group_name, date_display, group_id,
+            )
+            _es.notify_member(db, uid, group_id, "session_approved", s, h)
+
+        # new_penalty to each member with debt
+        for entry in entries:
+            uid = entry["user_id"]
+            if entry.get("absent"):
+                debt_amount = avg
+                desc = f"Kegelabend {date_display} — Fehlen (Durchschnitt)"
+            elif entry.get("late_arrival"):
+                own = round(_entry_penalty_total(entry), 2)
+                debt_amount = round(own + entry.get("late_arrival_avg", 0), 2)
+                desc = f"Kegelabend {date_display} — Strafen + Verspätungsausgleich"
+            else:
+                debt_amount = round(_entry_penalty_total(entry), 2)
+                desc = f"Kegelabend {date_display}"
+            if debt_amount <= 0:
+                continue
+            user_doc = db.read_item("users", uid, uid)
+            if not user_doc:
+                continue
+            s, h = _es.build_new_penalty(
+                user_doc.get("first_name", ""), group_name, desc, debt_amount, group_id,
+            )
+            _es.notify_member(db, uid, group_id, "new_penalty", s, h)
+    except Exception:
+        pass
+
     return RedirectResponse(f"/group/{group_id}/sessions/pending", status_code=302)
 
 

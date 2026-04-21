@@ -3,11 +3,14 @@
 {% block title %}Kassenbuch — {{ group_name }}{% endblock %}
 
 {% block content %}
-<div class="hero" style="background: linear-gradient(135deg, #0D0D0F 0%, #0a1610 60%, #0D0D0F 100%);">
-    <div class="hero__overlay"></div>
-    <div class="hero__content">
-        <h1 style="font-family: 'Syne', sans-serif; font-size: 1.5rem; margin: 0 0 0.25rem;">Kassenbuch</h1>
-        <p style="color: var(--color-text-secondary); font-size: 0.75rem; margin: 0;">{{ group_name }}</p>
+
+<div class="topbar">
+    <div>
+        <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.9rem;color:var(--text1);">Kassenbuch</div>
+        <div style="font-size:0.65rem;color:var(--text3);">{{ group_name }}</div>
+    </div>
+    <div style="display:flex;gap:0.5rem;">
+        <a href="/group/{{ group_id }}/treasury/import" class="btn btn-primary btn-sm">CSV Import</a>
     </div>
 </div>
 
