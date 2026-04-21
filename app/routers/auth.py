@@ -7,7 +7,6 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
-from fastapi.templating import Jinja2Templates
 
 from app.config import get_settings
 from app.database.cosmos import CosmosDB, get_db
@@ -22,8 +21,9 @@ from app.services.auth_service import (
 )
 from app.services.email_service import send_password_reset_email, send_verification_email
 
+from app.templates_config import templates
+
 router = APIRouter(prefix="", tags=["auth"])
-templates = Jinja2Templates(directory="app/templates")
 
 
 def _render(request: Request, template: str, **ctx):

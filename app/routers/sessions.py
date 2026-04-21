@@ -7,7 +7,6 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 
 from app.database.cosmos import CosmosDB, get_db
 from app.database.models import (
@@ -30,8 +29,9 @@ from app.services.auth_service import require_auth
 from app.services.calendar_service import calculate_due_date, next_occurrence
 import app.services.email_service as _es
 
+from app.templates_config import templates
+
 router = APIRouter(prefix="/group/{group_id}/sessions", tags=["sessions"])
-templates = Jinja2Templates(directory="app/templates")
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

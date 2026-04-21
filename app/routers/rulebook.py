@@ -7,14 +7,14 @@ from datetime import UTC, datetime
 import mistune
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
-from fastapi.templating import Jinja2Templates
 
 from app.database.cosmos import CosmosDB, get_db
 from app.database.models import Log, LogVisibility, Role, User
 from app.services.auth_service import require_auth
 
+from app.templates_config import templates
+
 router = APIRouter(prefix="/group/{group_id}/rulebook", tags=["rulebook"])
-templates = Jinja2Templates(directory="app/templates")
 
 
 def _render(request: Request, template: str, **ctx):

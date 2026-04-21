@@ -8,7 +8,6 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 
 from app.database.cosmos import CosmosDB, get_db
 from app.database.models import (
@@ -27,8 +26,9 @@ from app.services.csv_import_service import MemberInfo, match_rows, parse_csv
 from app.services.treasury_service import calculate_balance, check_late_payment, match_payment_to_debts
 import app.services.email_service as _es
 
+from app.templates_config import templates
+
 router = APIRouter(prefix="/group/{group_id}/treasury", tags=["treasury"])
-templates = Jinja2Templates(directory="app/templates")
 
 
 def _render(request: Request, template: str, **ctx):

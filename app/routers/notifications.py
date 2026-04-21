@@ -4,15 +4,15 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
-from fastapi.templating import Jinja2Templates
 
 from app.database.cosmos import CosmosDB, get_db
 from app.database.models import User
 from app.services.auth_service import require_auth
 from app.services.email_service import NOTIF_DEFAULTS
 
+from app.templates_config import templates
+
 router = APIRouter(tags=["notifications"])
-templates = Jinja2Templates(directory="app/templates")
 
 NOTIFICATION_TYPES: list[tuple[str, str, str]] = [
     ("new_penalty",          "Neue Strafe gebucht",          "Wenn nach einem Kegelabend eine Strafe für dich eingebucht wird"),

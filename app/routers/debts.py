@@ -7,14 +7,14 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 
 from app.database.cosmos import CosmosDB, get_db
 from app.database.models import Debt, DebtEntry, DebtType, Log, LogVisibility, Role, User
 from app.services.auth_service import require_auth
 
+from app.templates_config import templates
+
 router = APIRouter(prefix="/group/{group_id}/debts", tags=["debts"])
-templates = Jinja2Templates(directory="app/templates")
 
 
 def _render(request: Request, template: str, **ctx):

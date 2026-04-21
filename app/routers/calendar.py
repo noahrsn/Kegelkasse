@@ -8,7 +8,6 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
-from fastapi.templating import Jinja2Templates
 
 from app.database.cosmos import CosmosDB, get_db
 from app.database.models import (
@@ -27,8 +26,9 @@ from app.services.auth_service import require_auth
 from app.services.calendar_service import next_occurrence
 import app.services.email_service as _es
 
+from app.templates_config import templates
+
 router = APIRouter(prefix="/group/{group_id}/calendar", tags=["calendar"])
-templates = Jinja2Templates(directory="app/templates")
 
 WEEKDAY_NAMES_SHORT = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
 WEEKDAY_NAMES_LONG = [

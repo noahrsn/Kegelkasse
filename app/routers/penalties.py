@@ -5,14 +5,14 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 
 from app.database.cosmos import CosmosDB, get_db
 from app.database.models import PenaltyCatalog, Role, User
 from app.services.auth_service import require_auth
 
+from app.templates_config import templates
+
 router = APIRouter(prefix="/group/{group_id}", tags=["penalties"])
-templates = Jinja2Templates(directory="app/templates")
 
 
 def _user_role(group_doc: dict, user_id: str):
