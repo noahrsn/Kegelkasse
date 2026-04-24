@@ -3,53 +3,49 @@
 {% block title %}Gastkegler — {{ date_display }} — Kegelkasse{% endblock %}
 
 {% block content %}
-<div class="hero" style="background: linear-gradient(135deg, #0D0D0F 0%, #0a1218 60%, #0D0D0F 100%);">
-    <div class="hero__overlay"></div>
-    <div class="hero__content">
-        <h1 style="font-family: 'Space Grotesk', sans-serif; font-size: 1.25rem; margin: 0 0 0.125rem;">Gastkegler</h1>
-        <p style="color: var(--color-text-secondary); font-size: 0.75rem; margin: 0;">Kegelabend {{ date_display }} · {{ group_name }}</p>
+
+<!-- Header island -->
+<div style="background:var(--card-cream);border-radius:0 0 var(--radius-lg) var(--radius-lg);padding:1.25rem;margin-bottom:1rem;box-shadow:var(--shadow);">
+    <a href="/group/{{ group_id }}/sessions/{{ session_id }}" style="font-size:0.78rem;font-weight:800;color:var(--text2);text-decoration:none;font-family:'Nunito',sans-serif;display:inline-flex;align-items:center;gap:0.25rem;margin-bottom:0.75rem;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+        Session
+    </a>
+    <div style="display:flex;align-items:center;gap:0.625rem;flex-wrap:wrap;">
+        <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:1.2rem;color:var(--text1);">Gastkegler</div>
+        {% if guest_entries %}
+        <span class="badge badge--warning">{{ guest_entries | length }}</span>
+        {% endif %}
     </div>
+    <div style="font-size:0.68rem;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:0.08em;font-family:'Nunito',sans-serif;margin-top:4px;">Kegelabend {{ date_display }} · {{ group_name }}</div>
 </div>
 
-<div style="padding: 1.25rem; max-width: 640px;">
-    <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.25rem;">
-        <a href="/group/{{ group_id }}/sessions/{{ session_id }}" class="btn btn-secondary"
-           style="font-size: 0.8125rem; padding: 0.5rem 0.875rem; min-height: auto;">← Zurück</a>
-        <h2 style="font-size: 1rem; font-weight: 600; margin: 0;">
-            Gäste
-            {% if guest_entries %}<span class="badge badge--warning" style="margin-left: 0.5rem;">{{ guest_entries | length }}</span>{% endif %}
-        </h2>
-    </div>
+<div style="padding:0 1.25rem 1.5rem;max-width:640px;padding-bottom:96px;">
 
-    <!-- Add guest form -->
     {% if session.status != 'approved' %}
-    <div class="card" style="margin-bottom: 1.25rem;">
-        <h3 style="font-size: 0.875rem; font-weight: 600; margin: 0 0 0.875rem;">Gast hinzufügen</h3>
+    <div class="card" style="padding:1.25rem;margin-bottom:1rem;">
+        <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:0.875rem;color:var(--text1);margin-bottom:0.875rem;">Gast hinzufügen</div>
         <form hx-post="/group/{{ group_id }}/sessions/{{ session_id }}/guests"
               hx-target="#guest-list" hx-swap="beforeend"
               hx-on::after-request="this.reset()"
-              style="display: flex; gap: 0.75rem;">
-            <input class="input" type="text" name="guest_name" placeholder="Name des Gastes" required
-                   style="flex: 1;">
-            <button type="submit" class="btn btn-primary"
-                    style="min-height: auto; padding: 0.625rem 1rem; flex-shrink: 0;">
+              style="display:flex;gap:0.75rem;">
+            <input class="input" type="text" name="guest_name" placeholder="Name des Gastes" required style="flex:1;">
+            <button type="submit" class="btn btn-primary" style="min-height:auto;padding:0.625rem 1rem;flex-shrink:0;">
                 + Hinzufügen
             </button>
         </form>
     </div>
     {% endif %}
 
-    <!-- Guest list -->
-    <div id="guest-list" style="display: flex; flex-direction: column; gap: 0.875rem;">
+    <div id="guest-list" style="display:flex;flex-direction:column;gap:0.75rem;">
         {% for guest in guest_entries %}
         {% include "session_guest_card.html" %}
         {% endfor %}
     </div>
 
     {% if not guest_entries %}
-    <div class="card" style="text-align: center; padding: 2.5rem;">
-        <div style="font-size: 2rem; margin-bottom: 0.75rem;">👥</div>
-        <p class="text-secondary" style="font-size: 0.875rem; margin: 0;">Noch keine Gäste — füge einen Gast über das Formular oben hinzu.</p>
+    <div class="card" style="text-align:center;padding:3rem;">
+        <div style="font-size:2.5rem;margin-bottom:0.75rem;">👥</div>
+        <p style="font-size:0.875rem;font-weight:700;color:var(--text2);font-family:'Nunito',sans-serif;margin:0;">Noch keine Gäste — füge einen Gast über das Formular oben hinzu.</p>
     </div>
     {% endif %}
 </div>

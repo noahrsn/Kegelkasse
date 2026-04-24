@@ -27,16 +27,44 @@ def calculate_balance(
     return round(total, 2)
 
 
+def open_debt_total(entries: list) -> float:
+    """Calculate net open debt across a list of debt entry dicts or DebtEntry objects.
+
+    Credit entries (overpayments) are subtracted from the total.
+    """
+    total = 0.0
+    for e in entries:
+        if isinstance(e, dict):
+            paid = e.get("paid", False)
+            cancelled = e.get("cancelled", False)
+            amount = e.get("amount", 0)
+            dtype = e.get("type", "")
+        else:
+            paid = e.paid
+            cancelled = e.cancelled
+            amount = e.amount
+            dtype = e.type.value if hasattr(e.type, "value") else str(e.type)
+
+        if paid or cancelled:
+            continue
+        if dtype == DebtType.credit:
+            total -= amount
+        else:
+            total += amount
+    return round(total, 2)
+
+
 def match_payment_to_debts(
     debt: Debt, payment_amount: float, transaction_id: str, payment_date: date
 ) -> float:
     """Match a payment against the oldest open debt entries (FIFO).
 
-    Returns the remaining unmatched amount (overpayment).
+    Returns the remaining unmatched amount (overpayment). If overpayment > 0,
+    a credit entry is added to the debt object so future debts are offset.
     """
     remaining = payment_amount
     for entry in sorted(debt.entries, key=lambda e: e.created_at):
-        if entry.paid or entry.cancelled or remaining <= 0:
+        if entry.paid or entry.cancelled or entry.type == DebtType.credit or remaining <= 0:
             continue
         if remaining >= entry.amount:
             entry.paid = True
@@ -46,7 +74,18 @@ def match_payment_to_debts(
         else:
             # Partial payment — don't mark as paid, remaining goes to 0
             remaining = 0
-    return round(remaining, 2)
+
+    overpayment = round(remaining, 2)
+    if overpayment > 0:
+        credit_entry = DebtEntry(
+            type=DebtType.credit,
+            amount=overpayment,
+            description=f"Guthaben aus Überzahlung ({payment_date})",
+            transaction_id=transaction_id,
+        )
+        debt.entries.append(credit_entry)
+
+    return overpayment
 
 
 def check_late_payment(

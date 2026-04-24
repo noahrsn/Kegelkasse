@@ -117,11 +117,14 @@ async def group_dashboard(
     )
     my_open_debt = 0.0
     if debt_docs:
-        my_open_debt = round(sum(
-            e.get("amount", 0)
-            for e in debt_docs[0].get("entries", [])
-            if not e.get("paid") and not e.get("cancelled")
-        ), 2)
+        for e in debt_docs[0].get("entries", []):
+            if e.get("paid") or e.get("cancelled"):
+                continue
+            if e.get("type") == "credit":
+                my_open_debt -= e.get("amount", 0)
+            else:
+                my_open_debt += e.get("amount", 0)
+        my_open_debt = round(my_open_debt, 2)
 
     # Next upcoming event
     now = datetime.now(UTC)

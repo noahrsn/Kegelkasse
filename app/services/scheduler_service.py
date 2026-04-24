@@ -70,6 +70,15 @@ def start_scheduler() -> None:
         replace_existing=True,
     )
 
+    scheduler.add_job(
+        send_deadline_warnings,
+        "cron",
+        hour="8,14,19",
+        minute=0,
+        id="deadline_warnings",
+        replace_existing=True,
+    )
+
     scheduler.start()
     logger.info("Scheduler started with %d jobs", len(scheduler.get_jobs()))
 
@@ -203,11 +212,11 @@ def send_debt_reminders() -> None:
             )
             if not debts:
                 continue
-            total = sum(
-                e.get("amount", 0)
-                for e in debts[0].get("entries", [])
-                if not e.get("paid") and not e.get("cancelled")
-            )
+            total = 0.0
+            for e in debts[0].get("entries", []):
+                if e.get("paid") or e.get("cancelled"):
+                    continue
+                total += -e.get("amount", 0) if e.get("type") == "credit" else e.get("amount", 0)
             if total <= 0:
                 continue
             user_doc = db.read_item("users", user_id, user_id)
@@ -263,11 +272,10 @@ def send_monthly_summary() -> None:
             )
             open_debt = 0.0
             if debts:
-                open_debt = sum(
-                    e.get("amount", 0)
-                    for e in debts[0].get("entries", [])
-                    if not e.get("paid") and not e.get("cancelled")
-                )
+                for e in debts[0].get("entries", []):
+                    if e.get("paid") or e.get("cancelled"):
+                        continue
+                    open_debt += -e.get("amount", 0) if e.get("type") == "credit" else e.get("amount", 0)
             subj, html = es.build_monthly_summary(
                 user_doc.get("first_name", ""),
                 group.get("name", ""),
@@ -332,6 +340,64 @@ def send_rsvp_reminders() -> None:
                 event["id"],
             )
             es.notify_member(db, uid, group_id, "rsvp_reminder", subj, html)
+
+
+# ── Deadline warnings (final notice before RSVP deadline) ─────────────────────
+
+def send_deadline_warnings() -> None:
+    """Send a final warning to members whose RSVP deadline expires within 6 hours."""
+    from app.database.cosmos import CosmosDB
+    import app.services.email_service as es
+
+    db = CosmosDB.get()
+    now = datetime.now(tz=UTC)
+    window_end = now + timedelta(hours=6)
+
+    try:
+        events = db.query_items(
+            "events",
+            "SELECT * FROM c WHERE c.rsvp_deadline_hours > 0",
+        )
+    except Exception as exc:
+        logger.warning("send_deadline_warnings: query failed: %s", exc)
+        return
+
+    for event in events:
+        deadline_hours = event.get("rsvp_deadline_hours", 0)
+        try:
+            start_dt = datetime.fromisoformat(str(event["start_date"]).replace("Z", "+00:00"))
+            deadline_dt = start_dt - timedelta(hours=deadline_hours)
+        except Exception:
+            continue
+
+        # Only send if deadline falls within the next 6 hours (but not already passed)
+        if not (now <= deadline_dt <= window_end):
+            continue
+
+        group_id = event.get("group_id", "")
+        group_doc = db.read_item("groups", group_id, group_id)
+        if not group_doc:
+            continue
+
+        deadline_display = deadline_dt.strftime("%d.%m.%Y, %H:%M Uhr")
+        pending_uids = {
+            r["user_id"] for r in event.get("rsvp_entries", [])
+            if r.get("status") == "pending"
+        }
+
+        for uid in pending_uids:
+            user_doc = db.read_item("users", uid, uid)
+            if not user_doc:
+                continue
+            subj, html = es.build_deadline_warning(
+                user_doc.get("first_name", ""),
+                group_doc.get("name", ""),
+                event.get("title", ""),
+                deadline_display,
+                group_id,
+                event["id"],
+            )
+            es.notify_member(db, uid, group_id, "deadline_warning", subj, html)
 
 
 # ── Poll closing soon ──────────────────────────────────────────────────────────

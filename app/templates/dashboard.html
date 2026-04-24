@@ -8,33 +8,35 @@
 
         <!-- Logo -->
         <div style="text-align:center;margin-bottom:2.5rem;">
-            <div style="font-family:'Bebas Neue',sans-serif;font-size:2.8rem;color:var(--text1);letter-spacing:0.06em;line-height:1;margin-bottom:0.5rem;">KEGELKASSE</div>
-            <div style="font-size:0.875rem;color:var(--text2);">Hallo, <span style="color:var(--amber);font-weight:600;">{{ user.first_name }}</span>!</div>
+            <div style="font-size:3rem;margin-bottom:0.75rem;">🎳</div>
+            <div style="font-family:'Nunito',sans-serif;font-size:2rem;font-weight:900;color:var(--text1);line-height:1;margin-bottom:0.35rem;">Kegelkasse</div>
+            <div style="font-size:0.875rem;font-weight:700;color:var(--text2);font-family:'Nunito',sans-serif;">Hallo, <span style="color:var(--purple);font-weight:900;">{{ user.first_name }}</span>!</div>
         </div>
 
         {% if groups %}
-        <div style="font-size:0.65rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.75rem;font-family:'Space Grotesk',sans-serif;">Deine Clubs</div>
+        <div class="section-label">Deine Clubs</div>
         <div style="display:flex;flex-direction:column;gap:0.625rem;margin-bottom:2rem;">
             {% for group in groups %}
             <a href="/group/{{ group.id }}/dashboard" style="text-decoration:none;">
-                <div style="background:var(--surf);border:1px solid var(--border);border-left:3px solid var(--amber);border-radius:var(--radius);padding:1rem 1.25rem;display:flex;align-items:center;justify-content:space-between;transition:border-color 150ms,background 150ms;" onmouseover="this.style.background='var(--surf2)'" onmouseout="this.style.background='var(--surf)'">
+                <div style="background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);border-left:3px solid var(--purple);padding:1rem 1.25rem;display:flex;align-items:center;justify-content:space-between;transition:box-shadow 150ms;" onmouseover="this.style.boxShadow='var(--shadow-md)'" onmouseout="this.style.boxShadow='var(--shadow)'">
                     <div>
-                        <div style="font-weight:700;font-size:0.95rem;color:var(--text1);margin-bottom:0.125rem;">{{ group.name }}</div>
-                        <div style="font-size:0.72rem;color:var(--text2);">{{ group.role }}</div>
+                        <div style="font-weight:800;font-size:0.95rem;color:var(--text1);font-family:'Nunito',sans-serif;margin-bottom:0.125rem;">{{ group.name }}</div>
+                        <div style="font-size:0.72rem;font-weight:700;color:var(--text2);font-family:'Nunito',sans-serif;">{{ group.role }}</div>
                     </div>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
                 </div>
             </a>
             {% endfor %}
         </div>
         {% else %}
         <div class="card" style="text-align:center;padding:2.5rem 1.5rem;margin-bottom:1.5rem;">
-            <div style="font-family:'Bebas Neue',sans-serif;font-size:1.75rem;color:var(--text3);letter-spacing:0.06em;margin-bottom:0.5rem;">NOCH KEIN CLUB</div>
-            <p style="font-size:0.875rem;color:var(--text2);margin:0;">Erstelle deinen ersten Club oder tritt über einen Einladungslink bei.</p>
+            <div style="font-size:2rem;margin-bottom:0.75rem;">🎳</div>
+            <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:1.1rem;color:var(--text1);margin-bottom:0.5rem;">Noch kein Club</div>
+            <p style="font-size:0.875rem;font-weight:700;color:var(--text2);margin:0;font-family:'Nunito',sans-serif;">Erstelle deinen ersten Club oder tritt über einen Einladungslink bei.</p>
         </div>
         {% endif %}
 
-        <a href="/groups/new" class="btn btn-primary" style="width:100%;justify-content:center;">
+        <a href="/groups/new" class="btn btn-primary" style="width:100%;justify-content:center;min-height:48px;">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
             Neuen Club erstellen
         </a>

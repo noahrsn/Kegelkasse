@@ -3,72 +3,78 @@
 {% block title %}Import bestätigen — {{ group_name }}{% endblock %}
 
 {% block content %}
-<div style="padding: 1.5rem; max-width: 1000px;">
 
-    <div style="margin-bottom: 1.5rem;">
-        <a href="/group/{{ group_id }}/treasury/import" style="color: var(--color-text-secondary); text-decoration: none; font-size: 0.875rem;">← Neue Datei hochladen</a>
-    </div>
+<!-- Header island -->
+<div style="background:var(--card-cream);border-radius:0 0 var(--radius-lg) var(--radius-lg);padding:1.25rem;margin-bottom:1rem;box-shadow:var(--shadow);">
+    <a href="/group/{{ group_id }}/treasury/import" style="font-size:0.78rem;font-weight:800;color:var(--text2);text-decoration:none;font-family:'Nunito',sans-serif;display:inline-flex;align-items:center;gap:0.25rem;margin-bottom:0.75rem;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+        Neue Datei hochladen
+    </a>
+    <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:1.2rem;color:var(--text1);">Import bestätigen</div>
+    <div style="font-size:0.68rem;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:0.08em;font-family:'Nunito',sans-serif;margin-top:4px;">{{ group_name }}</div>
+</div>
 
-    <h1 style="font-family: 'Space Grotesk', sans-serif; font-size: 1.5rem; margin-bottom: 0.5rem;">Import bestätigen</h1>
-    <p class="text-secondary" style="font-size: 0.875rem; margin-bottom: 0.5rem;">{{ results | length }} neue Buchung{{ 'en' if results | length != 1 else '' }} gefunden{% if skipped > 0 %} · {{ skipped }} bereits importiert (übersprungen){% endif %}.</p>
-    <p class="text-secondary" style="font-size: 0.75rem; margin-bottom: 1.5rem;">Prüfe die Zuordnungen und klicke dann auf „Importieren".</p>
+<div style="padding:0 1.25rem 1.5rem;max-width:1000px;padding-bottom:96px;">
+
+    <p style="font-size:0.875rem;font-weight:700;color:var(--text2);font-family:'Nunito',sans-serif;margin:0 0 0.25rem;">{{ results | length }} neue Buchung{{ 'en' if results | length != 1 else '' }} gefunden{% if skipped > 0 %} · {{ skipped }} bereits importiert (übersprungen){% endif %}.</p>
+    <p style="font-size:0.75rem;font-weight:700;color:var(--text3);font-family:'Nunito',sans-serif;margin:0 0 1.25rem;">Prüfe die Zuordnungen und klicke dann auf „Importieren".</p>
 
     <form method="post" action="/group/{{ group_id }}/treasury/import/confirm">
         <input type="hidden" name="rows_json" value="{{ rows_json | e }}">
 
-        <div class="card" style="padding: 0; overflow: hidden; margin-bottom: 1.5rem;">
-            <div style="padding: 0.875rem 1.25rem; border-bottom: 1px solid var(--color-border); display: grid; grid-template-columns: 90px 140px 1fr auto 140px 60px; gap: 0.75rem; align-items: center;">
-                <div class="text-secondary" style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em;">Datum</div>
-                <div class="text-secondary" style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em;">Name</div>
-                <div class="text-secondary" style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em;">Verwendungszweck</div>
-                <div class="text-secondary" style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; text-align: right;">Betrag</div>
-                <div class="text-secondary" style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em;">Mitglied</div>
-                <div class="text-secondary" style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; text-align: center;">Überspr.</div>
+        <div class="card" style="padding:0;overflow:hidden;margin-bottom:1.25rem;">
+            <!-- Header -->
+            <div style="padding:0.65rem 1.25rem;border-bottom:1px solid var(--border);display:grid;grid-template-columns:90px 140px 1fr auto 140px 60px;gap:0.75rem;align-items:center;background:var(--purple-dim);">
+                <div style="font-size:0.65rem;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;font-family:'Nunito',sans-serif;">Datum</div>
+                <div style="font-size:0.65rem;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;font-family:'Nunito',sans-serif;">Name</div>
+                <div style="font-size:0.65rem;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;font-family:'Nunito',sans-serif;">Verwendungszweck</div>
+                <div style="font-size:0.65rem;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;font-family:'Nunito',sans-serif;text-align:right;">Betrag</div>
+                <div style="font-size:0.65rem;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;font-family:'Nunito',sans-serif;">Mitglied</div>
+                <div style="font-size:0.65rem;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;font-family:'Nunito',sans-serif;text-align:center;">Überspr.</div>
             </div>
 
             {% for row in results %}
-            <div style="padding: 0.875rem 1.25rem; border-bottom: 1px solid var(--color-border); display: grid; grid-template-columns: 90px 140px 1fr auto 140px 60px; gap: 0.75rem; align-items: center; {% if loop.last %}border-bottom: none;{% endif %}
-                {% if row.is_expense %}background: rgba(200,64,64,0.04);{% endif %}">
-                <div class="font-mono text-secondary" style="font-size: 0.8125rem;">
+            <div style="padding:0.875rem 1.25rem;border-bottom:{% if not loop.last %}1px solid var(--border){% else %}none{% endif %};display:grid;grid-template-columns:90px 140px 1fr auto 140px 60px;gap:0.75rem;align-items:center;{% if row.is_expense %}background:rgba(220,70,70,0.03);{% endif %}">
+                <div style="font-family:'Nunito',sans-serif;font-size:0.8125rem;font-weight:700;color:var(--text2);">
                     {% set d = row.date %}
                     {{ d[8:10] }}.{{ d[5:7] }}.{{ d[:4] }}
                 </div>
                 <div>
-                    <div style="font-size: 0.8125rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ row.name }}">{{ row.name[:20] }}{% if row.name | length > 20 %}…{% endif %}</div>
+                    <div style="font-size:0.8125rem;font-weight:700;font-family:'Nunito',sans-serif;color:var(--text1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="{{ row.name }}">{{ row.name[:20] }}{% if row.name | length > 20 %}…{% endif %}</div>
                     {% if row.match_confidence == 'iban' %}
-                    <span style="font-size: 0.625rem; background: rgba(74,144,96,0.2); color: var(--color-success); padding: 0.125rem 0.375rem; border-radius: 3px;">IBAN</span>
+                    <span class="badge badge--success" style="font-size:0.625rem;">IBAN</span>
                     {% elif row.match_confidence == 'name' %}
-                    <span style="font-size: 0.625rem; background: rgba(212,160,23,0.2); color: #d4a017; padding: 0.125rem 0.375rem; border-radius: 3px;">NAME</span>
+                    <span class="badge badge--warning" style="font-size:0.625rem;">NAME</span>
                     {% elif not row.is_expense %}
-                    <span style="font-size: 0.625rem; background: var(--color-surface-elevated); color: var(--color-text-secondary); padding: 0.125rem 0.375rem; border-radius: 3px;">OFFEN</span>
+                    <span class="badge badge--neutral" style="font-size:0.625rem;">OFFEN</span>
                     {% endif %}
                 </div>
-                <div class="text-secondary" style="font-size: 0.8125rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ row.verwendungszweck }}">
+                <div style="font-size:0.8125rem;font-weight:700;color:var(--text2);font-family:'Nunito',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="{{ row.verwendungszweck }}">
                     {{ (row.verwendungszweck or row.buchungstext)[:40] }}{% if (row.verwendungszweck or '') | length > 40 %}…{% endif %}
                 </div>
-                <div class="font-mono {% if row.amount > 0 %}text-success{% else %}text-danger{% endif %}" style="font-size: 0.9375rem; font-weight: 600; text-align: right; white-space: nowrap;">
-                    {% if row.amount > 0 %}+{% endif %}{{ '%.2f'|format(row.amount) }} €
+                <div style="font-family:'Nunito',sans-serif;font-size:0.9375rem;font-weight:900;text-align:right;white-space:nowrap;color:{% if row.amount > 0 %}var(--teal){% else %}var(--red){% endif %};">
+                    {% if row.amount > 0 %}+{% endif %}{{ '%.2f'|format(row.amount)|replace('.',',') }} €
                 </div>
                 <div>
                     {% if not row.is_expense %}
-                    <select name="user_{{ loop.index0 }}" class="input" style="font-size: 0.75rem; padding: 0.25rem 0.5rem; height: auto;">
+                    <select name="user_{{ loop.index0 }}" class="input" style="font-size:0.75rem;padding:0.25rem 0.5rem;height:auto;">
                         <option value="">— kein Mitglied —</option>
                         {% for member in all_members %}
                         <option value="{{ member.user_id }}" {% if member.user_id == row.matched_user_id %}selected{% endif %}>{{ member.name }}</option>
                         {% endfor %}
                     </select>
                     {% else %}
-                    <span class="text-secondary" style="font-size: 0.75rem;">Ausgabe</span>
+                    <span style="font-size:0.75rem;font-weight:700;color:var(--text2);font-family:'Nunito',sans-serif;">Ausgabe</span>
                     {% endif %}
                 </div>
-                <div style="text-align: center;">
-                    <input type="checkbox" name="skip_{{ loop.index0 }}" style="width: 18px; height: 18px; accent-color: var(--color-accent);">
+                <div style="text-align:center;">
+                    <input type="checkbox" name="skip_{{ loop.index0 }}" style="width:18px;height:18px;accent-color:var(--purple);">
                 </div>
             </div>
             {% endfor %}
         </div>
 
-        <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+        <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
             <button type="submit" class="btn btn-primary">{{ results | length }} Buchung{{ 'en' if results | length != 1 else '' }} importieren</button>
             <a href="/group/{{ group_id }}/treasury/import" class="btn btn-secondary">Abbrechen</a>
         </div>

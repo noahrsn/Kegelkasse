@@ -4,24 +4,28 @@
 
 {% block content %}
 
-<div class="topbar">
-    <div>
-        <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.9rem;color:var(--text1);">Statistiken & Awards</div>
-        <div style="font-size:0.65rem;color:var(--text3);">{{ group_name }} · {{ month_session_count }} Abend{{ 'e' if month_session_count != 1 else '' }} diesen Monat</div>
+<!-- Header island -->
+<div style="background:var(--card-lavender);border-radius:0 0 var(--radius-lg) var(--radius-lg);padding:1.25rem;margin-bottom:1rem;box-shadow:var(--shadow);">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div>
+            <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:1.2rem;color:var(--text1);">Statistiken & Awards</div>
+            <div style="font-size:0.68rem;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:0.08em;font-family:'Nunito',sans-serif;margin-top:2px;">{{ group_name }} · {{ month_session_count }} Abend{{ 'e' if month_session_count != 1 else '' }} diesen Monat</div>
+        </div>
+        <a href="/group/{{ group_id }}/stats/alltime" class="btn btn-secondary btn-sm">Ewige Tabelle</a>
     </div>
-    <a href="/group/{{ group_id }}/stats/alltime" class="btn btn-ghost btn-sm">Ewige Tabelle</a>
 </div>
 
-<div style="padding:1.25rem;padding-bottom:90px;max-width:900px;">
+<div style="padding:1rem 1.25rem;padding-bottom:96px;max-width:960px;">
 
     <!-- Awards -->
     {% set awards = saved_award_entries if saved_award_entries else month_award_entries %}
     <div class="section-label">Awards — {{ current_month }}</div>
 
     {% if awards %}
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:0.625rem;margin-bottom:1.5rem;">
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:0.625rem;margin-bottom:1.5rem;">
+        {% set award_colors = ['var(--card-lavender)', 'var(--card-peach)', 'var(--card-cream)', 'var(--card-mint)', 'var(--card-blue)', 'var(--white)'] %}
         {% for award in awards[:6] %}
-        <div class="card--glass card" style="padding:1rem 0.75rem;text-align:center;{% if loop.index == 1 %}border-color:var(--amber-glow);{% endif %}">
+        <div style="background:{{ award_colors[loop.index0 % 6] }};border-radius:var(--radius);box-shadow:var(--shadow);padding:1rem 0.75rem;text-align:center;">
             <div style="font-size:1.75rem;margin-bottom:0.35rem;">
                 {% if award.type == 'pudelkoenig' %}🎳
                 {% elif award.type == 'goldesel' %}💰
@@ -30,7 +34,7 @@
                 {% elif award.type == 'spaetzuender' %}⏰
                 {% else %}🏆{% endif %}
             </div>
-            <div style="font-size:0.65rem;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.25rem;">
+            <div style="font-size:0.62rem;font-weight:800;color:var(--purple);text-transform:uppercase;letter-spacing:0.08em;font-family:'Nunito',sans-serif;margin-bottom:0.25rem;">
                 {% if award.type == 'pudelkoenig' %}Pudelkönig
                 {% elif award.type == 'goldesel' %}Goldesel
                 {% elif award.type == 'streber' %}Streber
@@ -38,27 +42,28 @@
                 {% elif award.type == 'spaetzuender' %}Spätzünder
                 {% else %}{{ award.type }}{% endif %}
             </div>
-            <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.8rem;color:var(--text1);">{{ award.user_name }}</div>
-            <div style="font-size:0.65rem;color:var(--text2);margin-top:0.15rem;">{{ award.label }}</div>
+            <div style="font-family:'Nunito',sans-serif;font-weight:800;font-size:0.82rem;color:var(--text1);">{{ award.user_name }}</div>
+            <div style="font-size:0.65rem;font-weight:700;color:var(--text2);font-family:'Nunito',sans-serif;margin-top:0.15rem;">{{ award.label }}</div>
         </div>
         {% endfor %}
     </div>
     {% else %}
     <div class="card" style="padding:2rem;text-align:center;margin-bottom:1.5rem;">
-        <div style="font-family:'Bebas Neue',sans-serif;font-size:1.4rem;color:var(--text3);letter-spacing:0.05em;">NOCH KEINE DATEN</div>
-        <p style="font-size:0.875rem;color:var(--text2);margin:0.5rem 0 0;">Noch keine genehmigten Kegelabende diesen Monat.</p>
+        <div style="font-size:1.5rem;margin-bottom:0.5rem;">🏆</div>
+        <div style="font-size:0.9rem;font-weight:700;color:var(--text2);font-family:'Nunito',sans-serif;">Noch keine Daten</div>
+        <div style="font-size:0.78rem;font-weight:700;color:var(--text3);font-family:'Nunito',sans-serif;margin-top:0.25rem;">Noch keine genehmigten Kegelabende diesen Monat.</div>
     </div>
     {% endif %}
 
     <!-- Top this month -->
     {% if top_this_month %}
     <div class="section-label">Höchste Strafen diesen Monat</div>
-    <div class="card" style="padding:0;overflow:hidden;margin-bottom:1.5rem;">
+    <div class="card" style="padding:0;margin-bottom:1.5rem;">
         {% for item in top_this_month %}
-        <div style="padding:0.875rem 1rem;border-bottom:{% if not loop.last %}1px solid var(--border){% else %}none{% endif %};display:flex;align-items:center;gap:0.875rem;background:{% if loop.index == 1 %}linear-gradient(90deg,var(--amber-dim),var(--surf)){% else %}var(--surf){% endif %};">
-            <div style="font-family:'Bebas Neue',sans-serif;font-size:1.4rem;color:{% if loop.index == 1 %}var(--amber){% else %}var(--text3){% endif %};width:28px;text-align:right;line-height:1;">{{ loop.index }}</div>
-            <div style="flex:1;font-family:'Space Grotesk',sans-serif;font-weight:{% if loop.index == 1 %}700{% else %}500{% endif %};font-size:0.875rem;color:var(--text1);">{{ item.name }}</div>
-            <div class="font-mono" style="font-size:0.9rem;font-weight:600;color:var(--red);">{{ '%.2f'|format(item.amount)|replace('.',',') }} €</div>
+        <div style="padding:0.875rem 1rem;border-bottom:{% if not loop.last %}1px solid var(--border){% else %}none{% endif %};display:flex;align-items:center;gap:0.875rem;background:{% if loop.index == 1 %}var(--purple-dim){% else %}transparent{% endif %};">
+            <div style="font-family:'Nunito',sans-serif;font-size:1.1rem;font-weight:900;color:{% if loop.index == 1 %}var(--purple){% else %}var(--text3){% endif %};width:28px;text-align:right;line-height:1;">{{ loop.index }}</div>
+            <div style="flex:1;font-family:'Nunito',sans-serif;font-weight:{% if loop.index == 1 %}800{% else %}700{% endif %};font-size:0.875rem;color:var(--text1);">{{ item.name }}</div>
+            <div style="font-family:'Nunito',sans-serif;font-size:0.9rem;font-weight:800;color:var(--red);">{{ '%.2f'|format(item.amount)|replace('.',',') }} €</div>
         </div>
         {% endfor %}
     </div>
@@ -71,11 +76,11 @@
         {% set max_total = monthly_totals | map(attribute='total') | max %}
         {% for item in monthly_totals %}
         <div style="display:flex;align-items:center;gap:1rem;margin-bottom:{% if not loop.last %}0.75rem{% else %}0{% endif %};">
-            <div class="font-mono" style="font-size:0.72rem;color:var(--text3);width:55px;flex-shrink:0;">{{ item.month }}</div>
-            <div style="flex:1;background:var(--surf2);border-radius:4px;height:20px;overflow:hidden;">
-                <div style="height:100%;background:linear-gradient(90deg,var(--amber),var(--amber-hi));border-radius:4px;width:{{ ((item.total / max_total) * 100) | int if max_total > 0 else 0 }}%;transition:width 0.3s;box-shadow:0 0 6px var(--amber-glow);"></div>
+            <div style="font-family:'Nunito',sans-serif;font-size:0.72rem;font-weight:700;color:var(--text3);width:55px;flex-shrink:0;">{{ item.month }}</div>
+            <div style="flex:1;background:var(--purple-dim);border-radius:4px;height:20px;overflow:hidden;">
+                <div style="height:100%;background:var(--purple);border-radius:4px;width:{{ ((item.total / max_total) * 100) | int if max_total > 0 else 0 }}%;transition:width 0.3s;"></div>
             </div>
-            <div class="font-mono" style="font-size:0.8rem;font-weight:600;min-width:70px;text-align:right;color:var(--text1);">{{ '%.2f'|format(item.total)|replace('.',',') }} €</div>
+            <div style="font-family:'Nunito',sans-serif;font-size:0.8rem;font-weight:800;min-width:70px;text-align:right;color:var(--text1);">{{ '%.2f'|format(item.total)|replace('.',',') }} €</div>
         </div>
         {% endfor %}
     </div>
@@ -84,21 +89,21 @@
     <!-- Attendance -->
     {% if attendance %}
     <div class="section-label">Anwesenheitsraten</div>
-    <div class="card" style="padding:0;overflow:hidden;">
+    <div class="card" style="padding:0;">
         {% for row in attendance %}
         <div style="padding:0.875rem 1rem;border-bottom:{% if not loop.last %}1px solid var(--border){% else %}none{% endif %};display:flex;align-items:center;gap:1rem;">
             <div style="flex:1;min-width:0;">
-                <div style="font-size:0.875rem;font-weight:{% if row.is_me %}700{% else %}500{% endif %};color:var(--text1);font-family:'Space Grotesk',sans-serif;">
-                    {{ row.name }}{% if row.is_me %} <span style="color:var(--amber);font-size:0.72rem;">(Ich)</span>{% endif %}
+                <div style="font-size:0.875rem;font-weight:{% if row.is_me %}800{% else %}700{% endif %};color:var(--text1);font-family:'Nunito',sans-serif;">
+                    {{ row.name }}{% if row.is_me %} <span style="color:var(--purple);font-size:0.72rem;font-weight:800;">(Ich)</span>{% endif %}
                 </div>
-                <div style="font-size:0.7rem;color:var(--text3);margin-top:2px;">{{ row.attended }} / {{ row.total }} Abende</div>
+                <div style="font-size:0.7rem;font-weight:700;color:var(--text3);font-family:'Nunito',sans-serif;margin-top:2px;">{{ row.attended }} / {{ row.total }} Abende</div>
             </div>
             <div style="width:110px;">
                 {% if row.rate is not none %}
-                <div style="background:var(--surf2);border-radius:4px;height:6px;overflow:hidden;margin-bottom:0.25rem;">
-                    <div style="height:100%;border-radius:4px;width:{{ row.rate }}%;background:{% if row.rate >= 80 %}var(--teal){% elif row.rate >= 50 %}var(--amber){% else %}var(--red){% endif %};"></div>
+                <div class="stat-bar-bg" style="margin-bottom:0.25rem;">
+                    <div class="stat-bar-fill" style="width:{{ row.rate }}%;background:{% if row.rate >= 80 %}var(--teal){% elif row.rate >= 50 %}var(--orange){% else %}var(--red){% endif %};"></div>
                 </div>
-                <div class="font-mono" style="font-size:0.72rem;text-align:right;color:var(--text2);">{{ row.rate }}%</div>
+                <div style="font-family:'Nunito',sans-serif;font-size:0.72rem;font-weight:800;text-align:right;color:var(--text2);">{{ row.rate }}%</div>
                 {% else %}
                 <div style="font-size:0.75rem;text-align:right;color:var(--text3);">—</div>
                 {% endif %}

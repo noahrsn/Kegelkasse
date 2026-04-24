@@ -3,27 +3,28 @@
 {% block title %}Profil — Kegelkasse{% endblock %}
 
 {% block body %}
-<div style="min-height: 100vh; background: var(--color-bg); padding: 2rem 1rem;">
-    <div style="max-width: 480px; margin: 0 auto;">
-        <div style="text-align: center; margin-bottom: 2.5rem;">
-            <div style="width: 80px; height: 80px; border-radius: 50%; background: var(--color-accent-muted); display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; font-size: 2rem;">
+<div style="min-height:100vh;background:var(--bg);padding:2rem 1rem;padding-bottom:96px;">
+    <div style="max-width:480px;margin:0 auto;">
+
+        <!-- Avatar + name -->
+        <div style="text-align:center;margin-bottom:2rem;">
+            <div style="width:80px;height:80px;border-radius:50%;background:var(--purple-light);display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;font-size:2rem;font-weight:900;color:var(--purple);font-family:'Nunito',sans-serif;">
                 {{ user.first_name[0] | upper }}
             </div>
-            <h1 style="font-family: 'Space Grotesk', sans-serif; font-size: 1.5rem; margin-bottom: 0.125rem;">{{ user.first_name }} {{ user.last_name }}</h1>
-            <p class="text-secondary" style="font-size: 0.875rem;">{{ user.email }}</p>
+            <div style="font-family:'Nunito',sans-serif;font-size:1.375rem;font-weight:900;color:var(--text1);margin-bottom:0.125rem;">{{ user.first_name }} {{ user.last_name }}</div>
+            <div style="font-size:0.875rem;font-weight:700;color:var(--text2);font-family:'Nunito',sans-serif;">{{ user.email }}</div>
         </div>
 
         {% set success = request.query_params.get('success') %}
         {% if success == 'saved' %}
-        <div class="badge badge--success" style="display: block; padding: 0.75rem 1rem; border-radius: 8px; margin-bottom: 1.5rem; font-size: 0.875rem;">
-            Profil gespeichert.
-        </div>
+        <div class="alert alert--success" style="margin-bottom:1.25rem;">Profil gespeichert.</div>
         {% endif %}
 
-        <div class="card" style="padding: 1.5rem; margin-bottom: 1.5rem;">
-            <h2 style="font-size: 1rem; font-family: 'Space Grotesk', sans-serif; margin-bottom: 1.25rem;">Profil bearbeiten</h2>
-            <form method="post" action="/profile" style="display: flex; flex-direction: column; gap: 1.25rem;">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <!-- Edit profile -->
+        <div class="card" style="padding:1.5rem;margin-bottom:1rem;">
+            <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:0.9rem;color:var(--text1);margin-bottom:1.25rem;">Profil bearbeiten</div>
+            <form method="post" action="/profile" style="display:flex;flex-direction:column;gap:1.25rem;">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
                     <div>
                         <label>Vorname</label>
                         <input class="input" type="text" name="first_name" value="{{ user.first_name }}" required>
@@ -35,47 +36,47 @@
                 </div>
                 <div>
                     <label>E-Mail</label>
-                    <input class="input" type="email" value="{{ user.email }}" disabled style="opacity: 0.5; cursor: not-allowed;">
+                    <input class="input" type="email" value="{{ user.email }}" disabled style="opacity:0.5;cursor:not-allowed;">
                 </div>
-                <button type="submit" class="btn btn-primary" style="align-self: flex-start;">Speichern</button>
+                <button type="submit" class="btn btn-primary" style="align-self:flex-start;">Speichern</button>
             </form>
         </div>
 
         {% if user.group_ids %}
-        <div class="card" style="padding: 1.5rem; margin-bottom: 1.5rem;">
-            <h2 style="font-size: 1rem; font-family: 'Space Grotesk', sans-serif; margin-bottom: 1rem;">Meine Clubs</h2>
-            <a href="/dashboard" class="btn btn-secondary" style="font-size: 0.875rem;">Alle Clubs anzeigen →</a>
+        <div class="card" style="padding:1.5rem;margin-bottom:1rem;">
+            <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:0.9rem;color:var(--text1);margin-bottom:1rem;">Meine Clubs</div>
+            <a href="/dashboard" class="btn btn-secondary" style="font-size:0.875rem;">Alle Clubs anzeigen →</a>
         </div>
         {% endif %}
 
-        <div class="card" style="padding: 1.5rem; margin-bottom: 1.5rem;">
-            <h2 style="font-size: 1rem; font-family: 'Space Grotesk', sans-serif; margin-bottom: 0.5rem;">🔔 Benachrichtigungen</h2>
-            <p style="font-size: 0.8125rem; color: var(--text2); margin: 0 0 1rem;">E-Mail-Benachrichtigungen pro Club konfigurieren.</p>
-            <a href="/profile/notifications" class="btn btn-secondary" style="font-size: 0.875rem;">Einstellungen öffnen →</a>
+        <div class="card" style="padding:1.5rem;margin-bottom:1rem;">
+            <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:0.9rem;color:var(--text1);margin-bottom:0.5rem;">🔔 Benachrichtigungen</div>
+            <p style="font-size:0.8125rem;font-weight:700;color:var(--text2);font-family:'Nunito',sans-serif;margin:0 0 1rem;">E-Mail-Benachrichtigungen pro Club konfigurieren.</p>
+            <a href="/profile/notifications" class="btn btn-secondary" style="font-size:0.875rem;">Einstellungen öffnen →</a>
         </div>
 
         {% if active_awards %}
-        <div class="card" style="padding: 1.5rem; margin-bottom: 1.5rem;">
-            <h2 style="font-size: 1rem; font-family: 'Space Grotesk', sans-serif; margin-bottom: 1rem;">🏆 Aktuelle Titel</h2>
-            <div style="display: flex; flex-wrap: wrap; gap: 0.625rem;">
+        <div class="card" style="padding:1.5rem;margin-bottom:1rem;">
+            <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:0.9rem;color:var(--text1);margin-bottom:1rem;">🏆 Aktuelle Titel</div>
+            <div style="display:flex;flex-wrap:wrap;gap:0.625rem;">
                 {% for award in active_awards %}
-                <div style="background: rgba(224,128,32,0.1); border: 1px solid rgba(224,128,32,0.3); border-radius: 8px; padding: 0.5rem 0.875rem; font-size: 0.8125rem;">
+                <div style="background:var(--card-lavender);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:0.5rem 0.875rem;font-size:0.8125rem;font-weight:700;font-family:'Nunito',sans-serif;color:var(--text1);">
                     {% if award.type == 'pudelkoenig' %}🎳 Pudelkönig
                     {% elif award.type == 'goldesel' %}🤑 Goldesel
                     {% elif award.type == 'streber' %}📚 Streber
                     {% elif award.type == 'eisenmann' %}💪 Eisenmann
                     {% elif award.type == 'spaetzuender' %}⏰ Spätzünder
                     {% else %}🏆 {{ award.type }}{% endif %}
-                    <span class="text-secondary" style="font-size: 0.75rem;">· {{ award.group_name }}</span>
+                    <span style="font-size:0.75rem;font-weight:700;color:var(--text2);"> · {{ award.group_name }}</span>
                 </div>
                 {% endfor %}
             </div>
         </div>
         {% endif %}
 
-        <div style="text-align: center;">
+        <div style="text-align:center;">
             <form method="post" action="/logout">
-                <button type="submit" class="btn btn-danger" style="width: 100%;">Abmelden</button>
+                <button type="submit" class="btn btn-danger" style="width:100%;">Abmelden</button>
             </form>
         </div>
     </div>

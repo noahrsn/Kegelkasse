@@ -5,26 +5,42 @@
 {% block content %}
 <div x-data="sessionRecorder('{{ group_id }}', '{{ session_id }}')" style="min-height:100vh;">
 
-<!-- Sticky top bar -->
-<div class="topbar">
-    <div style="display:flex;align-items:center;gap:0.75rem;">
-        <a href="/group/{{ group_id }}/dashboard" style="background:none;border:none;cursor:pointer;padding:4px;display:flex;align-items:center;color:var(--text2);">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
-        </a>
-        <div>
-            <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.9rem;color:var(--text1);">Kegelabend · {{ date_display }}</div>
-            <div style="font-size:0.65rem;color:var(--text2);margin-top:1px;">
-                {{ present_count }} / {{ total_count }} anwesend
-                {% if session.status == 'submitted' %} · <span style="color:var(--amber);">Eingereicht</span>{% endif %}
-                {% if session.status == 'approved' %} · <span style="color:var(--teal);">Genehmigt</span>{% endif %}
+<!-- Sticky header island -->
+<div style="background:var(--card-lavender);padding:1rem 1.25rem;position:sticky;top:0;z-index:10;box-shadow:var(--shadow);">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.875rem;">
+        <div style="display:flex;align-items:center;gap:0.75rem;">
+            <a href="/group/{{ group_id }}/dashboard" style="width:32px;height:32px;background:rgba(59,45,130,0.12);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--purple);">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </a>
+            <div>
+                <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:1rem;color:var(--text1);">Kegelabend · {{ date_display }}</div>
+                <div style="font-size:0.68rem;font-weight:700;color:var(--text2);font-family:'Nunito',sans-serif;">
+                    {% if session.status == 'submitted' %}<span style="color:var(--orange);">Eingereicht</span>
+                    {% elif session.status == 'approved' %}<span style="color:var(--teal);">Genehmigt ✓</span>
+                    {% else %}In Bearbeitung{% endif %}
+                </div>
             </div>
         </div>
-    </div>
-    <div style="display:flex;align-items:center;gap:0.5rem;">
-        <a href="/group/{{ group_id }}/sessions/{{ session_id }}/guests" class="btn btn-ghost btn-sm">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+        <a href="/group/{{ group_id }}/sessions/{{ session_id }}/guests" class="btn btn-secondary btn-sm">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
             Gäste{% if session.guest_entries %} <span class="badge badge--warning" style="margin-left:2px;">{{ session.guest_entries | length }}</span>{% endif %}
         </a>
+    </div>
+
+    <!-- 3-stat row -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.5rem;">
+        <div style="background:rgba(59,45,130,0.1);border-radius:var(--radius-sm);padding:0.5rem 0.75rem;text-align:center;">
+            <div style="font-family:'Nunito',sans-serif;font-size:1.2rem;font-weight:900;color:var(--purple);">{{ present_count }}</div>
+            <div style="font-size:0.6rem;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:0.08em;font-family:'Nunito',sans-serif;">Anwesend</div>
+        </div>
+        <div style="background:rgba(59,45,130,0.1);border-radius:var(--radius-sm);padding:0.5rem 0.75rem;text-align:center;">
+            <div style="font-family:'Nunito',sans-serif;font-size:1.2rem;font-weight:900;color:var(--orange);">{{ entries | selectattr('penalties') | list | length }}</div>
+            <div style="font-size:0.6rem;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:0.08em;font-family:'Nunito',sans-serif;">Strafen</div>
+        </div>
+        <div style="background:rgba(59,45,130,0.1);border-radius:var(--radius-sm);padding:0.5rem 0.75rem;text-align:center;">
+            <div style="font-family:'Nunito',sans-serif;font-size:1.2rem;font-weight:900;color:var(--red);">{{ '%.2f'|format(entries | sum(attribute='_total') if entries else 0)|replace('.',',') }} €</div>
+            <div style="font-size:0.6rem;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:0.08em;font-family:'Nunito',sans-serif;">Gesamt</div>
+        </div>
     </div>
 </div>
 
@@ -35,14 +51,14 @@
 
 <!-- Status banner -->
 {% if session.status == 'submitted' %}
-<div style="background:var(--amber-dim);border-left:3px solid var(--amber);padding:0.875rem 1.25rem;">
-    <div style="font-weight:700;font-size:0.875rem;color:var(--amber);">Warten auf Freigabe</div>
-    <div style="font-size:0.75rem;color:var(--text2);">Kassenwart oder Admin muss den Abend genehmigen.</div>
+<div style="background:var(--orange-dim);border-left:3px solid var(--orange);padding:0.875rem 1.25rem;">
+    <div style="font-weight:800;font-size:0.875rem;color:var(--orange);font-family:'Nunito',sans-serif;">Warten auf Freigabe</div>
+    <div style="font-size:0.75rem;font-weight:700;color:var(--text2);font-family:'Nunito',sans-serif;">Kassenwart oder Admin muss den Abend genehmigen.</div>
 </div>
 {% elif session.status == 'approved' %}
 <div style="background:var(--teal-dim);border-left:3px solid var(--teal);padding:0.875rem 1.25rem;">
-    <div style="font-weight:700;font-size:0.875rem;color:var(--teal);">Genehmigt ✓</div>
-    <div style="font-size:0.75rem;color:var(--text2);">Schulden wurden eingebucht.</div>
+    <div style="font-weight:800;font-size:0.875rem;color:var(--teal);font-family:'Nunito',sans-serif;">Genehmigt ✓</div>
+    <div style="font-size:0.75rem;font-weight:700;color:var(--text2);font-family:'Nunito',sans-serif;">Schulden wurden eingebucht.</div>
 </div>
 {% endif %}
 
@@ -58,7 +74,7 @@
 <form method="post" action="/group/{{ group_id }}/sessions/{{ session_id }}/submit"
       style="position:fixed;bottom:5.5rem;right:1.5rem;z-index:40;">
     <button type="submit" class="btn btn-primary"
-            style="border-radius:9999px;padding:0.875rem 1.5rem;box-shadow:0 4px 20px var(--amber-glow);font-size:0.9375rem;">
+            style="border-radius:var(--pill);padding:0.875rem 1.5rem;box-shadow:0 4px 20px rgba(59,45,130,0.4);font-size:0.9375rem;">
         Einreichen →
     </button>
 </form>
@@ -68,7 +84,7 @@
 <form method="post" action="/group/{{ group_id }}/sessions/{{ session_id }}/approve"
       style="position:fixed;bottom:5.5rem;right:1.5rem;z-index:40;">
     <button type="submit" class="btn btn-primary"
-            style="border-radius:9999px;padding:0.875rem 1.5rem;box-shadow:0 4px 20px var(--amber-glow);font-size:0.9375rem;">
+            style="border-radius:var(--pill);padding:0.875rem 1.5rem;box-shadow:0 4px 20px rgba(59,45,130,0.4);font-size:0.9375rem;">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
         Genehmigen
     </button>
@@ -82,15 +98,15 @@
      x-transition:leave="transition ease-in duration-150"
      x-transition:leave-end="opacity-0 translate-y-full"
      @click.self="closeSheet()"
-     style="position:fixed;inset:0;z-index:60;background:rgba(0,0,0,0.65);backdrop-filter:blur(4px);display:flex;align-items:flex-end;"
+     style="position:fixed;inset:0;z-index:60;background:rgba(26,16,40,0.5);backdrop-filter:blur(4px);display:flex;align-items:flex-end;"
      x-cloak>
 
-    <div style="width:100%;background:var(--surf);border-radius:22px 22px 0 0;box-shadow:0 -2px 40px rgba(0,0,0,0.8),0 0 0 1px var(--border);padding:1.25rem;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom));max-height:65vh;overflow-y:auto;">
-        <div style="width:36px;height:4px;background:var(--surf3);border-radius:99px;margin:0 auto 1rem;"></div>
+    <div style="width:100%;background:var(--white);border-radius:var(--radius-lg) var(--radius-lg) 0 0;box-shadow:var(--shadow-lg);padding:1.25rem;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom));max-height:65vh;overflow-y:auto;">
+        <div style="width:36px;height:4px;background:var(--border);border-radius:99px;margin:0 auto 1rem;"></div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
-            <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:1rem;color:var(--text1);">Strafe wählen</div>
-            <button @click="closeSheet()" style="background:none;border:none;cursor:pointer;color:var(--text2);padding:4px;">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:1rem;color:var(--text1);">Strafe wählen</div>
+            <button @click="closeSheet()" style="background:none;border:none;cursor:pointer;color:var(--text2);padding:4px;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
             </button>
         </div>
 
@@ -99,22 +115,22 @@
             {% for cat_item in catalog %}
             <button type="button"
                     @click="addPenalty('{{ cat_item.id }}')"
-                    style="background:var(--surf2);border:1px solid var(--border);border-radius:var(--radius);padding:1rem 0.75rem;cursor:pointer;text-align:left;display:flex;justify-content:space-between;align-items:center;transition:all 120ms;font-family:'Space Grotesk',sans-serif;"
-                    onmouseover="this.style.borderColor='var(--amber)';this.style.background='var(--amber-dim)'"
-                    onmouseout="this.style.borderColor='var(--border)';this.style.background='var(--surf2)'">
-                <span style="font-weight:600;font-size:0.85rem;color:var(--text1);">{{ cat_item.name }}</span>
-                <span class="font-mono" style="font-size:0.875rem;color:var(--amber);font-weight:600;">{{ '%.2f'|format(cat_item.amount)|replace('.',',') }} €</span>
+                    style="background:var(--bg);border:1.5px solid var(--border);border-radius:var(--radius);padding:0.875rem 0.75rem;cursor:pointer;text-align:left;display:flex;justify-content:space-between;align-items:center;transition:all 120ms;font-family:'Nunito',sans-serif;"
+                    onmouseover="this.style.borderColor='var(--purple)';this.style.background='var(--purple-light)'"
+                    onmouseout="this.style.borderColor='var(--border)';this.style.background='var(--bg)'">
+                <span style="font-weight:800;font-size:0.85rem;color:var(--text1);">{{ cat_item.name }}</span>
+                <span style="font-size:0.875rem;color:var(--orange);font-weight:800;font-family:'Nunito',sans-serif;">{{ '%.2f'|format(cat_item.amount)|replace('.',',') }} €</span>
             </button>
             {% endfor %}
         </div>
         {% else %}
-        <div style="text-align:center;padding:2rem;color:var(--text2);font-size:0.875rem;">
+        <div style="text-align:center;padding:2rem;color:var(--text2);font-size:0.875rem;font-family:'Nunito',sans-serif;font-weight:700;">
             Kein Strafenkatalog vorhanden.
-            <a href="/group/{{ group_id }}/settings?section=catalog" style="color:var(--amber);">In Einstellungen anlegen →</a>
+            <a href="/group/{{ group_id }}/settings?section=catalog" style="color:var(--purple);">In Einstellungen anlegen →</a>
         </div>
         {% endif %}
 
-        <button class="btn btn-ghost" @click="closeSheet()" style="width:100%;margin-top:1rem;color:var(--text3);">Abbrechen</button>
+        <button class="btn btn-ghost" @click="closeSheet()" style="width:100%;margin-top:1rem;">Abbrechen</button>
     </div>
 </div>
 

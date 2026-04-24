@@ -71,19 +71,29 @@ def _write_log(db, group_id, actor, action, target_id=None, target_name=None, de
 
 
 def _open_total(debt_doc: dict) -> float:
-    return round(sum(
-        e.get("amount", 0)
-        for e in debt_doc.get("entries", [])
-        if not e.get("paid") and not e.get("cancelled")
-    ), 2)
+    total = 0.0
+    for e in debt_doc.get("entries", []):
+        if e.get("paid") or e.get("cancelled"):
+            continue
+        amount = e.get("amount", 0)
+        if e.get("type") == DebtType.credit:
+            total -= amount
+        else:
+            total += amount
+    return round(total, 2)
 
 
 def _breakdown(debt_doc: dict) -> dict[str, float]:
     result: dict[str, float] = {}
     for e in debt_doc.get("entries", []):
-        if not e.get("paid") and not e.get("cancelled"):
-            t = e.get("type", "penalty")
-            result[t] = round(result.get(t, 0.0) + e.get("amount", 0), 2)
+        if e.get("paid") or e.get("cancelled"):
+            continue
+        t = e.get("type", "penalty")
+        amount = e.get("amount", 0)
+        if t == DebtType.credit:
+            result["credit"] = round(result.get("credit", 0.0) - amount, 2)
+        else:
+            result[t] = round(result.get(t, 0.0) + amount, 2)
     return result
 
 

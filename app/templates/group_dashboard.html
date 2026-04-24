@@ -4,24 +4,24 @@
 
 {% block content %}
 
-<!-- Sticky top bar (mobile) -->
+<!-- Topbar -->
 <div class="topbar">
     <div>
-        <div style="font-family:'Bebas Neue',sans-serif;font-size:1.25rem;color:var(--text1);letter-spacing:0.06em;line-height:1;">{{ group_name | upper }}</div>
-        <div style="font-size:0.65rem;color:var(--text3);font-family:'Space Grotesk',sans-serif;margin-top:2px;">{{ member_count }} Mitglieder · {{ role }}</div>
+        <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:1.1rem;color:var(--text1);">{{ group_name }}</div>
+        <div style="font-size:0.68rem;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-top:1px;">{{ member_count }} Mitglieder · {{ role }}</div>
     </div>
-    <div style="display:flex;align-items:center;gap:0.75rem;">
-        <a href="/profile" style="display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;background:var(--surf2);border:1.5px solid var(--border);color:var(--text2);">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+    <div style="display:flex;align-items:center;gap:0.625rem;">
+        <a href="/profile" style="width:36px;height:36px;border-radius:50%;background:var(--card-lavender);display:flex;align-items:center;justify-content:center;color:var(--purple);font-weight:800;font-size:0.85rem;font-family:'Nunito',sans-serif;text-decoration:none;">
+            {{ user.first_name[:1] | upper if user is defined else '?' }}
         </a>
     </div>
 </div>
 
 {% if group.setup_step and group.setup_step > 0 %}
-<div style="background:var(--amber-dim);border-left:3px solid var(--amber);padding:0.875rem 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;">
+<div style="background:var(--purple-light);border-left:3px solid var(--purple);padding:0.875rem 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;">
     <div>
-        <div style="font-weight:700;font-size:0.875rem;color:var(--amber);">Einrichtung fortsetzen</div>
-        <div style="font-size:0.75rem;color:var(--text2);">Schritt {{ group.setup_step }} von 6</div>
+        <div style="font-weight:800;font-size:0.875rem;color:var(--purple);font-family:'Nunito',sans-serif;">Einrichtung fortsetzen</div>
+        <div style="font-size:0.75rem;font-weight:700;color:var(--text2);font-family:'Nunito',sans-serif;">Schritt {{ group.setup_step }} von 6</div>
     </div>
     <a href="/groups/setup/{{ group.setup_step }}?group_id={{ group_id }}" class="btn btn-primary btn-sm">Weiter →</a>
 </div>
@@ -30,78 +30,71 @@
 {% if can_manage and pending_sessions %}
 <div style="background:var(--red-dim);border-left:3px solid var(--red);padding:0.875rem 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;">
     <div>
-        <div style="font-weight:700;font-size:0.875rem;color:var(--red);">{{ pending_sessions | length }} Einreichung{{ 'en' if pending_sessions | length != 1 else '' }} offen</div>
-        <div style="font-size:0.75rem;color:var(--text2);">Warten auf Genehmigung</div>
+        <div style="font-weight:800;font-size:0.875rem;color:var(--red);font-family:'Nunito',sans-serif;">{{ pending_sessions | length }} Einreichung{{ 'en' if pending_sessions | length != 1 else '' }} offen</div>
+        <div style="font-size:0.75rem;font-weight:700;color:var(--text2);font-family:'Nunito',sans-serif;">Warten auf Genehmigung</div>
     </div>
     <a href="/group/{{ group_id }}/sessions/pending" class="btn btn-danger btn-sm">Prüfen →</a>
 </div>
 {% endif %}
 
-<div style="padding:1.25rem;padding-bottom:90px;max-width:900px;">
+<div style="padding:1rem;padding-bottom:96px;max-width:960px;">
 
-    <!-- HERO DEBT CARD -->
-    <div style="position:relative;border-radius:var(--radius-lg);overflow:hidden;margin-bottom:1rem;padding:1.75rem 1.5rem 1.5rem;">
-        <div style="position:absolute;inset:0;background:linear-gradient(135deg,#1a0a00 0%,var(--surf) 60%,#0a0014 100%);z-index:0;"></div>
-        <div style="position:absolute;top:-60px;right:-60px;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,var(--amber-glow) 0%,transparent 70%);z-index:0;"></div>
-        <div style="position:relative;z-index:1;">
-            <div style="font-family:'Space Grotesk',sans-serif;font-size:0.65rem;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:0.12em;margin-bottom:0.5rem;">Meine offenen Schulden</div>
-            {% if my_open_debt > 0 %}
-            <div class="glow-number glow-number--red" style="font-size:4.5rem;">{{ '%.2f'|format(my_open_debt)|replace('.',',') }} €</div>
-            {% else %}
-            <div class="glow-number" style="font-size:4.5rem;color:var(--teal);text-shadow:0 0 40px rgba(46,204,154,0.5);">0,00 €</div>
-            {% endif %}
-            <div style="display:flex;gap:0.6rem;margin-top:1.1rem;flex-wrap:wrap;">
-                <a href="/group/{{ group_id }}/debts" class="btn btn-primary btn-sm">Details ansehen</a>
-                {% if payment_info and (payment_info.get('iban') or payment_info.get('paypal')) %}
-                <a href="/group/{{ group_id }}/debts" class="btn btn-ghost btn-sm" style="border-color:rgba(255,255,255,0.12);">Zahlungsinfo</a>
-                {% endif %}
+    <!-- Bento Grid -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:1rem;">
+
+        <!-- Schulden-Card (groß, span 2 rows) -->
+        <a href="/group/{{ group_id }}/debts" style="text-decoration:none;grid-row:span 2;">
+            <div style="background:var(--card-lavender);border-radius:var(--radius);box-shadow:var(--shadow);padding:1.25rem;height:100%;display:flex;flex-direction:column;justify-content:space-between;min-height:180px;position:relative;overflow:hidden;">
+                <div style="position:absolute;top:-20px;right:-20px;width:100px;height:100px;border-radius:50%;background:rgba(59,45,130,0.12);pointer-events:none;"></div>
+                <div>
+                    <div style="font-size:0.62rem;font-weight:800;color:var(--purple);text-transform:uppercase;letter-spacing:0.1em;font-family:'Nunito',sans-serif;margin-bottom:0.5rem;">Meine Schulden</div>
+                    {% if my_open_debt > 0 %}
+                    <div style="font-family:'Nunito',sans-serif;font-size:2.5rem;font-weight:900;color:var(--red);line-height:1;">{{ '%.2f'|format(my_open_debt)|replace('.',',') }} €</div>
+                    {% else %}
+                    <div style="font-family:'Nunito',sans-serif;font-size:2.5rem;font-weight:900;color:var(--teal);line-height:1;">0,00 €</div>
+                    {% endif %}
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                    <div style="font-size:0.72rem;font-weight:700;color:var(--text2);font-family:'Nunito',sans-serif;">Details ansehen</div>
+                    <div style="width:32px;height:32px;background:var(--purple);border-radius:50%;display:flex;align-items:center;justify-content:center;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                    </div>
+                </div>
             </div>
-        </div>
-    </div>
+        </a>
 
-    <!-- Compact stats row -->
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.625rem;margin-bottom:1.25rem;">
+        <!-- Kasse-Card -->
         <a href="/group/{{ group_id }}/treasury" style="text-decoration:none;">
-            <div style="background:var(--surf);border:1px solid var(--border);border-radius:var(--radius);padding:0.875rem 0.75rem;transition:border-color 150ms;" onmouseover="this.style.borderColor='var(--border-hi)'" onmouseout="this.style.borderColor='var(--border)'">
-                <div style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.4rem;">Vereinskasse</div>
-                <div class="font-display" style="font-size:1.4rem;color:var(--text1);line-height:1;">{{ '%.2f'|format(balance)|replace('.',',') }} €</div>
-                <div style="font-size:0.62rem;color:var(--text2);margin-top:0.2rem;">Kassenstand</div>
+            <div style="background:var(--card-cream);border-radius:var(--radius);box-shadow:var(--shadow);padding:1rem;display:flex;flex-direction:column;gap:0.25rem;">
+                <div style="font-size:0.6rem;font-weight:800;color:#8A7B40;text-transform:uppercase;letter-spacing:0.1em;font-family:'Nunito',sans-serif;">Vereinskasse</div>
+                <div style="font-family:'Nunito',sans-serif;font-size:1.5rem;font-weight:900;color:var(--text1);line-height:1;">{{ '%.2f'|format(balance)|replace('.',',') }} €</div>
+                <div style="font-size:0.65rem;font-weight:700;color:var(--text2);font-family:'Nunito',sans-serif;">Kassenstand</div>
             </div>
         </a>
-        {% if next_event %}
-        <a href="/group/{{ group_id }}/calendar/{{ next_event.id }}" style="text-decoration:none;">
-            <div style="background:var(--surf);border:1px solid var(--border);border-radius:var(--radius);padding:0.875rem 0.75rem;transition:border-color 150ms;" onmouseover="this.style.borderColor='var(--border-hi)'" onmouseout="this.style.borderColor='var(--border)'">
-                <div style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.4rem;">Nächster Termin</div>
-                {% set start = next_event.start_date[:10] %}
-                <div class="font-display" style="font-size:1.4rem;color:var(--text1);line-height:1;">{{ start[8:10] }}.{{ start[5:7] }}.</div>
-                <div style="font-size:0.62rem;color:var(--text2);margin-top:0.2rem;">{{ next_event.title[:18] }}</div>
-            </div>
-        </a>
-        {% else %}
-        <a href="/group/{{ group_id }}/calendar/new" style="text-decoration:none;">
-            <div style="background:var(--surf);border:1px solid var(--border);border-radius:var(--radius);padding:0.875rem 0.75rem;">
-                <div style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.4rem;">Nächster Termin</div>
-                <div style="font-size:0.8rem;color:var(--text3);">Kein Termin</div>
-                <div style="font-size:0.62rem;color:var(--amber);margin-top:0.2rem;">Anlegen →</div>
-            </div>
-        </a>
-        {% endif %}
-        <div style="background:var(--surf);border:1px solid var(--border);border-radius:var(--radius);padding:0.875rem 0.75rem;">
-            <div style="font-family:'Space Grotesk',sans-serif;font-size:0.6rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.4rem;">Mitglieder</div>
-            <div class="font-display" style="font-size:1.4rem;color:var(--text1);line-height:1;">{{ member_count }}</div>
-            <div style="font-size:0.62rem;color:var(--text2);margin-top:0.2rem;">im Club</div>
+
+        <!-- Nächster Termin / Anwesenheit -->
+        <div style="background:var(--card-mint);border-radius:var(--radius);box-shadow:var(--shadow);padding:1rem;display:flex;flex-direction:column;gap:0.25rem;">
+            <div style="font-size:0.6rem;font-weight:800;color:#1A7A5A;text-transform:uppercase;letter-spacing:0.1em;font-family:'Nunito',sans-serif;">Nächster Termin</div>
+            {% if next_event %}
+            {% set start = next_event.start_date[:10] %}
+            <div style="font-family:'Nunito',sans-serif;font-size:1.5rem;font-weight:900;color:var(--text1);line-height:1;">{{ start[8:10] }}.{{ start[5:7] }}.</div>
+            <div style="font-size:0.65rem;font-weight:700;color:var(--text2);font-family:'Nunito',sans-serif;">{{ next_event.title[:20] }}</div>
+            {% else %}
+            <div style="font-family:'Nunito',sans-serif;font-size:0.875rem;font-weight:700;color:var(--text2);">Kein Termin</div>
+            <a href="/group/{{ group_id }}/calendar/new" style="font-size:0.65rem;font-weight:800;color:var(--teal);text-decoration:none;font-family:'Nunito',sans-serif;">Anlegen →</a>
+            {% endif %}
         </div>
     </div>
 
-    <!-- Start session CTA -->
-    <a href="/group/{{ group_id }}/sessions/new" style="text-decoration:none;display:block;margin-bottom:1.25rem;">
-        <div style="background:linear-gradient(135deg,var(--surf) 0%,#1a1008 100%);border:1px solid rgba(240,160,48,0.2);border-radius:var(--radius);padding:1rem 1.25rem;display:flex;align-items:center;justify-content:space-between;box-shadow:inset 0 0 0 1px var(--amber-glow);transition:border-color 150ms;" onmouseover="this.style.borderColor='rgba(240,160,48,0.4)'" onmouseout="this.style.borderColor='rgba(240,160,48,0.2)'">
+    <!-- Session CTA -->
+    <a href="/group/{{ group_id }}/sessions/new" style="text-decoration:none;display:block;margin-bottom:1rem;">
+        <div style="background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);padding:1rem 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;">
             <div>
-                <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.95rem;color:var(--text1);">Kegelabend erfassen</div>
-                <div style="font-size:0.72rem;color:var(--text2);margin-top:0.15rem;">{{ member_count }} Mitglieder{% if next_event %} · {{ next_event.start_date[8:10] }}.{{ next_event.start_date[5:7] }}.{% endif %}</div>
+                <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:1rem;color:var(--text1);">Kegelabend erfassen</div>
+                <div style="font-size:0.72rem;font-weight:700;color:var(--text2);margin-top:0.15rem;font-family:'Nunito',sans-serif;">{{ member_count }} Mitglieder{% if next_event %} · {{ next_event.start_date[8:10] }}.{{ next_event.start_date[5:7] }}.{% endif %}</div>
             </div>
-            <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,var(--amber-hi),var(--amber));display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px var(--amber-glow);flex-shrink:0;">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="9.5" cy="9.5" r="1.3" fill="#000" stroke="none"/><circle cx="13.5" cy="8.5" r="1.3" fill="#000" stroke="none"/><circle cx="11" cy="12.5" r="1.3" fill="#000" stroke="none"/></svg>
+            <div style="width:52px;height:52px;border-radius:50%;background:var(--orange);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(232,117,74,0.45);flex-shrink:0;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="9.5" cy="9.5" r="1.2" fill="#fff" stroke="none"/><circle cx="13.5" cy="8.5" r="1.2" fill="#fff" stroke="none"/><circle cx="11" cy="12.5" r="1.2" fill="#fff" stroke="none"/></svg>
             </div>
         </div>
     </a>
@@ -109,32 +102,32 @@
     <!-- Activity feed -->
     <div class="section-label">
         Aktivitäten
-        <a href="/group/{{ group_id }}/log">Alle anzeigen →</a>
+        <a href="/group/{{ group_id }}/log">Alle →</a>
     </div>
 
     {% if recent_logs %}
-    <div class="card" style="padding:0;overflow:hidden;">
+    <div class="card" style="padding:0;">
         {% for log in recent_logs %}
         <div style="padding:0.75rem 1rem;border-bottom:{% if not loop.last %}1px solid var(--border){% else %}none{% endif %};display:flex;align-items:center;gap:0.875rem;">
-            <div style="width:32px;height:32px;border-radius:50%;background:var(--surf2);display:flex;align-items:center;justify-content:center;flex-shrink:0;border:1px solid var(--border);">
+            <div style="width:34px;height:34px;border-radius:50%;background:var(--purple-light);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                 {% if 'penalty' in log.get('action','') or 'Strafe' in log.get('details','') %}
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7H4a1 1 0 00-1 1v10a1 1 0 001 1h16a1 1 0 001-1V8a1 1 0 00-1-1z"/><path d="M3 11h18"/></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7H4a1 1 0 00-1 1v10a1 1 0 001 1h16a1 1 0 001-1V8a1 1 0 00-1-1z"/><path d="M3 11h18"/></svg>
                 {% elif 'session' in log.get('action','') or 'Kegelabend' in log.get('details','') %}
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="9.5" cy="9.5" r="1.1" fill="var(--text2)" stroke="none"/><circle cx="13.5" cy="8.5" r="1.1" fill="var(--text2)" stroke="none"/><circle cx="11" cy="12.5" r="1.1" fill="var(--text2)" stroke="none"/></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="9.5" cy="9.5" r="1.1" fill="var(--purple)" stroke="none"/><circle cx="13.5" cy="8.5" r="1.1" fill="var(--purple)" stroke="none"/><circle cx="11" cy="12.5" r="1.1" fill="var(--purple)" stroke="none"/></svg>
                 {% elif 'event' in log.get('action','') or 'calendar' in log.get('action','') %}
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
                 {% elif 'paid' in log.get('action','') %}
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
                 {% else %}
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                 {% endif %}
             </div>
             <div style="flex:1;min-width:0;">
-                <div style="font-size:0.8rem;color:var(--text1);font-family:'Space Grotesk',sans-serif;">
+                <div style="font-size:0.82rem;font-weight:700;color:var(--text1);font-family:'Nunito',sans-serif;">
                     <strong>{{ log.get('actor_name', '') }}</strong>
-                    {% if log.get('details') %}<span style="color:var(--text2);"> — {{ log.get('details', '') }}</span>{% endif %}
+                    {% if log.get('details') %}<span style="color:var(--text2);font-weight:700;"> — {{ log.get('details', '') }}</span>{% endif %}
                 </div>
-                <div style="font-size:0.67rem;color:var(--text3);margin-top:2px;">
+                <div style="font-size:0.67rem;font-weight:700;color:var(--text3);margin-top:2px;font-family:'Nunito',sans-serif;">
                     {% set ts = log.get('timestamp', '')[:16] %}
                     {% if ts %}{{ ts[8:10] }}.{{ ts[5:7] }}.{{ ts[:4] }} {{ ts[11:16] }} Uhr{% endif %}
                 </div>
@@ -144,8 +137,9 @@
     </div>
     {% else %}
     <div class="card" style="padding:2rem;text-align:center;">
-        <div style="font-family:'Bebas Neue',sans-serif;font-size:1.5rem;color:var(--text3);letter-spacing:0.05em;margin-bottom:0.5rem;">NOCH KEINE AKTIVITÄTEN</div>
-        <p style="font-size:0.875rem;color:var(--text2);margin:0;">Starte den ersten Kegelabend!</p>
+        <div style="font-size:2rem;margin-bottom:0.5rem;">🎳</div>
+        <div style="font-size:0.9rem;font-weight:700;color:var(--text2);font-family:'Nunito',sans-serif;">Noch keine Aktivitäten</div>
+        <div style="font-size:0.78rem;font-weight:700;color:var(--text3);margin-top:0.25rem;font-family:'Nunito',sans-serif;">Starte den ersten Kegelabend!</div>
     </div>
     {% endif %}
 </div>

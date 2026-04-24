@@ -3,249 +3,247 @@
 {% block title %}Einstellungen — {{ group_name }} — Kegelkasse{% endblock %}
 
 {% block content %}
-<div class="hero" style="background: linear-gradient(135deg, #0D0D0F 0%, #1a120a 60%, #0D0D0F 100%);">
-    <div class="hero__overlay"></div>
-    <div class="hero__content">
-        <h1 style="font-family: 'Space Grotesk', sans-serif; font-size: 1.5rem; margin: 0 0 0.125rem;">Einstellungen</h1>
-        <p style="color: var(--color-text-secondary); font-size: 0.75rem; margin: 0;">{{ group_name }}</p>
+
+<div class="topbar">
+    <div>
+        <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:1.1rem;color:var(--text1);">Einstellungen</div>
+        <div style="font-size:0.68rem;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;">{{ group_name }}</div>
     </div>
 </div>
 
 {% if success %}
-<div style="background: rgba(74,144,96,0.1); border-left: 3px solid var(--color-success); padding: 0.875rem 1.5rem; font-size: 0.875rem; color: var(--color-success);">
-    Änderungen gespeichert.
-</div>
+<div class="alert alert--success">Änderungen gespeichert.</div>
 {% endif %}
 
-<div style="display: flex; gap: 0; padding: 1.5rem; max-width: 1000px;">
-    <!-- Sidebar tabs -->
-    <nav style="width: 200px; flex-shrink: 0; margin-right: 2rem;">
-        {% macro tab(id, label, allowed_roles) %}
-        {% if role in allowed_roles %}
-        <a href="/group/{{ group_id }}/settings?section={{ id }}"
-           style="display: flex; align-items: center; gap: 0.5rem; padding: 0.625rem 0.75rem; border-radius: 6px; text-decoration: none; font-size: 0.875rem; margin-bottom: 0.25rem;
-                  color: {% if active_section == id %}var(--color-accent){% else %}var(--color-text-secondary){% endif %};
-                  background: {% if active_section == id %}rgba(224,128,32,0.08){% else %}transparent{% endif %};">
-            {{ label }}
-        </a>
-        {% endif %}
-        {% endmacro %}
+<div style="padding:1.25rem;max-width:1000px;padding-bottom:96px;">
+    <div style="display:flex;gap:0;flex-wrap:wrap;">
 
-        {{ tab('general', '⚙️ Allgemein', ['admin', 'präsident']) }}
-        {{ tab('finances', '💰 Finanzen', ['admin', 'kassenwart']) }}
-        {{ tab('catalog', '📋 Strafenkatalog', ['admin', 'kassenwart']) }}
-        {{ tab('rulebook', '📖 Regelwerk', ['admin', 'präsident']) }}
-        {{ tab('members', '👥 Mitglieder', ['admin']) }}
-        {{ tab('invite', '🔗 Einladungslink', ['admin', 'präsident']) }}
-    </nav>
+        <!-- Sidebar tabs -->
+        <nav style="width:180px;flex-shrink:0;margin-right:1.5rem;margin-bottom:1rem;">
+            {% macro tab(id, label, allowed_roles) %}
+            {% if role in allowed_roles %}
+            <a href="/group/{{ group_id }}/settings?section={{ id }}"
+               style="display:flex;align-items:center;gap:0.5rem;padding:0.625rem 0.75rem;border-radius:var(--radius-sm);text-decoration:none;font-size:0.875rem;font-weight:800;font-family:'Nunito',sans-serif;margin-bottom:0.25rem;
+                      color:{% if active_section == id %}var(--purple){% else %}var(--text2){% endif %};
+                      background:{% if active_section == id %}rgba(203,194,242,0.2){% else %}transparent{% endif %};">
+                {{ label }}
+            </a>
+            {% endif %}
+            {% endmacro %}
 
-    <!-- Content -->
-    <div style="flex: 1; min-width: 0;">
+            {{ tab('general', '⚙️ Allgemein', ['admin', 'präsident']) }}
+            {{ tab('finances', '💰 Finanzen', ['admin', 'kassenwart']) }}
+            {{ tab('catalog', '📋 Strafenkatalog', ['admin', 'kassenwart']) }}
+            {{ tab('rulebook', '📖 Regelwerk', ['admin', 'präsident']) }}
+            {{ tab('members', '👥 Mitglieder', ['admin']) }}
+            {{ tab('invite', '🔗 Einladungslink', ['admin', 'präsident']) }}
+        </nav>
 
-        <!-- General -->
-        {% if active_section == 'general' and role in ['admin', 'präsident'] %}
-        <h2 style="font-size: 1.125rem; font-family: 'Space Grotesk', sans-serif; margin-bottom: 1.5rem;">Allgemein</h2>
-        <form method="post" action="/group/{{ group_id }}/settings/general" style="display: flex; flex-direction: column; gap: 1.25rem; max-width: 440px;">
-            <div>
-                <label for="name">Clubname</label>
-                <input class="input" type="text" id="name" name="name" value="{{ group.name }}" required>
-            </div>
-            <button type="submit" class="btn btn-primary" style="align-self: flex-start;">Speichern</button>
-        </form>
+        <!-- Content -->
+        <div style="flex:1;min-width:0;">
 
-        <!-- Finances -->
-        {% elif active_section == 'finances' and role in ['admin', 'kassenwart'] %}
-        <h2 style="font-size: 1.125rem; font-family: 'Space Grotesk', sans-serif; margin-bottom: 1.5rem;">Finanzen</h2>
-        <form method="post" action="/group/{{ group_id }}/settings/finances" style="display: flex; flex-direction: column; gap: 1.25rem; max-width: 440px;">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <!-- General -->
+            {% if active_section == 'general' and role in ['admin', 'präsident'] %}
+            <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:1rem;color:var(--text1);margin-bottom:1.25rem;">Allgemein</div>
+            <form method="post" action="/group/{{ group_id }}/settings/general" style="display:flex;flex-direction:column;gap:1.25rem;max-width:440px;">
                 <div>
-                    <label>Monatsbeitrag (€)</label>
-                    <input class="input" type="text" name="monthly_fee" value="{{ '%.2f' | format(group.monthly_fee | default(0)) }}">
+                    <label>Clubname</label>
+                    <input class="input" type="text" name="name" value="{{ group.name }}" required>
                 </div>
-                <div>
-                    <label>Buchungstag</label>
-                    <input class="input" type="number" name="fee_day" value="{{ group.fee_day | default(1) }}" min="1" max="28">
-                </div>
-            </div>
-            <div>
-                <label>IBAN des Vereinskontos</label>
-                <input class="input" type="text" name="iban" value="{{ group.payment_info.iban | default('') }}">
-            </div>
-            <div>
-                <label>PayPal-Link (optional)</label>
-                <input class="input" type="text" name="paypal" value="{{ group.payment_info.paypal | default('') }}">
-            </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                <div>
-                    <label>Eröffnungssaldo (€)</label>
-                    <input class="input" type="text" name="opening_balance" value="{{ '%.2f' | format(group.treasury.opening_balance | default(0)) }}">
-                </div>
-                <div>
-                    <label>Verspätungsstrafe (€)</label>
-                    <input class="input" type="text" name="late_payment_fee" value="{{ '%.2f' | format(group.treasury.late_payment_fee | default(2.0)) }}">
-                </div>
-            </div>
-            <div>
-                <label style="margin-bottom: 0.5rem; display: block;">Zahlungsfrist</label>
-                <select class="input" name="deadline_type" id="deadline-type" onchange="toggleDeadlineFields()" style="margin-bottom: 0.75rem;">
-                    <option value="days_before_next_event" {% if group.treasury.payment_deadline.type == 'days_before_next_event' %}selected{% endif %}>N Tage vor nächstem Kegeltermin</option>
-                    <option value="days_after_booking" {% if group.treasury.payment_deadline.type == 'days_after_booking' %}selected{% endif %}>N Tage nach Buchung</option>
-                    <option value="fixed_day_of_month" {% if group.treasury.payment_deadline.type == 'fixed_day_of_month' %}selected{% endif %}>Fixer Tag im Monat</option>
-                </select>
-                <div id="deadline-days-field" style="display: flex; align-items: center; gap: 0.5rem;">
-                    <input class="input" type="number" name="deadline_days" value="{{ group.treasury.payment_deadline.days | default(2) }}" min="0" max="60" style="width: 5rem;">
-                    <span class="text-secondary" style="font-size: 0.875rem;" id="deadline-days-label">Tage</span>
-                </div>
-            </div>
-            <button type="submit" class="btn btn-primary" style="align-self: flex-start;">Speichern</button>
-        </form>
-        <script>
-        function toggleDeadlineFields() {
-            const t = document.getElementById('deadline-type').value;
-            const label = document.getElementById('deadline-days-label');
-            if (t === 'fixed_day_of_month') label.textContent = '(Tag des Monats, z.B. 15)';
-            else if (t === 'days_before_next_event') label.textContent = 'Tage vor dem Termin';
-            else label.textContent = 'Tage nach Buchung';
-        }
-        toggleDeadlineFields();
-        </script>
+                <button type="submit" class="btn btn-primary" style="align-self:flex-start;">Speichern</button>
+            </form>
 
-        <!-- Catalog -->
-        {% elif active_section == 'catalog' and role in ['admin', 'kassenwart'] %}
-        <h2 style="font-size: 1.125rem; font-family: 'Space Grotesk', sans-serif; margin-bottom: 0.5rem;">Strafenkatalog</h2>
-        <p class="text-secondary" style="font-size: 0.8125rem; margin-bottom: 1.5rem;">Änderungen werden direkt gespeichert. Deaktivierte Strafen bleiben für den Audit-Trail erhalten.</p>
-
-        <div id="catalog-items" style="display: flex; flex-direction: column; gap: 0.75rem;">
-            {% for item in catalog_items %}
-            <div class="card" id="catalog-row-{{ item.id }}"
-                 style="padding: 0.75rem 1rem; display: grid; grid-template-columns: 2.5rem 1fr auto auto auto; gap: 0.75rem; align-items: center;
-                        {% if not item.active %}opacity: 0.45;{% endif %}">
-                <form method="post" action="/group/{{ group_id }}/penalties/catalog/{{ item.id }}/edit"
-                      hx-post="/group/{{ group_id }}/penalties/catalog/{{ item.id }}/edit"
-                      hx-target="#catalog-row-{{ item.id }}" hx-swap="outerHTML"
-                      style="display: contents;">
-                    <input class="input" type="text" name="icon" value="{{ item.icon }}" style="padding: 0.375rem; text-align: center;">
-                    <input class="input" type="text" name="name" value="{{ item.name }}" required>
-                    <div style="display: flex; align-items: center; gap: 0.25rem;">
-                        <input class="input" type="text" name="amount" value="{{ '%.2f' | format(item.amount) }}" style="width: 5rem; text-align: right;" required>
-                        <span class="text-secondary" style="font-size: 0.75rem;">€</span>
+            <!-- Finances -->
+            {% elif active_section == 'finances' and role in ['admin', 'kassenwart'] %}
+            <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:1rem;color:var(--text1);margin-bottom:1.25rem;">Finanzen</div>
+            <form method="post" action="/group/{{ group_id }}/settings/finances" style="display:flex;flex-direction:column;gap:1.25rem;max-width:440px;">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                    <div>
+                        <label>Monatsbeitrag (€)</label>
+                        <input class="input" type="text" name="monthly_fee" value="{{ '%.2f' | format(group.monthly_fee | default(0)) }}">
                     </div>
-                    <button type="submit" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.375rem 0.75rem; min-height: auto;">OK</button>
-                </form>
-                <form method="post"
-                      action="/group/{{ group_id }}/penalties/catalog/{{ item.id }}/{{ 'activate' if not item.active else 'deactivate' }}"
-                      hx-post="/group/{{ group_id }}/penalties/catalog/{{ item.id }}/{{ 'activate' if not item.active else 'deactivate' }}"
-                      hx-target="#catalog-row-{{ item.id }}" hx-swap="outerHTML">
-                    <button type="submit" title="{{ 'Reaktivieren' if not item.active else 'Deaktivieren' }}"
-                            style="background: none; border: none; cursor: pointer; font-size: 1rem;
-                                   color: {{ 'var(--color-success)' if not item.active else 'var(--color-danger)' }};">
-                        {{ '▶' if not item.active else '⏸' }}
-                    </button>
-                </form>
-            </div>
-            {% endfor %}
-        </div>
-
-        <!-- Add new item form -->
-        <form method="post" action="/group/{{ group_id }}/penalties/catalog/add"
-              hx-post="/group/{{ group_id }}/penalties/catalog/add"
-              hx-target="#catalog-items" hx-swap="beforeend"
-              hx-on::after-request="this.reset()"
-              style="display: grid; grid-template-columns: 2.5rem 1fr auto auto auto; gap: 0.75rem; align-items: center; margin-top: 0.75rem; padding: 0.75rem 1rem; border: 1px dashed var(--color-border); border-radius: 8px;">
-            <input class="input" type="text" name="icon" value="🎳" style="padding: 0.375rem; text-align: center;">
-            <input class="input" type="text" name="name" placeholder="Neue Strafe" required>
-            <div style="display: flex; align-items: center; gap: 0.25rem;">
-                <input class="input" type="text" name="amount" value="0.10" style="width: 5rem; text-align: right;" required>
-                <span class="text-secondary" style="font-size: 0.75rem;">€</span>
-            </div>
-            <button type="submit" class="btn btn-primary" style="font-size: 0.75rem; padding: 0.375rem 0.75rem; min-height: auto;">+ Hinzufügen</button>
-            <span></span>
-        </form>
-        <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
-
-        <!-- Rulebook -->
-        {% elif active_section == 'rulebook' and role in ['admin', 'präsident'] %}
-        <h2 style="font-size: 1.125rem; font-family: 'Space Grotesk', sans-serif; margin-bottom: 1.5rem;">Vereinsregelwerk</h2>
-        <form method="post" action="/group/{{ group_id }}/settings/rulebook" style="display: flex; flex-direction: column; gap: 1.25rem;">
-            <div>
-                <label>Regelwerk (Markdown)</label>
-                <textarea class="input" name="content" rows="16" placeholder="# Vereinsregelwerk ...">{{ group.rulebook.content | default('') }}</textarea>
-            </div>
-            <button type="submit" class="btn btn-primary" style="align-self: flex-start;">Speichern</button>
-        </form>
-
-        <!-- Members -->
-        {% elif active_section == 'members' and role == 'admin' %}
-        <h2 style="font-size: 1.125rem; font-family: 'Space Grotesk', sans-serif; margin-bottom: 1.5rem;">Mitglieder & Rollen</h2>
-        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-            {% for m in members %}
-            <div class="card" style="padding: 0.875rem 1.25rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem;">
+                    <div>
+                        <label>Buchungstag</label>
+                        <input class="input" type="number" name="fee_day" value="{{ group.fee_day | default(1) }}" min="1" max="28">
+                    </div>
+                </div>
                 <div>
-                    <div style="font-weight: 600; font-size: 0.875rem;">{{ m.name }}</div>
-                    <div class="text-secondary" style="font-size: 0.75rem;">{{ m.email }}</div>
+                    <label>IBAN des Vereinskontos</label>
+                    <input class="input" type="text" name="iban" value="{{ group.payment_info.iban | default('') }}">
                 </div>
-                <div style="display: flex; align-items: center; gap: 0.75rem;">
-                    {% if m.user_id != user.id %}
-                    <form method="post" action="/group/{{ group_id }}/settings/members" style="display: flex; align-items: center; gap: 0.5rem;">
-                        <input type="hidden" name="user_id" value="{{ m.user_id }}">
-                        <input type="hidden" name="action" value="change_role">
-                        <select class="input" name="role" style="padding: 0.375rem 0.5rem; font-size: 0.75rem;">
-                            <option value="mitglied" {% if m.role == 'mitglied' %}selected{% endif %}>Mitglied</option>
-                            <option value="kassenwart" {% if m.role == 'kassenwart' %}selected{% endif %}>Kassenwart</option>
-                            <option value="präsident" {% if m.role == 'präsident' %}selected{% endif %}>Präsident</option>
-                            <option value="admin" {% if m.role == 'admin' %}selected{% endif %}>Admin</option>
-                        </select>
-                        <button type="submit" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.375rem 0.75rem; min-height: auto;">Speichern</button>
+                <div>
+                    <label>PayPal-Link <span style="color:var(--text3);font-weight:700;text-transform:none;letter-spacing:0;">(optional)</span></label>
+                    <input class="input" type="text" name="paypal" value="{{ group.payment_info.paypal | default('') }}">
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                    <div>
+                        <label>Eröffnungssaldo (€)</label>
+                        <input class="input" type="text" name="opening_balance" value="{{ '%.2f' | format(group.treasury.opening_balance | default(0)) }}">
+                    </div>
+                    <div>
+                        <label>Verspätungsstrafe (€)</label>
+                        <input class="input" type="text" name="late_payment_fee" value="{{ '%.2f' | format(group.treasury.late_payment_fee | default(2.0)) }}">
+                    </div>
+                </div>
+                <div>
+                    <label style="margin-bottom:0.5rem;display:block;">Zahlungsfrist</label>
+                    <select class="input" name="deadline_type" id="deadline-type" onchange="toggleDeadlineFields()" style="margin-bottom:0.75rem;">
+                        <option value="days_before_next_event" {% if group.treasury.payment_deadline.type == 'days_before_next_event' %}selected{% endif %}>N Tage vor nächstem Kegeltermin</option>
+                        <option value="days_after_booking" {% if group.treasury.payment_deadline.type == 'days_after_booking' %}selected{% endif %}>N Tage nach Buchung</option>
+                        <option value="fixed_day_of_month" {% if group.treasury.payment_deadline.type == 'fixed_day_of_month' %}selected{% endif %}>Fixer Tag im Monat</option>
+                    </select>
+                    <div id="deadline-days-field" style="display:flex;align-items:center;gap:0.5rem;">
+                        <input class="input" type="number" name="deadline_days" value="{{ group.treasury.payment_deadline.days | default(2) }}" min="0" max="60" style="width:5rem;">
+                        <span style="font-size:0.875rem;font-weight:700;color:var(--text2);font-family:'Nunito',sans-serif;" id="deadline-days-label">Tage</span>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary" style="align-self:flex-start;">Speichern</button>
+            </form>
+            <script>
+            function toggleDeadlineFields() {
+                const t = document.getElementById('deadline-type').value;
+                const label = document.getElementById('deadline-days-label');
+                if (t === 'fixed_day_of_month') label.textContent = '(Tag des Monats, z.B. 15)';
+                else if (t === 'days_before_next_event') label.textContent = 'Tage vor dem Termin';
+                else label.textContent = 'Tage nach Buchung';
+            }
+            toggleDeadlineFields();
+            </script>
+
+            <!-- Catalog -->
+            {% elif active_section == 'catalog' and role in ['admin', 'kassenwart'] %}
+            <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:1rem;color:var(--text1);margin-bottom:0.375rem;">Strafenkatalog</div>
+            <p style="font-size:0.8125rem;font-weight:700;color:var(--text2);font-family:'Nunito',sans-serif;margin-bottom:1.25rem;">Änderungen werden direkt gespeichert. Deaktivierte Strafen bleiben für den Audit-Trail erhalten.</p>
+
+            <div id="catalog-items" style="display:flex;flex-direction:column;gap:0.75rem;">
+                {% for item in catalog_items %}
+                <div class="card" id="catalog-row-{{ item.id }}"
+                     style="padding:0.75rem 1rem;display:grid;grid-template-columns:2.5rem 1fr auto auto auto;gap:0.75rem;align-items:center;{% if not item.active %}opacity:0.45;{% endif %}">
+                    <form method="post" action="/group/{{ group_id }}/penalties/catalog/{{ item.id }}/edit"
+                          hx-post="/group/{{ group_id }}/penalties/catalog/{{ item.id }}/edit"
+                          hx-target="#catalog-row-{{ item.id }}" hx-swap="outerHTML"
+                          style="display:contents;">
+                        <input class="input" type="text" name="icon" value="{{ item.icon }}" style="padding:0.375rem;text-align:center;">
+                        <input class="input" type="text" name="name" value="{{ item.name }}" required>
+                        <div style="display:flex;align-items:center;gap:0.25rem;">
+                            <input class="input" type="text" name="amount" value="{{ '%.2f' | format(item.amount) }}" style="width:5rem;text-align:right;" required>
+                            <span style="font-size:0.75rem;font-weight:700;color:var(--text2);font-family:'Nunito',sans-serif;">€</span>
+                        </div>
+                        <button type="submit" class="btn btn-secondary" style="font-size:0.75rem;padding:0.375rem 0.75rem;min-height:auto;">OK</button>
                     </form>
-                    <form method="post" action="/group/{{ group_id }}/settings/members">
-                        <input type="hidden" name="user_id" value="{{ m.user_id }}">
-                        <input type="hidden" name="action" value="remove">
-                        <button type="submit" class="btn btn-danger" style="font-size: 0.75rem; padding: 0.375rem 0.75rem; min-height: auto;"
-                                onclick="return confirm('Mitglied entfernen?')">Entfernen</button>
+                    <form method="post"
+                          action="/group/{{ group_id }}/penalties/catalog/{{ item.id }}/{{ 'activate' if not item.active else 'deactivate' }}"
+                          hx-post="/group/{{ group_id }}/penalties/catalog/{{ item.id }}/{{ 'activate' if not item.active else 'deactivate' }}"
+                          hx-target="#catalog-row-{{ item.id }}" hx-swap="outerHTML">
+                        <button type="submit" title="{{ 'Reaktivieren' if not item.active else 'Deaktivieren' }}"
+                                style="background:none;border:none;cursor:pointer;font-size:1rem;padding:0.25rem 0.375rem;
+                                       color:{{ 'var(--teal)' if not item.active else 'var(--red)' }};">
+                            {{ '▶' if not item.active else '⏸' }}
+                        </button>
                     </form>
-                    {% else %}
-                    <span class="badge badge--warning">{{ m.role }}</span>
-                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+
+            <form method="post" action="/group/{{ group_id }}/penalties/catalog/add"
+                  hx-post="/group/{{ group_id }}/penalties/catalog/add"
+                  hx-target="#catalog-items" hx-swap="beforeend"
+                  hx-on::after-request="this.reset()"
+                  style="display:grid;grid-template-columns:2.5rem 1fr auto auto auto;gap:0.75rem;align-items:center;margin-top:0.75rem;padding:0.75rem 1rem;border:1.5px dashed var(--border);border-radius:var(--radius-sm);">
+                <input class="input" type="text" name="icon" value="🎳" style="padding:0.375rem;text-align:center;">
+                <input class="input" type="text" name="name" placeholder="Neue Strafe" required>
+                <div style="display:flex;align-items:center;gap:0.25rem;">
+                    <input class="input" type="text" name="amount" value="0.10" style="width:5rem;text-align:right;" required>
+                    <span style="font-size:0.75rem;font-weight:700;color:var(--text2);font-family:'Nunito',sans-serif;">€</span>
+                </div>
+                <button type="submit" class="btn btn-primary" style="font-size:0.75rem;padding:0.375rem 0.75rem;min-height:auto;">+ Hinzufügen</button>
+                <span></span>
+            </form>
+
+            <!-- Rulebook -->
+            {% elif active_section == 'rulebook' and role in ['admin', 'präsident'] %}
+            <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:1rem;color:var(--text1);margin-bottom:1.25rem;">Vereinsregelwerk</div>
+            <form method="post" action="/group/{{ group_id }}/settings/rulebook" style="display:flex;flex-direction:column;gap:1.25rem;">
+                <div>
+                    <label>Regelwerk (Markdown)</label>
+                    <textarea class="input" name="content" rows="16" placeholder="# Vereinsregelwerk ...">{{ group.rulebook.content | default('') }}</textarea>
+                </div>
+                <button type="submit" class="btn btn-primary" style="align-self:flex-start;">Speichern</button>
+            </form>
+
+            <!-- Members -->
+            {% elif active_section == 'members' and role == 'admin' %}
+            <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:1rem;color:var(--text1);margin-bottom:1.25rem;">Mitglieder & Rollen</div>
+            <div style="display:flex;flex-direction:column;gap:0.75rem;">
+                {% for m in members %}
+                <div class="card" style="padding:0.875rem 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;">
+                    <div>
+                        <div style="font-size:0.875rem;font-weight:800;font-family:'Nunito',sans-serif;color:var(--text1);">{{ m.name }}</div>
+                        <div style="font-size:0.75rem;font-weight:700;color:var(--text2);font-family:'Nunito',sans-serif;">{{ m.email }}</div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:0.75rem;">
+                        {% if m.user_id != user.id %}
+                        <form method="post" action="/group/{{ group_id }}/settings/members" style="display:flex;align-items:center;gap:0.5rem;">
+                            <input type="hidden" name="user_id" value="{{ m.user_id }}">
+                            <input type="hidden" name="action" value="change_role">
+                            <select class="input" name="role" style="padding:0.375rem 0.5rem;font-size:0.75rem;">
+                                <option value="mitglied" {% if m.role == 'mitglied' %}selected{% endif %}>Mitglied</option>
+                                <option value="kassenwart" {% if m.role == 'kassenwart' %}selected{% endif %}>Kassenwart</option>
+                                <option value="präsident" {% if m.role == 'präsident' %}selected{% endif %}>Präsident</option>
+                                <option value="admin" {% if m.role == 'admin' %}selected{% endif %}>Admin</option>
+                            </select>
+                            <button type="submit" class="btn btn-secondary" style="font-size:0.75rem;padding:0.375rem 0.75rem;min-height:auto;">Speichern</button>
+                        </form>
+                        <form method="post" action="/group/{{ group_id }}/settings/members">
+                            <input type="hidden" name="user_id" value="{{ m.user_id }}">
+                            <input type="hidden" name="action" value="remove">
+                            <button type="submit" class="btn btn-danger" style="font-size:0.75rem;padding:0.375rem 0.75rem;min-height:auto;"
+                                    onclick="return confirm('Mitglied entfernen?')">Entfernen</button>
+                        </form>
+                        {% else %}
+                        <span class="badge badge--warning">{{ m.role }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Invite link -->
+            {% elif active_section == 'invite' and role in ['admin', 'präsident'] %}
+            <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:1rem;color:var(--text1);margin-bottom:1.25rem;">Einladungslink</div>
+            <div class="card" style="padding:1.25rem;margin-bottom:1.5rem;background:var(--card-lavender);">
+                <label>Aktueller Link</label>
+                <div style="display:flex;gap:0.75rem;align-items:center;margin-top:0.25rem;">
+                    <code id="invite-link" style="flex:1;font-family:'Nunito',sans-serif;font-size:0.75rem;font-weight:700;color:var(--purple);word-break:break-all;">
+                        {{ request.base_url }}join/{{ group.invite_token }}
+                    </code>
+                    <button type="button" onclick="copyLink()" class="btn btn-secondary" style="min-width:auto;padding:0.5rem 0.75rem;font-size:0.75rem;">Kopieren</button>
                 </div>
             </div>
-            {% endfor %}
-        </div>
+            <form method="post" action="/group/{{ group_id }}/settings/invite">
+                <input type="hidden" name="action" value="reset_token">
+                <button type="submit" class="btn btn-danger" onclick="return confirm('Alten Link ungültig machen und neuen erstellen?')">
+                    Link zurücksetzen
+                </button>
+            </form>
+            <script>
+            function copyLink() {
+                const link = document.getElementById('invite-link').textContent.trim();
+                navigator.clipboard.writeText(link).then(() => {
+                    const btn = event.target;
+                    btn.textContent = 'Kopiert!';
+                    setTimeout(() => btn.textContent = 'Kopieren', 2000);
+                });
+            }
+            </script>
 
-        <!-- Invite link -->
-        {% elif active_section == 'invite' and role in ['admin', 'präsident'] %}
-        <h2 style="font-size: 1.125rem; font-family: 'Space Grotesk', sans-serif; margin-bottom: 1.5rem;">Einladungslink</h2>
-        <div class="card card--accent" style="padding: 1.25rem; margin-bottom: 1.5rem;">
-            <label>Aktueller Link</label>
-            <div style="display: flex; gap: 0.75rem; align-items: center; margin-top: 0.25rem;">
-                <code id="invite-link" style="flex: 1; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--color-accent); word-break: break-all;">
-                    {{ request.base_url }}join/{{ group.invite_token }}
-                </code>
-                <button type="button" onclick="copyLink()" class="btn btn-secondary" style="min-width: auto; padding: 0.5rem 0.75rem; font-size: 0.75rem;">Kopieren</button>
+            {% else %}
+            <div class="card" style="padding:2rem;text-align:center;">
+                <p style="font-size:0.875rem;font-weight:700;color:var(--text2);font-family:'Nunito',sans-serif;margin:0;">Kein Zugriff auf diesen Bereich.</p>
             </div>
-        </div>
-        <form method="post" action="/group/{{ group_id }}/settings/invite">
-            <input type="hidden" name="action" value="reset_token">
-            <button type="submit" class="btn btn-danger" onclick="return confirm('Alten Link ungültig machen und neuen erstellen?')">
-                Link zurücksetzen
-            </button>
-        </form>
-        <script>
-        function copyLink() {
-            const link = document.getElementById('invite-link').textContent.trim();
-            navigator.clipboard.writeText(link).then(() => {
-                const btn = event.target;
-                btn.textContent = 'Kopiert!';
-                setTimeout(() => btn.textContent = 'Kopieren', 2000);
-            });
-        }
-        </script>
+            {% endif %}
 
-        {% else %}
-        <div class="card" style="padding: 2rem; text-align: center;">
-            <p class="text-secondary" style="font-size: 0.875rem; margin: 0;">Kein Zugriff auf diesen Bereich.</p>
         </div>
-        {% endif %}
-
     </div>
 </div>
 {% endblock %}

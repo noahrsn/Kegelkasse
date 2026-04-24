@@ -10,6 +10,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from app.database.cosmos import CosmosDB, get_db
 from app.database.models import (
+    Award,
+    AwardPeriod,
     Debt,
     DebtEntry,
     DebtType,
@@ -28,6 +30,7 @@ from app.database.models import (
 from app.services.auth_service import require_auth
 from app.services.calendar_service import calculate_due_date, next_occurrence
 import app.services.email_service as _es
+from app.services.awards_service import calculate_session_awards
 
 from app.templates_config import templates
 
@@ -618,6 +621,21 @@ async def approve_session(
         target_name=f"Kegelabend {date_display}",
         details=f"Kegelabend vom {date_display} genehmigt — Schulden für {len(entries)} Mitglieder eingebucht",
     )
+
+    # Persist session awards to awards container
+    try:
+        session_obj = Session(**session_doc)
+        session_award_entries = calculate_session_awards(session_obj)
+        if session_award_entries:
+            award_doc = Award(
+                group_id=group_id,
+                period=AwardPeriod.session,
+                period_ref=session_id,
+                awards=session_award_entries,
+            )
+            db.upsert_item("awards", award_doc.model_dump(mode="json"))
+    except Exception:
+        pass
 
     try:
         group_name = group_doc.get("name", "")

@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Kegelkasse v3</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body, #root { height: 100%; }
+    body {
+      font-family: 'Nunito', system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      background: #FAF0E8;
+      overflow: hidden;
+    }
+    #root { display: flex; height: 100vh; align-items: center; justify-content: center; background: #EFE0D2; }
+
+    /* Phone shell */
+    .phone-shell {
+      width: 100%;
+      max-width: 390px;
+      height: 100%;
+      max-height: 844px;
+      background: #FAF0E8;
+      border-radius: 44px;
+      overflow: hidden;
+      position: relative;
+      box-shadow: 0 32px 80px rgba(59,45,130,0.25), 0 0 0 1px rgba(59,45,130,0.08);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* On small screens, go full-bleed */
+    @media (max-width: 420px) {
+      #root { background: #FAF0E8; }
+      .phone-shell {
+        max-width: 100%;
+        max-height: 100%;
+        border-radius: 0;
+        box-shadow: none;
+      }
+    }
+
+    .screen-content {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .screen-content::-webkit-scrollbar { display: none; }
+
+    /* Bottom nav */
+    .bottom-nav {
+      height: 72px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: stretch;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    /* Tweaks panel */
+    .kk3-tweaks {
+      position: absolute;
+      bottom: 84px;
+      right: 16px;
+      z-index: 300;
+      width: 200px;
+      display: none;
+      pointer-events: auto;
+    }
+    .kk3-tweaks.open { display: block; }
+
+    /* Scrollbar hide on filter row */
+    .pills-row { scrollbar-width: none; }
+    .pills-row::-webkit-scrollbar { display: none; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="kk-components-v3.jsx"></script>
+<script type="text/babel" src="kk-screens-v3.jsx"></script>
+
+<script type="text/babel">
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "screen": "dashboard"
+}/*EDITMODE-END*/;
+
+const NAV_ITEMS = [
+  { id:'dashboard', icon:'home',     label:'Home'    },
+  { id:'calendar',  icon:'calendar', label:'Kalender'},
+  { id:'session',   icon:'bowling',  label:'Abend',  fab:true },
+  { id:'debts',     icon:'wallet',   label:'Schulden'},
+  { id:'stats',     icon:'trophy',   label:'Stats'   },
+];
+
+function App() {
+  const [screen, setScreen] = React.useState(() => localStorage.getItem('kk3_screen') || 'login');
+  const [tweaksOpen, setTweaksOpen] = React.useState(false);
+
+  React.useEffect(() => { localStorage.setItem('kk3_screen', screen); }, [screen]);
+
+  React.useEffect(() => {
+    const handler = e => {
+      if (e.data?.type === '__activate_edit_mode')   setTweaksOpen(true);
+      if (e.data?.type === '__deactivate_edit_mode') setTweaksOpen(false);
+    };
+    window.addEventListener('message', handler);
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
+  const nav = s => setScreen(s);
+  const showNav = screen !== 'login';
+
+  const renderScreen = () => {
+    const props = { onNavigate: nav, onBack: () => setScreen('dashboard') };
+    switch (screen) {
+      case 'login':     return <V3Login     onLogin={() => setScreen('dashboard')} />;
+      case 'dashboard': return <V3Dashboard {...props} />;
+      case 'session':   return <V3Session   {...props} />;
+      case 'debts':     return <V3Debts     {...props} />;
+      case 'calendar':  return <V3Calendar  {...props} />;
+      case 'stats':     return <V3Stats     {...props} />;
+      default:          return <V3Placeholder name={screen} onBack={() => setScreen('dashboard')} />;
+    }
+  };
+
+  return (
+    <div className="phone-shell">
+
+      {/* Screen */}
+      <div className="screen-content">
+        {renderScreen()}
+      </div>
+
+      {/* Bottom nav */}
+      {showNav && (
+        <nav className="bottom-nav" style={{
+          background: V3.navBg,
+        }}>
+          {NAV_ITEMS.map(item => {
+            const active = screen === item.id;
+
+            if (item.fab) return (
+              <button key={item.id} onClick={() => setScreen(item.id)} style={{
+                flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+                border:'none', background:'none', cursor:'pointer',
+              }}>
+                <div style={{
+                  width:54, height:54, borderRadius:'50%',
+                  background: V3.orange,
+                  display:'flex', alignItems:'center', justifyContent:'center',
+                  marginTop:-20,
+                  boxShadow: `0 4px 20px ${V3.orange}70`,
+                }}>
+                  <V3Icon name="bowling" size={24} color="#fff" sw={2}/>
+                </div>
+              </button>
+            );
+
+            return (
+              <button key={item.id} onClick={() => setScreen(item.id)} style={{
+                flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+                gap:'0.2rem', border:'none', background:'none', cursor:'pointer',
+                position:'relative',
+              }}>
+                {active && (
+                  <div style={{
+                    position:'absolute', top:0, left:'50%', transform:'translateX(-50%)',
+                    width:24, height:3, borderRadius:'0 0 3px 3px',
+                    background: V3.cardLavender,
+                  }}/>
+                )}
+                <V3Icon name={item.icon} size={22} color={active ? V3.cardLavender : 'rgba(255,255,255,0.3)'} sw={active ? 2.5 : 1.8}/>
+                <span style={{
+                  fontFamily:"'Nunito', sans-serif", fontWeight: active ? 800 : 600,
+                  fontSize:'0.58rem', color: active ? V3.cardLavender : 'rgba(255,255,255,0.3)',
+                }}>{item.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+      )}
+
+      {/* Tweaks */}
+      <div className={`kk3-tweaks ${tweaksOpen ? 'open' : ''}`}>
+        <div style={{
+          background: V3.white,
+          borderRadius: V3.radiusLg,
+          padding: '1rem',
+          boxShadow: V3.shadowLg,
+        }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'0.875rem' }}>
+            <span style={{ fontFamily:"'Nunito', sans-serif", fontWeight:900, fontSize:'0.75rem', color:V3.text3, textTransform:'uppercase', letterSpacing:'0.08em' }}>Tweaks</span>
+            <button onClick={() => { setTweaksOpen(false); window.parent.postMessage({ type:'__edit_mode_dismissed' }, '*'); }} style={{ background:'none', border:'none', cursor:'pointer', padding:2 }}>
+              <V3Icon name="x" size={14} color={V3.text3} sw={2}/>
+            </button>
+          </div>
+          <div style={{ fontFamily:"'Nunito', sans-serif", fontWeight:800, fontSize:'0.65rem', color:V3.text3, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:'0.4rem' }}>Screen</div>
+          <div style={{ display:'flex', flexDirection:'column', gap:'0.2rem' }}>
+            {[
+              ['login','Login'],
+              ['dashboard','Dashboard'],
+              ['session','Kegelabend'],
+              ['debts','Schulden'],
+              ['calendar','Kalender'],
+              ['stats','Statistiken'],
+            ].map(([id, label]) => (
+              <button key={id} onClick={() => setScreen(id)} style={{
+                padding:'0.4rem 0.75rem', borderRadius:V3.radiusSm, border:'none',
+                background: screen===id ? V3.purpleLight : 'transparent',
+                color: screen===id ? V3.purple : V3.text2,
+                fontFamily:"'Nunito', sans-serif", fontWeight: screen===id ? 800 : 700,
+                fontSize:'0.8rem', cursor:'pointer', textAlign:'left',
+              }}>{label}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

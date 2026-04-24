@@ -3,17 +3,23 @@
 {% block title %}CSV importieren — {{ group_name }}{% endblock %}
 
 {% block content %}
-<div style="padding: 1.5rem; max-width: 700px;">
 
-    <div style="margin-bottom: 1.5rem;">
-        <a href="/group/{{ group_id }}/treasury" style="color: var(--color-text-secondary); text-decoration: none; font-size: 0.875rem;">← Kassenbuch</a>
-    </div>
+<!-- Header island -->
+<div style="background:var(--card-cream);border-radius:0 0 var(--radius-lg) var(--radius-lg);padding:1.25rem;margin-bottom:1rem;box-shadow:var(--shadow);">
+    <a href="/group/{{ group_id }}/treasury" style="font-size:0.78rem;font-weight:800;color:var(--text2);text-decoration:none;font-family:'Nunito',sans-serif;display:inline-flex;align-items:center;gap:0.25rem;margin-bottom:0.75rem;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+        Kassenbuch
+    </a>
+    <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:1.2rem;color:var(--text1);">CSV importieren</div>
+    <div style="font-size:0.68rem;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:0.08em;font-family:'Nunito',sans-serif;margin-top:4px;">{{ group_name }}</div>
+</div>
 
-    <h1 style="font-family: 'Space Grotesk', sans-serif; font-size: 1.5rem; margin-bottom: 0.5rem;">CSV importieren</h1>
-    <p class="text-secondary" style="font-size: 0.875rem; margin-bottom: 1.5rem;">Sparkasse-Kontoauszug (CSV) hochladen. Bereits importierte Buchungen werden automatisch übersprungen.</p>
+<div style="padding:0 1.25rem 1.5rem;max-width:700px;padding-bottom:96px;">
+
+    <p style="font-size:0.875rem;font-weight:700;color:var(--text2);font-family:'Nunito',sans-serif;margin:0 0 1.25rem;">Sparkasse-Kontoauszug (CSV) hochladen. Bereits importierte Buchungen werden automatisch übersprungen.</p>
 
     {% if error %}
-    <div style="background: rgba(200,64,64,0.1); border-left: 3px solid var(--color-danger); padding: 0.875rem 1.25rem; border-radius: 6px; margin-bottom: 1.5rem; font-size: 0.875rem;">
+    <div class="alert alert--danger" style="margin-bottom:1.25rem;">
         {% if error == 'empty' %}Die Datei ist leer.
         {% elif error == 'parse' %}Fehler beim Einlesen der CSV-Datei. Format korrekt?
         {% elif error == 'norows' %}Keine Buchungszeilen in der Datei gefunden.
@@ -23,31 +29,31 @@
     </div>
     {% endif %}
 
-    <div class="card" style="padding: 1.5rem;">
-        <form method="post" action="/group/{{ group_id }}/treasury/import" enctype="multipart/form-data" style="display: flex; flex-direction: column; gap: 1.25rem;">
+    <div class="card" style="padding:1.5rem;margin-bottom:1rem;">
+        <form method="post" action="/group/{{ group_id }}/treasury/import" enctype="multipart/form-data" style="display:flex;flex-direction:column;gap:1.25rem;">
             <div>
-                <label style="font-size: 0.875rem; font-weight: 500; display: block; margin-bottom: 0.5rem;">CSV-Datei (Sparkasse-Export)</label>
+                <label>CSV-Datei (Sparkasse-Export)</label>
                 <input class="input" type="file" name="csv_file" accept=".csv,.txt" required>
-                <div class="text-secondary" style="font-size: 0.75rem; margin-top: 0.375rem;">Encoding: Latin-1 / ISO-8859-1 · Trennzeichen: Semikolon</div>
+                <div style="font-size:0.72rem;font-weight:700;color:var(--text3);font-family:'Nunito',sans-serif;margin-top:0.375rem;">Encoding: Latin-1 / ISO-8859-1 · Trennzeichen: Semikolon</div>
             </div>
-            <button type="submit" class="btn btn-primary" style="align-self: flex-start;">Datei hochladen und analysieren</button>
+            <button type="submit" class="btn btn-primary" style="align-self:flex-start;">Datei hochladen und analysieren</button>
         </form>
     </div>
 
-    <div class="card" style="padding: 1.25rem; margin-top: 1.5rem;">
-        <div style="font-size: 0.875rem; font-weight: 600; margin-bottom: 0.75rem;">So wird gematcht</div>
-        <div style="display: flex; flex-direction: column; gap: 0.625rem;">
-            <div style="display: flex; gap: 0.75rem; align-items: flex-start;">
-                <span style="background: var(--color-success); color: #fff; font-size: 0.625rem; font-weight: 700; padding: 0.125rem 0.375rem; border-radius: 3px; flex-shrink: 0; margin-top: 2px;">SICHER</span>
-                <span class="text-secondary" style="font-size: 0.8125rem;">IBAN-Match — Mitglieds-IBAN gegen Kontonummer des Überweisenden</span>
+    <div class="card" style="padding:1.25rem;">
+        <div style="font-size:0.875rem;font-weight:900;font-family:'Nunito',sans-serif;color:var(--text1);margin-bottom:0.75rem;">So wird gematcht</div>
+        <div style="display:flex;flex-direction:column;gap:0.625rem;">
+            <div style="display:flex;gap:0.75rem;align-items:flex-start;">
+                <span class="badge badge--success" style="font-size:0.625rem;flex-shrink:0;margin-top:2px;">SICHER</span>
+                <span style="font-size:0.8125rem;font-weight:700;color:var(--text2);font-family:'Nunito',sans-serif;">IBAN-Match — Mitglieds-IBAN gegen Kontonummer des Überweisenden</span>
             </div>
-            <div style="display: flex; gap: 0.75rem; align-items: flex-start;">
-                <span style="background: #d4a017; color: #fff; font-size: 0.625rem; font-weight: 700; padding: 0.125rem 0.375rem; border-radius: 3px; flex-shrink: 0; margin-top: 2px;">NAME</span>
-                <span class="text-secondary" style="font-size: 0.8125rem;">Namens-Match — muss manuell bestätigt werden</span>
+            <div style="display:flex;gap:0.75rem;align-items:flex-start;">
+                <span class="badge badge--warning" style="font-size:0.625rem;flex-shrink:0;margin-top:2px;">NAME</span>
+                <span style="font-size:0.8125rem;font-weight:700;color:var(--text2);font-family:'Nunito',sans-serif;">Namens-Match — muss manuell bestätigt werden</span>
             </div>
-            <div style="display: flex; gap: 0.75rem; align-items: flex-start;">
-                <span style="background: var(--color-surface-elevated); color: var(--color-text-secondary); font-size: 0.625rem; font-weight: 700; padding: 0.125rem 0.375rem; border-radius: 3px; flex-shrink: 0; margin-top: 2px;">OFFEN</span>
-                <span class="text-secondary" style="font-size: 0.8125rem;">Kein Match — manuelle Zuweisung oder Kategorisierung als Ausgabe</span>
+            <div style="display:flex;gap:0.75rem;align-items:flex-start;">
+                <span class="badge badge--neutral" style="font-size:0.625rem;flex-shrink:0;margin-top:2px;">OFFEN</span>
+                <span style="font-size:0.8125rem;font-weight:700;color:var(--text2);font-family:'Nunito',sans-serif;">Kein Match — manuelle Zuweisung oder Kategorisierung als Ausgabe</span>
             </div>
         </div>
     </div>

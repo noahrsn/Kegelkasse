@@ -3,65 +3,60 @@
 {% block title %}Abstimmungen — {{ group_name }}{% endblock %}
 
 {% block content %}
-<div class="hero" style="background:linear-gradient(135deg,#0D0D0F 0%,#0a0a12 60%,#0D0D0F 100%);">
-    <div class="hero__overlay"></div>
-    <div class="hero__content">
-        <h1 style="font-family:'Space Grotesk',sans-serif;font-size:1.5rem;margin:0 0 0.25rem;">Abstimmungen</h1>
-        <p style="color:var(--text2);font-size:0.75rem;margin:0;">{{ group_name }}</p>
+
+<div class="topbar">
+    <div>
+        <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:1.1rem;color:var(--text1);">Abstimmungen</div>
+        <div style="font-size:0.68rem;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;">{{ group_name }}</div>
     </div>
+    {% if can_manage %}
+    <a href="/group/{{ group_id }}/polls/new" class="btn btn-primary btn-sm">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+        Neue Abstimmung
+    </a>
+    {% endif %}
 </div>
 
-<div style="padding:1.5rem;max-width:760px;">
-
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:0.75rem;">
-        <a href="/group/{{ group_id }}/dashboard" style="font-size:0.8125rem;color:var(--text2);text-decoration:none;">← Dashboard</a>
-        {% if can_manage %}
-        <a href="/group/{{ group_id }}/polls/new" class="btn btn-primary" style="font-size:0.875rem;">
-            + Neue Abstimmung
-        </a>
-        {% endif %}
-    </div>
+<div style="padding:1.25rem;padding-bottom:96px;max-width:760px;">
 
     <!-- Open polls -->
     {% if open_polls %}
-    <h2 style="font-size:0.75rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text2);margin-bottom:0.75rem;">Offen</h2>
-    <div style="display:flex;flex-direction:column;gap:0.75rem;margin-bottom:2rem;">
+    <div class="section-label">Offen</div>
+    <div style="display:flex;flex-direction:column;gap:0.75rem;margin-bottom:1.5rem;">
+        {% set island_colors = ['var(--card-lavender)', 'var(--card-peach)', 'var(--white)', 'var(--card-cream)'] %}
         {% for poll in open_polls %}
-        <a href="/group/{{ group_id }}/polls/{{ poll.id }}"
-           style="display:block;text-decoration:none;color:inherit;">
-            <div class="card" style="padding:1.125rem 1.25rem;transition:background 150ms ease;border-left:3px solid var(--amber);"
-                 onmouseover="this.style.background='var(--surf2)'" onmouseout="this.style.background=''">
+        <a href="/group/{{ group_id }}/polls/{{ poll.id }}" style="text-decoration:none;display:block;">
+            <div style="background:{{ island_colors[loop.index0 % 4] }};border-radius:var(--radius);box-shadow:var(--shadow);padding:1.125rem 1.25rem;">
                 <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;">
                     <div style="flex:1;min-width:0;">
-                        <div style="display:flex;align-items:center;gap:0.625rem;flex-wrap:wrap;margin-bottom:0.375rem;">
-                            <span style="font-weight:700;font-size:0.9375rem;">{{ poll.title }}</span>
+                        <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.375rem;">
+                            <span style="font-family:'Nunito',sans-serif;font-weight:900;font-size:0.95rem;color:var(--text1);">{{ poll.title }}</span>
                             {% if poll.type == 'yes_no' %}
-                            <span style="font-size:0.6875rem;padding:0.125rem 0.5rem;border-radius:9999px;background:rgba(91,158,255,0.15);color:#5B9EFF;font-weight:600;">Ja/Nein</span>
+                            <span class="badge badge--neutral">Ja/Nein</span>
                             {% elif poll.type == 'multi_choice' %}
-                            <span style="font-size:0.6875rem;padding:0.125rem 0.5rem;border-radius:9999px;background:rgba(240,160,48,0.15);color:var(--amber);font-weight:600;">Mehrfach</span>
+                            <span class="badge badge--purple">Mehrfach</span>
                             {% else %}
-                            <span style="font-size:0.6875rem;padding:0.125rem 0.5rem;border-radius:9999px;background:rgba(46,204,154,0.12);color:var(--teal);font-weight:600;">Einfach</span>
+                            <span class="badge badge--neutral">Einfach</span>
                             {% endif %}
                             {% if poll.anonymous %}
-                            <span style="font-size:0.6875rem;padding:0.125rem 0.5rem;border-radius:9999px;background:rgba(255,255,255,0.06);color:var(--text2);font-weight:600;">🔒 Anonym</span>
+                            <span class="badge badge--neutral">🔒 Anonym</span>
                             {% endif %}
                         </div>
                         {% if poll.description %}
-                        <p style="font-size:0.8125rem;color:var(--text2);margin:0 0 0.625rem;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">{{ poll.description }}</p>
+                        <p style="font-size:0.82rem;font-weight:700;color:var(--text2);margin:0 0 0.5rem;font-family:'Nunito',sans-serif;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">{{ poll.description }}</p>
                         {% endif %}
                         <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
-                            <span style="font-size:0.75rem;color:var(--text2);">{{ poll._vote_count }} Stimme{% if poll._vote_count != 1 %}n{% endif %}</span>
+                            <span style="font-size:0.72rem;font-weight:700;color:var(--text2);font-family:'Nunito',sans-serif;">{{ poll._vote_count }} Stimme{% if poll._vote_count != 1 %}n{% endif %}</span>
                             {% if poll._deadline_display %}
-                            <span style="font-size:0.75rem;color:var(--text2);">⏰ bis {{ poll._deadline_display }}</span>
+                            <span style="font-size:0.72rem;font-weight:700;color:var(--text2);font-family:'Nunito',sans-serif;">⏰ bis {{ poll._deadline_display }}</span>
                             {% endif %}
-                            <span style="font-size:0.75rem;color:var(--text3);">erstellt {{ poll._created_display }}</span>
                         </div>
                     </div>
-                    <div style="flex-shrink:0;display:flex;align-items:center;gap:0.5rem;">
+                    <div style="flex-shrink:0;">
                         {% if poll._user_voted %}
-                        <span style="font-size:0.75rem;padding:0.25rem 0.625rem;border-radius:9999px;background:rgba(46,204,154,0.12);color:var(--teal);font-weight:600;">✓ Abgestimmt</span>
+                        <span class="badge badge--success">✓ Abgestimmt</span>
                         {% else %}
-                        <span style="font-size:0.75rem;padding:0.25rem 0.625rem;border-radius:9999px;background:rgba(240,160,48,0.15);color:var(--amber);font-weight:600;">Abstimmen →</span>
+                        <span class="badge badge--warning">Abstimmen →</span>
                         {% endif %}
                     </div>
                 </div>
@@ -73,21 +68,17 @@
 
     <!-- Closed polls -->
     {% if closed_polls %}
-    <h2 style="font-size:0.75rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text2);margin-bottom:0.75rem;">Abgeschlossen</h2>
-    <div style="display:flex;flex-direction:column;gap:0.625rem;">
+    <div class="section-label">Abgeschlossen</div>
+    <div style="display:flex;flex-direction:column;gap:0.5rem;">
         {% for poll in closed_polls %}
-        <a href="/group/{{ group_id }}/polls/{{ poll.id }}"
-           style="display:block;text-decoration:none;color:inherit;">
-            <div class="card" style="padding:1rem 1.25rem;opacity:0.7;transition:opacity 150ms ease;"
-                 onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">
+        <a href="/group/{{ group_id }}/polls/{{ poll.id }}" style="text-decoration:none;display:block;">
+            <div class="card" style="padding:1rem 1.25rem;opacity:0.65;transition:opacity 150ms ease;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.65'">
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;">
                     <div>
-                        <div style="display:flex;align-items:center;gap:0.625rem;flex-wrap:wrap;margin-bottom:0.25rem;">
-                            <span style="font-weight:600;font-size:0.875rem;">{{ poll.title }}</span>
-                        </div>
-                        <span style="font-size:0.75rem;color:var(--text2);">{{ poll._vote_count }} Stimme{% if poll._vote_count != 1 %}n{% endif %} · {{ poll._created_display }}</span>
+                        <div style="font-family:'Nunito',sans-serif;font-weight:800;font-size:0.9rem;color:var(--text1);margin-bottom:0.2rem;">{{ poll.title }}</div>
+                        <span style="font-size:0.72rem;font-weight:700;color:var(--text3);font-family:'Nunito',sans-serif;">{{ poll._vote_count }} Stimme{% if poll._vote_count != 1 %}n{% endif %} · {{ poll._created_display }}</span>
                     </div>
-                    <span style="font-size:0.75rem;padding:0.25rem 0.625rem;border-radius:9999px;background:rgba(255,255,255,0.06);color:var(--text2);white-space:nowrap;">Geschlossen</span>
+                    <span class="badge badge--neutral">Geschlossen</span>
                 </div>
             </div>
         </a>
@@ -96,10 +87,10 @@
     {% endif %}
 
     {% if not open_polls and not closed_polls %}
-    <div class="card" style="padding:2.5rem;text-align:center;">
+    <div class="card" style="padding:3rem;text-align:center;">
         <div style="font-size:2.5rem;margin-bottom:0.875rem;">📋</div>
-        <p style="font-weight:600;margin:0 0 0.375rem;">Noch keine Abstimmungen</p>
-        <p style="font-size:0.875rem;color:var(--text2);margin:0 0 1.25rem;">
+        <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:1.1rem;color:var(--text1);margin-bottom:0.375rem;">Noch keine Abstimmungen</div>
+        <p style="font-size:0.875rem;font-weight:700;color:var(--text2);margin:0 0 1.25rem;font-family:'Nunito',sans-serif;">
             {% if can_manage %}Erstelle die erste Abstimmung für deinen Club.{% else %}Admins können hier Abstimmungen erstellen.{% endif %}
         </p>
         {% if can_manage %}

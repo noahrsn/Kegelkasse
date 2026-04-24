@@ -57,6 +57,7 @@ class DebtType(str, Enum):
     correction = "correction"
     storno = "storno"
     late_payment_fee = "late_payment_fee"
+    credit = "credit"  # overpayment credit applied to future debts
 
 
 class TransactionType(str, Enum):

@@ -3,17 +3,20 @@
 {% block title %}{% if edit_mode %}Event bearbeiten{% else %}Event anlegen{% endif %} — Kegelkasse{% endblock %}
 
 {% block content %}
-<div class="hero" style="background:linear-gradient(135deg,#0D0D0F 0%,#0a0f1a 60%,#0D0D0F 100%);">
-    <div class="hero__overlay"></div>
-    <div class="hero__content">
-        <h1 style="font-family:'Space Grotesk',sans-serif;font-size:1.5rem;margin:0 0 0.125rem;">
-            {% if edit_mode %}Event bearbeiten{% else %}Neues Event anlegen{% endif %}
-        </h1>
-        <p style="color:var(--color-text-secondary);font-size:0.75rem;margin:0;">{{ group_name }}</p>
+
+<!-- Header island -->
+<div style="background:var(--card-lavender);border-radius:0 0 var(--radius-lg) var(--radius-lg);padding:1.25rem;margin-bottom:1rem;box-shadow:var(--shadow);">
+    <a href="/group/{{ group_id }}/calendar{% if edit_mode %}/{{ event_id }}{% endif %}" style="font-size:0.78rem;font-weight:800;color:var(--text2);text-decoration:none;font-family:'Nunito',sans-serif;display:inline-flex;align-items:center;gap:0.25rem;margin-bottom:0.75rem;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+        {% if edit_mode %}Event{% else %}Kalender{% endif %}
+    </a>
+    <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:1.2rem;color:var(--text1);">
+        {% if edit_mode %}Event bearbeiten{% else %}Neues Event anlegen{% endif %}
     </div>
+    <div style="font-size:0.68rem;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:0.08em;font-family:'Nunito',sans-serif;margin-top:4px;">{{ group_name }}</div>
 </div>
 
-<div style="padding:1.5rem;max-width:640px;">
+<div style="padding:0 1.25rem 1.5rem;max-width:640px;padding-bottom:96px;">
     <form method="post"
           action="/group/{{ group_id }}/calendar/{% if edit_mode %}{{ event_id }}/edit{% else %}new{% endif %}"
           x-data="{
@@ -21,129 +24,114 @@
               pattern: '{{ event.recurrence.pattern if edit_mode and event and event.recurrence else 'monthly_nth_weekday' }}'
           }">
 
-        <!-- Title -->
-        <div class="card" style="margin-bottom:1.25rem;">
-            <h2 style="font-size:1rem;font-weight:600;margin-bottom:1.25rem;">Allgemein</h2>
+        <!-- Title + Description -->
+        <div class="card" style="padding:1.25rem;margin-bottom:1rem;">
+            <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:0.9rem;color:var(--text1);margin-bottom:1rem;">Allgemein</div>
 
-            <div style="margin-bottom:1rem;">
-                <label for="title">Titel *</label>
-                <input class="input" type="text" id="title" name="title" required
+            <div style="margin-bottom:0.875rem;">
+                <label>Titel *</label>
+                <input class="input" type="text" name="title" required
                        placeholder="z.B. Regulärer Kegelabend"
                        value="{{ event.title if edit_mode and event else '' }}">
             </div>
 
             <div>
-                <label for="description">Beschreibung</label>
-                <textarea class="input" id="description" name="description" rows="2"
+                <label>Beschreibung <span style="color:var(--text3);font-weight:700;text-transform:none;letter-spacing:0;">(optional)</span></label>
+                <textarea class="input" name="description" rows="2"
                           placeholder="Optionale Infos zum Termin"
                           style="resize:vertical;">{{ event.description if edit_mode and event else '' }}</textarea>
             </div>
         </div>
 
         <!-- Type -->
-        <div class="card" style="margin-bottom:1.25rem;">
-            <h2 style="font-size:1rem;font-weight:600;margin-bottom:1.25rem;">Termintyp</h2>
+        <div class="card" style="padding:1.25rem;margin-bottom:1rem;">
+            <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:0.9rem;color:var(--text1);margin-bottom:1rem;">Termintyp</div>
 
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.75rem;margin-bottom:1.25rem;">
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.625rem;margin-bottom:1.25rem;">
                 <label style="cursor:pointer;">
-                    <input type="radio" name="event_type" value="single"
-                           x-model="type" style="display:none;">
-                    <div :style="type=='single' ? 'border-color:var(--color-accent);background:rgba(224,128,32,0.1);' : ''"
-                         style="border:2px solid var(--color-border);border-radius:10px;padding:0.875rem 0.5rem;
-                                text-align:center;transition:all 150ms;">
-                        <div style="font-size:1.375rem;margin-bottom:0.375rem;">📌</div>
-                        <div style="font-size:0.8125rem;font-weight:600;">Einzeltermin</div>
-                        <div style="font-size:0.6875rem;color:var(--color-text-secondary);">Einmalig</div>
+                    <input type="radio" name="event_type" value="single" x-model="type" style="display:none;">
+                    <div :style="type=='single' ? 'border-color:var(--purple);background:var(--purple-light);' : ''"
+                         style="border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:0.875rem 0.5rem;text-align:center;transition:all 150ms;font-family:'Nunito',sans-serif;">
+                        <div style="font-size:1.25rem;margin-bottom:0.25rem;">📌</div>
+                        <div style="font-size:0.78rem;font-weight:800;color:var(--text1);">Einzeltermin</div>
+                        <div style="font-size:0.68rem;font-weight:700;color:var(--text3);margin-top:2px;">Einmalig</div>
                     </div>
                 </label>
                 <label style="cursor:pointer;">
-                    <input type="radio" name="event_type" value="recurring"
-                           x-model="type" style="display:none;">
-                    <div :style="type=='recurring' ? 'border-color:#6bcf8e;background:rgba(74,144,96,0.1);' : ''"
-                         style="border:2px solid var(--color-border);border-radius:10px;padding:0.875rem 0.5rem;
-                                text-align:center;transition:all 150ms;">
-                        <div style="font-size:1.375rem;margin-bottom:0.375rem;">🔁</div>
-                        <div style="font-size:0.8125rem;font-weight:600;">Regeltermin</div>
-                        <div style="font-size:0.6875rem;color:var(--color-text-secondary);">Wiederkehrend</div>
+                    <input type="radio" name="event_type" value="recurring" x-model="type" style="display:none;">
+                    <div :style="type=='recurring' ? 'border-color:var(--teal);background:rgba(46,204,154,0.08);' : ''"
+                         style="border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:0.875rem 0.5rem;text-align:center;transition:all 150ms;font-family:'Nunito',sans-serif;">
+                        <div style="font-size:1.25rem;margin-bottom:0.25rem;">🔁</div>
+                        <div style="font-size:0.78rem;font-weight:800;color:var(--text1);">Regeltermin</div>
+                        <div style="font-size:0.68rem;font-weight:700;color:var(--text3);margin-top:2px;">Wiederkehrend</div>
                     </div>
                 </label>
                 <label style="cursor:pointer;">
-                    <input type="radio" name="event_type" value="multi_day"
-                           x-model="type" style="display:none;">
-                    <div :style="type=='multi_day' ? 'border-color:#a5b4fc;background:rgba(99,102,241,0.1);' : ''"
-                         style="border:2px solid var(--color-border);border-radius:10px;padding:0.875rem 0.5rem;
-                                text-align:center;transition:all 150ms;">
-                        <div style="font-size:1.375rem;margin-bottom:0.375rem;">🗓️</div>
-                        <div style="font-size:0.8125rem;font-weight:600;">Mehrtägig</div>
-                        <div style="font-size:0.6875rem;color:var(--color-text-secondary);">z.B. Kegeltour</div>
+                    <input type="radio" name="event_type" value="multi_day" x-model="type" style="display:none;">
+                    <div :style="type=='multi_day' ? 'border-color:var(--purple);background:var(--purple-light);' : ''"
+                         style="border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:0.875rem 0.5rem;text-align:center;transition:all 150ms;font-family:'Nunito',sans-serif;">
+                        <div style="font-size:1.25rem;margin-bottom:0.25rem;">🗓️</div>
+                        <div style="font-size:0.78rem;font-weight:800;color:var(--text1);">Mehrtägig</div>
+                        <div style="font-size:0.68rem;font-weight:700;color:var(--text3);margin-top:2px;">z.B. Kegeltour</div>
                     </div>
                 </label>
             </div>
 
-            <!-- Start date -->
-            <div style="margin-bottom:1rem;">
-                <label for="start_date">
+            <div style="margin-bottom:0.875rem;">
+                <label>
                     <span x-text="type=='multi_day' ? 'Beginn *' : 'Datum *'">Datum *</span>
                 </label>
-                <input class="input" type="datetime-local" id="start_date" name="start_date" required
-                       value="{{ event._start_input if edit_mode and event else today_dt }}">
+                <input class="input" type="datetime-local" name="start_date" required
+                       value="{{ event._start_input if edit_mode and event else today_dt }}" style="max-width:240px;">
             </div>
 
-            <!-- End date (multi_day only) -->
-            <div x-show="type=='multi_day'" x-cloak style="margin-bottom:1rem;">
-                <label for="end_date">Ende *</label>
-                <input class="input" type="datetime-local" id="end_date" name="end_date"
+            <div x-show="type=='multi_day'" x-cloak>
+                <label>Ende *</label>
+                <input class="input" type="datetime-local" name="end_date"
                        :required="type=='multi_day'"
-                       value="{{ event._end_input if edit_mode and event else '' }}">
+                       value="{{ event._end_input if edit_mode and event else '' }}" style="max-width:240px;">
             </div>
         </div>
 
-        <!-- Recurrence (recurring only) -->
-        <div x-show="type=='recurring'" x-cloak class="card" style="margin-bottom:1.25rem;">
-            <h2 style="font-size:1rem;font-weight:600;margin-bottom:1.25rem;">Wiederholung</h2>
+        <!-- Recurrence -->
+        <div x-show="type=='recurring'" x-cloak class="card" style="padding:1.25rem;margin-bottom:1rem;">
+            <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:0.9rem;color:var(--text1);margin-bottom:1rem;">Wiederholung</div>
 
-            <div style="margin-bottom:1rem;">
+            <div style="margin-bottom:0.875rem;">
                 <label>Muster</label>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.625rem;">
                     <label style="cursor:pointer;">
-                        <input type="radio" name="recurrence_pattern" value="monthly_nth_weekday"
-                               x-model="pattern" style="display:none;">
-                        <div :style="pattern=='monthly_nth_weekday' ? 'border-color:var(--color-accent);' : ''"
-                             style="border:2px solid var(--color-border);border-radius:8px;padding:0.75rem;
-                                    text-align:center;transition:all 150ms;">
-                            <div style="font-size:0.8125rem;font-weight:600;">Monatlich</div>
-                            <div style="font-size:0.6875rem;color:var(--color-text-secondary);">z.B. Jeden 4. Samstag</div>
+                        <input type="radio" name="recurrence_pattern" value="monthly_nth_weekday" x-model="pattern" style="display:none;">
+                        <div :style="pattern=='monthly_nth_weekday' ? 'border-color:var(--purple);background:var(--purple-light);' : ''"
+                             style="border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:0.75rem;text-align:center;transition:all 150ms;font-family:'Nunito',sans-serif;">
+                            <div style="font-size:0.82rem;font-weight:800;color:var(--text1);">Monatlich</div>
+                            <div style="font-size:0.68rem;font-weight:700;color:var(--text3);">z.B. Jeden 4. Samstag</div>
                         </div>
                     </label>
                     <label style="cursor:pointer;">
-                        <input type="radio" name="recurrence_pattern" value="weekly"
-                               x-model="pattern" style="display:none;">
-                        <div :style="pattern=='weekly' ? 'border-color:var(--color-accent);' : ''"
-                             style="border:2px solid var(--color-border);border-radius:8px;padding:0.75rem;
-                                    text-align:center;transition:all 150ms;">
-                            <div style="font-size:0.8125rem;font-weight:600;">Wöchentlich</div>
-                            <div style="font-size:0.6875rem;color:var(--color-text-secondary);">Jeden Wochentag</div>
+                        <input type="radio" name="recurrence_pattern" value="weekly" x-model="pattern" style="display:none;">
+                        <div :style="pattern=='weekly' ? 'border-color:var(--purple);background:var(--purple-light);' : ''"
+                             style="border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:0.75rem;text-align:center;transition:all 150ms;font-family:'Nunito',sans-serif;">
+                            <div style="font-size:0.82rem;font-weight:800;color:var(--text1);">Wöchentlich</div>
+                            <div style="font-size:0.68rem;font-weight:700;color:var(--text3);">Jeden Wochentag</div>
                         </div>
                     </label>
                 </div>
             </div>
 
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
-                <!-- nth (monthly only) -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:0.875rem;">
                 <div x-show="pattern=='monthly_nth_weekday'" x-cloak>
-                    <label for="recurrence_nth">Vorkommen</label>
-                    <select class="input" id="recurrence_nth" name="recurrence_nth">
+                    <label>Vorkommen</label>
+                    <select class="input" name="recurrence_nth">
                         <option value="1" {% if edit_mode and event and event.recurrence and event.recurrence.nth == 1 %}selected{% endif %}>Ersten</option>
                         <option value="2" {% if edit_mode and event and event.recurrence and event.recurrence.nth == 2 %}selected{% endif %}>Zweiten</option>
                         <option value="3" {% if edit_mode and event and event.recurrence and event.recurrence.nth == 3 %}selected{% endif %}>Dritten</option>
                         <option value="4" {% if edit_mode and event and event.recurrence and event.recurrence.nth == 4 %}selected{% elif not (edit_mode and event and event.recurrence) %}selected{% endif %}>Vierten</option>
                     </select>
                 </div>
-
-                <!-- Weekday -->
                 <div>
-                    <label for="recurrence_weekday">Wochentag</label>
-                    <select class="input" id="recurrence_weekday" name="recurrence_weekday">
+                    <label>Wochentag</label>
+                    <select class="input" name="recurrence_weekday">
                         {% for wday in weekday_names_long %}
                         {% set i = loop.index0 %}
                         <option value="{{ i }}"
@@ -157,31 +145,26 @@
             </div>
 
             <div>
-                <label for="recurrence_until">Enddatum (optional)</label>
-                <input class="input" type="date" id="recurrence_until" name="recurrence_until"
-                       value="{{ event._rec_until_input if edit_mode and event else '' }}">
-                <p style="font-size:0.75rem;color:var(--color-text-secondary);margin:0.375rem 0 0;">
-                    Leer lassen für unbegrenzte Wiederholung.
-                </p>
+                <label>Enddatum <span style="color:var(--text3);font-weight:700;text-transform:none;letter-spacing:0;">(optional)</span></label>
+                <input class="input" type="date" name="recurrence_until"
+                       value="{{ event._rec_until_input if edit_mode and event else '' }}" style="max-width:200px;">
+                <div style="font-size:0.72rem;font-weight:700;color:var(--text3);font-family:'Nunito',sans-serif;margin-top:0.375rem;">Leer lassen für unbegrenzte Wiederholung.</div>
             </div>
         </div>
 
         <!-- RSVP -->
-        <div class="card" style="margin-bottom:1.5rem;">
-            <h2 style="font-size:1rem;font-weight:600;margin-bottom:1.25rem;">RSVP-Einstellungen</h2>
+        <div class="card" style="padding:1.25rem;margin-bottom:1.25rem;">
+            <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:0.9rem;color:var(--text1);margin-bottom:1rem;">RSVP-Einstellungen</div>
             <div>
-                <label for="rsvp_deadline_hours">Absagefrist (Stunden vor Termin)</label>
-                <input class="input" type="number" id="rsvp_deadline_hours" name="rsvp_deadline_hours"
+                <label>Absagefrist (Stunden vor Termin)</label>
+                <input class="input" type="number" name="rsvp_deadline_hours"
                        min="0" max="336"
-                       value="{{ event.rsvp_deadline_hours if edit_mode and event else 48 }}">
-                <p style="font-size:0.75rem;color:var(--color-text-secondary);margin:0.375rem 0 0;">
-                    0 = keine Frist. Bei verspäteter Absage wird ein Log-Eintrag erstellt.
-                </p>
+                       value="{{ event.rsvp_deadline_hours if edit_mode and event else 48 }}" style="max-width:120px;">
+                <div style="font-size:0.72rem;font-weight:700;color:var(--text3);font-family:'Nunito',sans-serif;margin-top:0.375rem;">0 = keine Frist. Bei verspäteter Absage wird ein Log-Eintrag erstellt.</div>
             </div>
         </div>
 
-        <!-- Actions -->
-        <div style="display:flex;gap:1rem;">
+        <div style="display:flex;gap:0.75rem;">
             <a href="/group/{{ group_id }}/calendar{% if edit_mode %}/{{ event_id }}{% endif %}"
                class="btn btn-secondary" style="flex:1;text-align:center;">Abbrechen</a>
             <button type="submit" class="btn btn-primary" style="flex:2;">
@@ -193,9 +176,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-// Make enumerate available for the weekday template — handled server-side via enumerate()
-// Alpine x-cloak needs the CSS rule
-</script>
 <style>[x-cloak]{display:none!important}</style>
 {% endblock %}

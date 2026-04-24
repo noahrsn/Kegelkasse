@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kegelkasse — Web</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body, #root { height: 100%; }
+    body {
+      font-family: 'Nunito', system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      background: #FAF0E8;
+      overflow: hidden;
+    }
+    #root { display: flex; height: 100vh; }
+
+    .web-main {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      height: 100vh;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(59,45,130,0.15) transparent;
+    }
+    .web-main::-webkit-scrollbar { width: 6px; }
+    .web-main::-webkit-scrollbar-track { background: transparent; }
+    .web-main::-webkit-scrollbar-thumb { background: rgba(59,45,130,0.15); border-radius: 3px; }
+
+    /* Sidebar nav hover */
+    .kk-nav-btn { transition: background 120ms, color 120ms; }
+    .kk-nav-btn:hover { background: rgba(203,194,242,0.1) !important; color: rgba(203,194,242,0.8) !important; }
+
+    /* Tweaks */
+    .kk-tweaks {
+      position: fixed;
+      bottom: 24px; right: 24px;
+      z-index: 300; width: 210px;
+      display: none;
+    }
+    .kk-tweaks.open { display: block; }
+
+    /* Login layout */
+    @media (max-width: 700px) {
+      .web-login-left { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="kk-components-v3.jsx"></script>
+<script type="text/babel" src="kk-screens-v3.jsx"></script>
+<script type="text/babel" src="kk-screens-web.jsx"></script>
+
+<script type="text/babel">
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "screen": "dashboard"
+}/*EDITMODE-END*/;
+
+function App() {
+  const [screen, setScreen] = React.useState(() => localStorage.getItem('kkweb_screen') || 'login');
+  const [tweaksOpen, setTweaksOpen] = React.useState(false);
+
+  React.useEffect(() => { localStorage.setItem('kkweb_screen', screen); }, [screen]);
+
+  React.useEffect(() => {
+    const handler = e => {
+      if (e.data?.type === '__activate_edit_mode')   setTweaksOpen(true);
+      if (e.data?.type === '__deactivate_edit_mode') setTweaksOpen(false);
+    };
+    window.addEventListener('message', handler);
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
+  const nav = s => setScreen(s);
+  const showLayout = screen !== 'login';
+
+  const renderScreen = () => {
+    const props = { onNavigate: nav, onBack: () => setScreen('dashboard') };
+    switch (screen) {
+      case 'login':     return <WebLogin     onLogin={() => setScreen('dashboard')} />;
+      case 'dashboard': return <WebDashboard {...props} />;
+      case 'session':   return <WebSession   {...props} />;
+      case 'debts':     return <WebDebts     {...props} />;
+      case 'calendar':  return <WebCalendar  {...props} />;
+      case 'stats':     return <WebStats     {...props} />;
+      default:          return <V3Placeholder name={screen} onBack={() => setScreen('dashboard')} />;
+    }
+  };
+
+  if (!showLayout) return (
+    <div style={{ flex:1, overflow:'auto' }}>
+      {renderScreen()}
+
+      {/* Tweaks */}
+      <div className={`kk-tweaks ${tweaksOpen ? 'open' : ''}`}>
+        <TweaksPanel nav={nav} screen={screen} setTweaksOpen={setTweaksOpen}/>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ display:'flex', width:'100%', height:'100%' }}>
+      <WebSidebar screen={screen} onNavigate={nav}/>
+
+      <main className="web-main">
+        {renderScreen()}
+      </main>
+
+      {/* Tweaks */}
+      <div className={`kk-tweaks ${tweaksOpen ? 'open' : ''}`}>
+        <TweaksPanel nav={nav} screen={screen} setTweaksOpen={setTweaksOpen}/>
+      </div>
+    </div>
+  );
+}
+
+function TweaksPanel({ nav, screen, setTweaksOpen }) {
+  return (
+    <div style={{
+      background: V3.white, borderRadius: V3.radiusLg,
+      padding: '1rem', boxShadow: V3.shadowLg,
+      border: `1px solid ${V3.border}`,
+    }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'0.875rem' }}>
+        <span style={{ fontFamily:"'Nunito', sans-serif", fontWeight:900, fontSize:'0.72rem', color:V3.text3, textTransform:'uppercase', letterSpacing:'0.1em' }}>Tweaks</span>
+        <button onClick={() => { setTweaksOpen(false); window.parent.postMessage({ type:'__edit_mode_dismissed' }, '*'); }} style={{ background:'none', border:'none', cursor:'pointer', padding:2 }}>
+          <V3Icon name="x" size={14} color={V3.text3} sw={2}/>
+        </button>
+      </div>
+      <div style={{ fontFamily:"'Nunito', sans-serif", fontWeight:800, fontSize:'0.62rem', color:V3.text3, textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:'0.4rem' }}>Screen</div>
+      <div style={{ display:'flex', flexDirection:'column', gap:'0.15rem' }}>
+        {[
+          ['login','Login'],
+          ['dashboard','Dashboard'],
+          ['session','Kegelabend'],
+          ['debts','Schulden'],
+          ['calendar','Kalender'],
+          ['stats','Statistiken'],
+        ].map(([id, label]) => (
+          <button key={id} onClick={() => nav(id)} style={{
+            padding:'0.4rem 0.75rem', borderRadius:V3.radiusSm, border:'none',
+            background: screen===id ? V3.purpleLight : 'transparent',
+            color: screen===id ? V3.purple : V3.text2,
+            fontFamily:"'Nunito', sans-serif", fontWeight: screen===id ? 800 : 700,
+            fontSize:'0.82rem', cursor:'pointer', textAlign:'left',
+            transition:'background 100ms',
+          }}>{label}</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

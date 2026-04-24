@@ -6,16 +6,13 @@
 <div class="split-layout">
 
     <!-- LEFT — brand panel -->
-    <div class="split-layout__image v2-login-left-hide">
-        <div style="position:absolute;top:30%;left:50%;transform:translate(-50%,-50%);width:380px;height:380px;border-radius:50%;background:var(--amber-glow);filter:blur(80px);pointer-events:none;"></div>
-        <svg width="72" height="90" viewBox="0 0 64 80" fill="none" style="position:absolute;right:18%;bottom:22%;opacity:0.16;">
-            <ellipse cx="32" cy="16" rx="13" ry="15" fill="#F0A030"/>
-            <rect x="20" y="30" width="24" height="10" rx="3" fill="#F0A030"/>
-            <ellipse cx="32" cy="60" rx="18" ry="20" fill="#F0A030"/>
-        </svg>
-        <div style="position:relative;z-index:1;text-align:center;padding:2rem;">
-            <div style="font-family:'Bebas Neue',sans-serif;font-size:3.8rem;color:var(--text1);letter-spacing:0.06em;line-height:1;margin-bottom:0.5rem;">KEGELKASSE</div>
-            <div style="font-family:'Space Grotesk',sans-serif;color:var(--text2);font-size:1rem;line-height:1.7;">Dein Kegelclub. <span style="color:var(--amber);">Digital.</span></div>
+    <div class="split-layout__image">
+        <div style="position:absolute;top:-80px;right:-80px;width:280px;height:280px;border-radius:50%;background:rgba(59,45,130,0.12);pointer-events:none;"></div>
+        <div style="position:absolute;bottom:-60px;left:-60px;width:220px;height:220px;border-radius:50%;background:rgba(59,45,130,0.1);pointer-events:none;"></div>
+        <div style="position:relative;z-index:1;text-align:center;padding:2.5rem;">
+            <div style="font-size:4rem;margin-bottom:1rem;">🎳</div>
+            <div style="font-family:'Nunito',sans-serif;font-size:2.2rem;font-weight:900;color:#1A1028;line-height:1;margin-bottom:0.5rem;">Kegelkasse</div>
+            <div style="font-family:'Nunito',sans-serif;font-size:0.95rem;font-weight:700;color:#5A4E78;">Dein Kegelclub. Digital.</div>
         </div>
     </div>
 
@@ -23,10 +20,8 @@
     <div class="split-layout__form">
         <div style="width:100%;max-width:380px;">
 
-            <div style="font-family:'Bebas Neue',sans-serif;font-size:2rem;color:var(--amber);letter-spacing:0.06em;margin-bottom:2rem;display:none;" class="v2-mobile-logo">KEGELKASSE</div>
-
-            <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:1.6rem;color:var(--text1);margin-bottom:0.25rem;">Konto erstellen</div>
-            <div style="font-size:0.875rem;color:var(--text2);margin-bottom:2rem;">Kostenlos registrieren und deinen Club verwalten.</div>
+            <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:1.8rem;color:var(--text1);margin-bottom:0.25rem;">Konto erstellen</div>
+            <div style="font-size:0.875rem;font-weight:700;color:var(--text2);margin-bottom:2rem;font-family:'Nunito',sans-serif;">Kostenlos registrieren und deinen Club verwalten.</div>
 
             {% if error %}
             <div class="alert alert--danger">{{ error }}</div>
@@ -51,20 +46,14 @@
                     <label for="password">Passwort</label>
                     <input class="input" type="password" id="password" name="password" placeholder="Mindestens 8 Zeichen" required autocomplete="new-password" minlength="8">
                 </div>
-                <button type="submit" class="btn btn-primary" style="width:100%;">Konto erstellen</button>
+                <button type="submit" class="btn btn-primary" style="width:100%;min-height:48px;">Konto erstellen</button>
             </form>
 
-            <p style="text-align:center;font-size:0.8rem;color:var(--text2);">
+            <p style="text-align:center;font-size:0.8rem;font-weight:700;color:var(--text2);font-family:'Nunito',sans-serif;">
                 Bereits registriert?
-                <a href="/login" style="color:var(--amber);text-decoration:none;font-weight:700;">Anmelden</a>
+                <a href="/login" style="color:var(--purple);text-decoration:none;font-weight:800;">Anmelden</a>
             </p>
         </div>
     </div>
 </div>
-
-<style>
-@media (max-width: 768px) {
-    .v2-mobile-logo { display: block !important; }
-}
-</style>
 {% endblock %}

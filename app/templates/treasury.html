@@ -6,78 +6,90 @@
 
 <div class="topbar">
     <div>
-        <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.9rem;color:var(--text1);">Kassenbuch</div>
-        <div style="font-size:0.65rem;color:var(--text3);">{{ group_name }}</div>
+        <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:1.1rem;color:var(--text1);">Kassenbuch</div>
+        <div style="font-size:0.68rem;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;">{{ group_name }}</div>
     </div>
-    <div style="display:flex;gap:0.5rem;">
-        <a href="/group/{{ group_id }}/treasury/import" class="btn btn-primary btn-sm">CSV Import</a>
-    </div>
+    <a href="/group/{{ group_id }}/treasury/import" class="btn btn-primary btn-sm">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        CSV Import
+    </a>
 </div>
 
 {% if not has_import_this_month %}
-<div style="background: rgba(212,160,23,0.1); border-left: 3px solid #d4a017; padding: 1rem 1.5rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem;">
+<div class="alert alert--warning" style="border-radius:0;border-left:3px solid var(--orange);display:flex;align-items:center;justify-content:space-between;gap:1rem;">
     <div>
-        <div style="font-weight: 600; font-size: 0.875rem; color: #d4a017;">Kassenstand möglicherweise veraltet</div>
-        <div class="text-secondary" style="font-size: 0.75rem;">
+        <div style="font-weight:800;font-size:0.875rem;">Kassenstand möglicherweise veraltet</div>
+        <div style="font-size:0.75rem;font-weight:700;margin-top:2px;">
             {% if last_import_date %}Letzter Import: {{ last_import_date }}{% else %}Noch kein CSV-Import vorhanden{% endif %}
         </div>
     </div>
-    <a href="/group/{{ group_id }}/treasury/import" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.5rem 1rem; min-height: auto;">Importieren →</a>
+    <a href="/group/{{ group_id }}/treasury/import" class="btn btn-secondary btn-sm">Importieren →</a>
 </div>
 {% endif %}
 
 {% if success == 'import' %}
-<div class="badge badge--success" style="display: block; padding: 0.75rem 1.5rem; font-size: 0.875rem;">CSV-Import erfolgreich.</div>
+<div class="alert alert--success">CSV-Import erfolgreich.</div>
 {% elif success == 'tx' %}
-<div class="badge badge--success" style="display: block; padding: 0.75rem 1.5rem; font-size: 0.875rem;">Buchung wurde erfasst.</div>
+<div class="alert alert--success">Buchung wurde erfasst.</div>
 {% endif %}
 
-<div style="padding: 1.5rem; max-width: 1000px;">
+<div style="padding:1.25rem;padding-bottom:96px;max-width:1000px;">
 
     <!-- Balance cards -->
-    <div class="grid grid-cols-3 gap-4" style="margin-bottom: 1.5rem;">
-        <div class="card card--accent">
-            <div class="text-secondary" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Kassenstand</div>
-            <div class="font-mono {% if balance >= 0 %}text-success{% else %}text-danger{% endif %}" style="font-size: 2rem; font-weight: 700;">{{ '%.2f'|format(balance) }} €</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.75rem;margin-bottom:1.25rem;">
+        <div style="background:var(--card-cream);border-radius:var(--radius);box-shadow:var(--shadow);padding:1.25rem;">
+            <div style="font-size:0.62rem;font-weight:800;color:#8A7B40;text-transform:uppercase;letter-spacing:0.1em;font-family:'Nunito',sans-serif;margin-bottom:0.35rem;">Kassenstand</div>
+            <div style="font-family:'Nunito',sans-serif;font-size:2rem;font-weight:900;color:{% if balance >= 0 %}var(--teal){% else %}var(--red){% endif %};line-height:1;">{{ '%.2f'|format(balance)|replace('.',',') }} €</div>
         </div>
-        <div class="card">
-            <div class="text-secondary" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Eröffnungssaldo</div>
-            <div class="font-mono" style="font-size: 1.25rem; font-weight: 600;">{{ '%.2f'|format(opening_balance) }} €</div>
+        <div style="background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);padding:1.25rem;">
+            <div style="font-size:0.62rem;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:0.1em;font-family:'Nunito',sans-serif;margin-bottom:0.35rem;">Eröffnungssaldo</div>
+            <div style="font-family:'Nunito',sans-serif;font-size:1.5rem;font-weight:900;color:var(--text1);line-height:1;">{{ '%.2f'|format(opening_balance)|replace('.',',') }} €</div>
         </div>
-        <div class="card">
-            <div class="text-secondary" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Buchungen</div>
-            <div class="font-mono" style="font-size: 1.25rem; font-weight: 600;">{{ transactions | length }}</div>
+        <div style="background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);padding:1.25rem;">
+            <div style="font-size:0.62rem;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:0.1em;font-family:'Nunito',sans-serif;margin-bottom:0.35rem;">Buchungen</div>
+            <div style="font-family:'Nunito',sans-serif;font-size:1.5rem;font-weight:900;color:var(--text1);line-height:1;">{{ transactions | length }}</div>
         </div>
     </div>
 
     <!-- Actions -->
-    <div style="display: flex; gap: 0.75rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
-        <a href="/group/{{ group_id }}/treasury/import" class="btn btn-primary" style="font-size: 0.875rem;">📥 CSV importieren</a>
-        <a href="/group/{{ group_id }}/treasury/transactions/new" class="btn btn-secondary" style="font-size: 0.875rem;">➕ Manuelle Buchung</a>
-        <a href="/group/{{ group_id }}/debts/all" class="btn btn-secondary" style="font-size: 0.875rem;">💸 Schuldenübersicht</a>
+    <div style="display:flex;gap:0.625rem;margin-bottom:1.25rem;flex-wrap:wrap;">
+        <a href="/group/{{ group_id }}/treasury/import" class="btn btn-primary btn-sm">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            CSV importieren
+        </a>
+        <a href="/group/{{ group_id }}/treasury/transactions/new" class="btn btn-secondary btn-sm">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+            Manuelle Buchung
+        </a>
+        <a href="/group/{{ group_id }}/debts/all" class="btn btn-secondary btn-sm">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7H4a1 1 0 00-1 1v10a1 1 0 001 1h16a1 1 0 001-1V8a1 1 0 00-1-1z"/><path d="M3 11h18"/></svg>
+            Schuldenübersicht
+        </a>
     </div>
 
     <!-- Transaction list -->
-    <h2 style="font-size: 0.875rem; font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1rem;">Buchungen</h2>
+    <div class="section-label">Buchungen</div>
 
     {% if transactions %}
-    <div class="card" style="padding: 0; overflow: hidden;">
-        <div style="padding: 0.875rem 1.25rem; border-bottom: 1px solid var(--color-border); display: grid; grid-template-columns: 100px 1fr auto auto; gap: 1rem; align-items: center;">
-            <div class="text-secondary" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">Datum</div>
-            <div class="text-secondary" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">Beschreibung</div>
-            <div class="text-secondary" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; text-align: right;">Betrag</div>
-            <div class="text-secondary" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; text-align: right; min-width: 90px;">Saldo</div>
+    <div class="card" style="padding:0;overflow:hidden;">
+
+        <!-- Header row -->
+        <div style="padding:0.65rem 1.25rem;border-bottom:1px solid var(--border);display:grid;grid-template-columns:90px 1fr auto 100px;gap:1rem;align-items:center;background:var(--purple-dim);">
+            <div style="font-size:0.65rem;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;font-family:'Nunito',sans-serif;">Datum</div>
+            <div style="font-size:0.65rem;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;font-family:'Nunito',sans-serif;">Beschreibung</div>
+            <div style="font-size:0.65rem;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;font-family:'Nunito',sans-serif;text-align:right;">Betrag</div>
+            <div style="font-size:0.65rem;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;font-family:'Nunito',sans-serif;text-align:right;">Saldo</div>
         </div>
 
         {% for tx in transactions %}
-        <div style="padding: 0.875rem 1.25rem; border-bottom: 1px solid var(--color-border); display: grid; grid-template-columns: 100px 1fr auto auto; gap: 1rem; align-items: center; {% if loop.last %}border-bottom: none;{% endif %}">
-            <div class="font-mono text-secondary" style="font-size: 0.8125rem;">
+        <div style="padding:0.875rem 1.25rem;border-bottom:{% if not loop.last %}1px solid var(--border){% else %}none{% endif %};display:grid;grid-template-columns:90px 1fr auto 100px;gap:1rem;align-items:center;">
+            <div style="font-family:'Nunito',sans-serif;font-size:0.78rem;font-weight:700;color:var(--text3);">
                 {% set d = tx.get('date', '')[:10] %}
                 {% if d %}{{ d[8:10] }}.{{ d[5:7] }}.{{ d[:4] }}{% endif %}
             </div>
             <div>
-                <div style="font-size: 0.875rem;">{{ tx.get('description', '') or tx.get('category', '') }}</div>
-                <div class="text-secondary" style="font-size: 0.75rem; display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.125rem;">
+                <div style="font-size:0.875rem;font-weight:700;font-family:'Nunito',sans-serif;color:var(--text1);">{{ tx.get('description', '') or tx.get('category', '') }}</div>
+                <div style="font-size:0.72rem;font-weight:700;color:var(--text3);font-family:'Nunito',sans-serif;display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:2px;">
                     <span>{{ tx.get('category', '').replace('_', ' ') }}</span>
                     {% if tx.get('source') == 'csv_import' %}<span>· CSV-Import</span>{% endif %}
                     {% if tx.get('matched_user_id') and user_names.get(tx.get('matched_user_id')) %}
@@ -85,20 +97,22 @@
                     {% endif %}
                 </div>
             </div>
-            <div class="font-mono {% if tx.get('type') == 'income' %}text-success{% else %}text-danger{% endif %}" style="font-size: 0.9375rem; font-weight: 600; text-align: right; white-space: nowrap;">
-                {% if tx.get('type') == 'income' %}+{% else %}−{% endif %}{{ '%.2f'|format(tx.get('amount', 0)) }} €
+            <div style="font-family:'Nunito',sans-serif;font-size:0.9rem;font-weight:900;text-align:right;white-space:nowrap;color:{% if tx.get('type') == 'income' %}var(--teal){% else %}var(--red){% endif %};">
+                {% if tx.get('type') == 'income' %}+{% else %}−{% endif %}{{ '%.2f'|format(tx.get('amount', 0))|replace('.',',') }} €
             </div>
-            <div class="font-mono text-secondary" style="font-size: 0.8125rem; text-align: right; min-width: 90px;">
-                {% if running_balances.get(tx['id']) is not none %}{{ '%.2f'|format(running_balances[tx['id']]) }} €{% endif %}
+            <div style="font-family:'Nunito',sans-serif;font-size:0.78rem;font-weight:700;color:var(--text3);text-align:right;">
+                {% if running_balances.get(tx['id']) is not none %}{{ '%.2f'|format(running_balances[tx['id']])|replace('.',',') }} €{% endif %}
             </div>
         </div>
         {% endfor %}
     </div>
+
     {% else %}
-    <div class="card" style="padding: 2rem; text-align: center;">
-        <div style="font-size: 2rem; margin-bottom: 0.75rem;">📊</div>
-        <p class="text-secondary" style="font-size: 0.875rem; margin: 0 0 1rem;">Noch keine Buchungen vorhanden.</p>
-        <a href="/group/{{ group_id }}/treasury/import" class="btn btn-primary" style="font-size: 0.875rem;">CSV importieren</a>
+    <div class="card" style="padding:3rem;text-align:center;">
+        <div style="font-size:2.5rem;margin-bottom:0.75rem;">📊</div>
+        <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:1rem;color:var(--text1);margin-bottom:0.375rem;">Noch keine Buchungen</div>
+        <p style="font-size:0.875rem;font-weight:700;color:var(--text2);margin:0 0 1.25rem;font-family:'Nunito',sans-serif;">Importiere einen CSV-Auszug oder erstelle eine manuelle Buchung.</p>
+        <a href="/group/{{ group_id }}/treasury/import" class="btn btn-primary">CSV importieren</a>
     </div>
     {% endif %}
 </div>

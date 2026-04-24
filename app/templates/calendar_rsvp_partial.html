@@ -4,28 +4,25 @@
 
     <!-- Late response warning -->
     {% if late_response %}
-    <div style="background:rgba(200,64,64,0.1);border-left:3px solid var(--color-danger);
-                padding:0.75rem 1rem;border-radius:0 8px 8px 0;margin-bottom:1rem;">
-        <div style="font-size:0.8125rem;font-weight:600;color:var(--color-danger);">Verspätete Absage</div>
-        <div style="font-size:0.75rem;color:var(--color-text-secondary);margin-top:0.125rem;">
-            Die Absagefrist ist abgelaufen. Ein Log-Eintrag wurde erstellt.
-        </div>
+    <div style="background:rgba(220,70,70,0.08);border-left:3px solid var(--red);padding:0.75rem 1rem;border-radius:0 var(--radius-sm) var(--radius-sm) 0;margin-bottom:1rem;">
+        <div style="font-size:0.8125rem;font-weight:800;color:var(--red);font-family:'Nunito',sans-serif;">Verspätete Absage</div>
+        <div style="font-size:0.75rem;font-weight:700;color:var(--text2);font-family:'Nunito',sans-serif;margin-top:0.125rem;">Die Absagefrist ist abgelaufen. Ein Log-Eintrag wurde erstellt.</div>
     </div>
     {% endif %}
 
     <!-- RSVP Summary -->
     <div style="display:flex;gap:1.5rem;margin-bottom:1.25rem;">
         <div style="text-align:center;">
-            <div style="font-size:1.5rem;font-weight:700;color:var(--color-success);">{{ event._rsvp_attending }}</div>
-            <div style="font-size:0.75rem;color:var(--color-text-secondary);">Zusagen</div>
+            <div style="font-family:'Nunito',sans-serif;font-size:1.5rem;font-weight:900;color:var(--teal);">{{ event._rsvp_attending }}</div>
+            <div style="font-size:0.75rem;font-weight:700;color:var(--text2);font-family:'Nunito',sans-serif;">Zusagen</div>
         </div>
         <div style="text-align:center;">
-            <div style="font-size:1.5rem;font-weight:700;color:var(--color-danger);">{{ event._rsvp_declined }}</div>
-            <div style="font-size:0.75rem;color:var(--color-text-secondary);">Absagen</div>
+            <div style="font-family:'Nunito',sans-serif;font-size:1.5rem;font-weight:900;color:var(--red);">{{ event._rsvp_declined }}</div>
+            <div style="font-size:0.75rem;font-weight:700;color:var(--text2);font-family:'Nunito',sans-serif;">Absagen</div>
         </div>
         <div style="text-align:center;">
-            <div style="font-size:1.5rem;font-weight:700;color:var(--color-text-secondary);">{{ event._rsvp_pending }}</div>
-            <div style="font-size:0.75rem;color:var(--color-text-secondary);">Ausstehend</div>
+            <div style="font-family:'Nunito',sans-serif;font-size:1.5rem;font-weight:900;color:var(--text2);">{{ event._rsvp_pending }}</div>
+            <div style="font-size:0.75rem;font-weight:700;color:var(--text2);font-family:'Nunito',sans-serif;">Ausstehend</div>
         </div>
     </div>
 
@@ -40,26 +37,24 @@
 
         <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;flex-wrap:wrap;">
             <button type="button" @click="status='attending'"
-                    :class="status=='attending' ? 'btn-success-active' : ''"
-                    style="flex:1;"
+                    class="btn" style="flex:1;min-width:80px;"
                     :style="status=='attending'
-                        ? 'background:var(--color-success);color:#fff;border-color:var(--color-success);'
-                        : 'background:rgba(74,144,96,0.08);color:var(--color-success);border:1px solid rgba(74,144,96,0.3);'"
-                    class="btn" style="min-width:80px;">
+                        ? 'background:var(--teal);color:#fff;border-color:var(--teal);'
+                        : 'background:rgba(46,204,154,0.08);color:var(--teal);border:1.5px solid rgba(46,204,154,0.3);'">
                 ✓ Zusagen
             </button>
             <button type="button" @click="status='pending'"
+                    class="btn" style="flex:1;min-width:80px;"
                     :style="status=='pending'
-                        ? 'background:var(--color-surface-elevated);color:var(--color-text);border-color:var(--color-border);'
-                        : 'background:transparent;color:var(--color-text-secondary);border:1px solid var(--color-border);'"
-                    class="btn" style="min-width:80px;">
+                        ? 'background:var(--card-lavender);color:var(--text1);border-color:var(--border);'
+                        : 'background:transparent;color:var(--text2);border:1.5px solid var(--border);'">
                 ? Ausstehend
             </button>
             <button type="button" @click="status='declined'"
+                    class="btn" style="flex:1;min-width:80px;"
                     :style="status=='declined'
-                        ? 'background:var(--color-danger);color:#fff;border-color:var(--color-danger);'
-                        : 'background:rgba(200,64,64,0.08);color:var(--color-danger);border:1px solid rgba(200,64,64,0.3);'"
-                    class="btn" style="min-width:80px;">
+                        ? 'background:var(--red);color:#fff;border-color:var(--red);'
+                        : 'background:rgba(220,70,70,0.08);color:var(--red);border:1.5px solid rgba(220,70,70,0.3);'">
                 ✗ Absagen
             </button>
         </div>
@@ -70,13 +65,10 @@
                    style="font-size:0.875rem;">
         </div>
 
-        <button type="submit" class="btn btn-primary" style="width:100%;">
-            Rückmeldung speichern
-        </button>
+        <button type="submit" class="btn btn-primary" style="width:100%;">Rückmeldung speichern</button>
     </form>
     {% else %}
-    <div style="font-size:0.8125rem;color:var(--color-text-secondary);
-                padding:0.75rem;background:var(--color-surface-elevated);border-radius:8px;">
+    <div style="font-size:0.8125rem;font-weight:700;color:var(--text2);padding:0.75rem;background:var(--purple-dim);border-radius:var(--radius-sm);font-family:'Nunito',sans-serif;">
         Vergangener Termin — keine RSVP mehr möglich.
     </div>
     {% endif %}
@@ -84,37 +76,30 @@
     <!-- Member list -->
     {% if member_names %}
     <div style="margin-top:1.25rem;">
-        <div style="font-size:0.75rem;font-weight:600;color:var(--color-text-secondary);
-                    text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.625rem;">
-            Alle Rückmeldungen
-        </div>
+        <div style="font-size:0.72rem;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.625rem;font-family:'Nunito',sans-serif;">Alle Rückmeldungen</div>
         <div style="display:flex;flex-direction:column;gap:0.375rem;">
             {% for entry in event.rsvp_entries %}
             {% set name = member_names.get(entry.user_id, entry.user_id) %}
-            <div style="display:flex;align-items:center;justify-content:space-between;
-                        padding:0.5rem 0.75rem;background:var(--color-surface-elevated);border-radius:8px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:0.5rem 0.75rem;background:var(--purple-dim);border-radius:var(--radius-sm);">
                 <div style="display:flex;align-items:center;gap:0.625rem;">
-                    <div style="width:28px;height:28px;border-radius:50%;
-                                background:var(--color-accent-muted);
-                                display:flex;align-items:center;justify-content:center;
-                                font-size:0.6875rem;font-weight:700;color:var(--color-accent);">
+                    <div style="width:28px;height:28px;border-radius:50%;background:var(--purple-light);display:flex;align-items:center;justify-content:center;font-size:0.6875rem;font-weight:900;color:var(--purple);">
                         {{ name[:1]|upper }}
                     </div>
-                    <span style="font-size:0.875rem;{% if entry.user_id == current_user.id %}font-weight:600;{% endif %}">
+                    <span style="font-size:0.875rem;font-weight:{% if entry.user_id == current_user.id %}800{% else %}700{% endif %};font-family:'Nunito',sans-serif;color:var(--text1);">
                         {{ name }}{% if entry.user_id == current_user.id %} (ich){% endif %}
                     </span>
                 </div>
                 <div style="display:flex;align-items:center;gap:0.5rem;">
                     {% if entry.note %}
-                    <span style="font-size:0.75rem;color:var(--color-text-secondary);">{{ entry.note }}</span>
+                    <span style="font-size:0.75rem;font-weight:700;color:var(--text2);font-family:'Nunito',sans-serif;">{{ entry.note }}</span>
                     {% endif %}
                     {% if entry.late_response %}
-                    <span style="font-size:0.6875rem;color:var(--color-danger);">⚠ verspätet</span>
+                    <span style="font-size:0.6875rem;font-weight:800;color:var(--red);font-family:'Nunito',sans-serif;">⚠ verspätet</span>
                     {% endif %}
-                    <span style="font-size:0.8125rem;font-weight:600;
-                                 {% if entry.status == 'attending' %}color:var(--color-success);
-                                 {% elif entry.status == 'declined' %}color:var(--color-danger);
-                                 {% else %}color:var(--color-text-secondary);{% endif %}">
+                    <span style="font-size:0.875rem;font-weight:900;font-family:'Nunito',sans-serif;
+                                 {% if entry.status == 'attending' %}color:var(--teal);
+                                 {% elif entry.status == 'declined' %}color:var(--red);
+                                 {% else %}color:var(--text2);{% endif %}">
                         {% if entry.status == 'attending' %}✓
                         {% elif entry.status == 'declined' %}✗
                         {% else %}?{% endif %}

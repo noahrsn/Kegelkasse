@@ -3,24 +3,25 @@
 {% block title %}Benachrichtigungen — Kegelkasse{% endblock %}
 
 {% block body %}
-<div style="min-height:100vh;background:var(--bg);padding:2rem 1rem;">
+<div style="min-height:100vh;background:var(--bg);padding:2rem 1rem;padding-bottom:96px;">
     <div style="max-width:600px;margin:0 auto;">
 
         <!-- Header -->
         <div style="display:flex;align-items:center;gap:1rem;margin-bottom:2rem;flex-wrap:wrap;">
-            <a href="/profile" style="font-size:0.8125rem;color:var(--text2);text-decoration:none;">← Profil</a>
-            <h1 style="font-family:'Space Grotesk',sans-serif;font-size:1.375rem;margin:0;">Benachrichtigungen</h1>
+            <a href="/profile" style="font-size:0.78rem;font-weight:800;color:var(--text2);text-decoration:none;font-family:'Nunito',sans-serif;display:inline-flex;align-items:center;gap:0.25rem;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+                Profil
+            </a>
+            <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:1.375rem;color:var(--text1);">Benachrichtigungen</div>
         </div>
 
         {% if success %}
-        <div style="background:rgba(46,204,154,0.1);border-left:3px solid var(--teal);padding:0.875rem 1.25rem;border-radius:8px;font-size:0.875rem;color:var(--teal);margin-bottom:1.25rem;">
-            Einstellungen gespeichert.
-        </div>
+        <div class="alert alert--success" style="margin-bottom:1.25rem;">Einstellungen gespeichert.</div>
         {% endif %}
 
         {% if not groups %}
         <div class="card" style="padding:2rem;text-align:center;">
-            <p style="color:var(--text2);margin:0;">Du bist noch in keinem Club Mitglied.</p>
+            <p style="font-size:0.875rem;font-weight:700;color:var(--text2);font-family:'Nunito',sans-serif;margin:0;">Du bist noch in keinem Club Mitglied.</p>
         </div>
         {% else %}
 
@@ -29,34 +30,34 @@
         <div style="display:flex;gap:0.5rem;margin-bottom:1.5rem;flex-wrap:wrap;">
             {% for g in groups %}
             <a href="/profile/notifications?group={{ g.id }}"
-               style="padding:0.5rem 1rem;border-radius:9999px;font-size:0.8125rem;font-weight:600;text-decoration:none;
-                      background:{% if active_group_id == g.id %}var(--amber){% else %}var(--surf2){% endif %};
-                      color:{% if active_group_id == g.id %}#000{% else %}var(--text2){% endif %};">
+               style="padding:0.5rem 1rem;border-radius:9999px;font-size:0.82rem;font-weight:800;text-decoration:none;font-family:'Nunito',sans-serif;transition:all 150ms;
+                      background:{% if active_group_id == g.id %}var(--purple){% else %}var(--purple-dim){% endif %};
+                      color:{% if active_group_id == g.id %}#fff{% else %}var(--text2){% endif %};">
                 {{ g.name }}
             </a>
             {% endfor %}
         </div>
         {% endif %}
 
-        <!-- Settings form for active group -->
+        <!-- Settings form -->
         {% for g in groups %}
         {% if g.id == active_group_id %}
         <div class="card" style="padding:0;overflow:hidden;">
             <div style="padding:1.125rem 1.25rem;border-bottom:1px solid var(--border);">
-                <span style="font-size:0.75rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text2);">{{ g.name }}</span>
+                <span style="font-size:0.72rem;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--text2);font-family:'Nunito',sans-serif;">{{ g.name }}</span>
             </div>
             <form method="post" action="/profile/notifications/{{ g.id }}">
                 {% for key, label, description in notification_types %}
                 <label style="display:flex;align-items:flex-start;gap:1rem;padding:1rem 1.25rem;border-bottom:1px solid var(--border);cursor:pointer;transition:background 150ms;"
-                       onmouseover="this.style.background='var(--surf2)'" onmouseout="this.style.background=''">
+                       onmouseover="this.style.background='var(--purple-dim)'" onmouseout="this.style.background=''">
                     <div style="padding-top:2px;flex-shrink:0;">
                         <input type="checkbox" name="{{ key }}" value="on"
                                {% if g.settings.get(key, True) %}checked{% endif %}
-                               style="width:16px;height:16px;accent-color:var(--amber);cursor:pointer;">
+                               style="width:16px;height:16px;accent-color:var(--purple);cursor:pointer;">
                     </div>
                     <div style="flex:1;min-width:0;">
-                        <div style="font-size:0.875rem;font-weight:600;">{{ label }}</div>
-                        <div style="font-size:0.75rem;color:var(--text2);margin-top:0.125rem;">{{ description }}</div>
+                        <div style="font-size:0.875rem;font-weight:800;font-family:'Nunito',sans-serif;color:var(--text1);">{{ label }}</div>
+                        <div style="font-size:0.75rem;font-weight:700;color:var(--text2);font-family:'Nunito',sans-serif;margin-top:0.125rem;">{{ description }}</div>
                     </div>
                 </label>
                 {% endfor %}

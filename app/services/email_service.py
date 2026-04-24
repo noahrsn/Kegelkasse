@@ -294,6 +294,25 @@ def build_rsvp_reminder(
     return subject, html
 
 
+def build_deadline_warning(
+    first_name: str, group_name: str, event_title: str,
+    deadline_display: str, group_id: str, event_id: str
+) -> tuple[str, str]:
+    base = get_settings().app_base_url
+    subject = f"[{group_name}] Absagefrist läuft ab: {event_title}"
+    html = _base_html(
+        "Absagefrist läuft bald ab!",
+        f"<p>Hallo {first_name},</p>"
+        f"<p>die Absagefrist für <strong>{event_title}</strong> im Club <strong>{group_name}</strong> "
+        f"läuft <strong style='color:#F0A030;'>bald ab</strong>:</p>"
+        f"<p style='background:rgba(240,160,48,0.08);padding:12px;border-radius:8px;"
+        f"border-left:3px solid #F0A030;'>{deadline_display}</p>"
+        f"<p>Du hast noch keine Rückmeldung gegeben. Jetzt ist deine letzte Chance!</p>",
+        f"{base}/group/{group_id}/calendar/{event_id}", "Jetzt rückmelden",
+    )
+    return subject, html
+
+
 def build_late_rsvp_kassenwart(
     group_name: str, member_name: str, event_title: str, group_id: str, event_id: str
 ) -> tuple[str, str]:
