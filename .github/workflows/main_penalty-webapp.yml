@@ -61,7 +61,7 @@ jobs:
           name: python-app
       
       - name: Login to Azure
-        uses: azure/login@v2
+        uses: azure/login@v2.1.0
         with:
           auth-type: oidc
           client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_FB96F9113B0D4E3AA988DAB9D515D262 }}
@@ -69,7 +69,7 @@ jobs:
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_3FAD859ABF6649B8940C348B7183AF4C }}
 
       - name: 'Deploy to Azure Web App'
-        uses: azure/webapps-deploy@v2
+        uses: azure/webapps-deploy@v3.2.0
         id: deploy-to-webapp
         with:
           app-name: 'penalty-webapp'
