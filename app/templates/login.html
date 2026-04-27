@@ -8,29 +8,29 @@
     <!-- LEFT — brand panel -->
     <div class="split-layout__image">
         <!-- Decorative blobs -->
-        <div style="position:absolute;top:-80px;right:-80px;width:280px;height:280px;border-radius:50%;background:rgba(59,45,130,0.12);pointer-events:none;"></div>
-        <div style="position:absolute;bottom:-60px;left:-60px;width:220px;height:220px;border-radius:50%;background:rgba(59,45,130,0.1);pointer-events:none;"></div>
+        <div style="position:absolute;top:-80px;right:-80px;width:300px;height:300px;border-radius:50%;background:rgba(255,255,255,0.25);pointer-events:none;"></div>
+        <div style="position:absolute;bottom:-60px;left:-60px;width:220px;height:220px;border-radius:50%;background:rgba(255,255,255,0.15);pointer-events:none;"></div>
 
         <div style="position:relative;z-index:1;text-align:center;padding:2.5rem;">
-            <div style="font-size:4rem;margin-bottom:1rem;">🎳</div>
-            <div style="font-family:'Nunito',sans-serif;font-size:2.2rem;font-weight:900;color:#1A1028;line-height:1;margin-bottom:0.5rem;">Kegelkasse</div>
-            <div style="font-family:'Nunito',sans-serif;font-size:0.95rem;font-weight:700;color:#5A4E78;margin-bottom:2rem;">Dein Kegelclub. Digital.</div>
+            <div class="login-emoji">🎳</div>
+            <div class="login-brand-title" style="font-family:'Nunito',sans-serif;font-weight:900;color:var(--purple);line-height:1;margin-bottom:0.5rem;">Kegelkasse</div>
+            <div style="font-family:'Nunito',sans-serif;font-size:1rem;font-weight:700;color:var(--text2);">Dein Kegelclub. Digital &amp; Einfach.</div>
 
-            <!-- Feature pills -->
-            <div style="display:flex;flex-direction:column;gap:0.5rem;align-items:center;">
-                <div style="background:rgba(59,45,130,0.1);border-radius:999px;padding:0.4rem 1rem;font-size:0.8rem;font-weight:800;color:#3B2D82;font-family:'Nunito',sans-serif;">🏆 Strafen & Schulden</div>
-                <div style="background:rgba(59,45,130,0.1);border-radius:999px;padding:0.4rem 1rem;font-size:0.8rem;font-weight:800;color:#3B2D82;font-family:'Nunito',sans-serif;">📅 Kalender & Termine</div>
-                <div style="background:rgba(59,45,130,0.1);border-radius:999px;padding:0.4rem 1rem;font-size:0.8rem;font-weight:800;color:#3B2D82;font-family:'Nunito',sans-serif;">💰 Vereinskasse</div>
+            <!-- Feature pills — hidden on mobile -->
+            <div class="login-feature-pills">
+                <div style="background:rgba(255,255,255,0.5);border-radius:999px;padding:0.5rem 1rem;font-size:0.82rem;font-weight:700;color:var(--purple);font-family:'Nunito',sans-serif;">🎳 Strafen erfassen</div>
+                <div style="background:rgba(255,255,255,0.5);border-radius:999px;padding:0.5rem 1rem;font-size:0.82rem;font-weight:700;color:var(--purple);font-family:'Nunito',sans-serif;">💰 Kasse im Blick</div>
+                <div style="background:rgba(255,255,255,0.5);border-radius:999px;padding:0.5rem 1rem;font-size:0.82rem;font-weight:700;color:var(--purple);font-family:'Nunito',sans-serif;">📅 Termine planen</div>
             </div>
         </div>
     </div>
 
     <!-- RIGHT — form -->
     <div class="split-layout__form">
-        <div style="width:100%;max-width:380px;">
+        <div style="width:100%;max-width:400px;">
 
-            <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:1.8rem;color:var(--text1);margin-bottom:0.25rem;">Willkommen zurück</div>
-            <div style="font-size:0.875rem;font-weight:700;color:var(--text2);margin-bottom:2rem;">Meld dich an und los geht's.</div>
+            <div class="login-form-heading" style="font-family:'Nunito',sans-serif;font-weight:900;color:var(--text1);margin-bottom:0.25rem;">Willkommen zurück!</div>
+            <div style="font-size:0.875rem;font-weight:700;color:var(--text3);margin-bottom:2rem;font-family:'Nunito',sans-serif;">Meld dich an und los geht's.</div>
 
             {% if error == 'invalid_token' %}
             <div class="alert alert--danger">Ungültiger Bestätigungslink.</div>
@@ -63,7 +63,7 @@
                 <button type="submit" class="btn btn-primary" style="width:100%;min-height:48px;font-size:0.9rem;">Anmelden</button>
             </form>
 
-            <p style="text-align:center;font-size:0.8rem;font-weight:700;color:var(--text2);font-family:'Nunito',sans-serif;">
+            <p style="text-align:center;font-size:0.85rem;font-weight:700;color:var(--text3);font-family:'Nunito',sans-serif;">
                 Noch kein Konto?
                 <a href="/register" style="color:var(--purple);text-decoration:none;font-weight:800;">Registrieren</a>
             </p>
