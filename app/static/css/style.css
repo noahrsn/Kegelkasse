@@ -759,16 +759,11 @@ label {
     .session-fab-mobile     { display: none !important; }
 
     .session-content {
-        display: grid;
-        grid-template-columns: 1fr 300px;
-        gap: 1.5rem;
         padding: 1.75rem 2rem;
         padding-bottom: 2rem;
-        align-items: start;
     }
 
-    .session-member-grid { grid-template-columns: repeat(2, 1fr); }
-    .session-catalog-panel { display: block; }
+    .session-member-grid { grid-template-columns: repeat(3, 1fr); }
 }
 
 /* ── Debts page ────────────────────────────────────────────────────────────── */

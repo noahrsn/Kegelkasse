@@ -30,28 +30,37 @@ document.body.addEventListener("htmx:confirm", function (event) {
 // Session recording UI state (kept global so it survives HTMX page swaps)
 window.sessionRecorder = function (groupId, sessionId) {
     return {
-        sheetOpen: false,
+        modalOpen: false,
         userId: "",
         userName: "",
-        resetSelection() {
-            this.userId = "";
-            this.userName = "";
-        },
-        openSheet(userId, userName) {
+        isAbsent: false,
+        openSheet(userId, userName, isAbsent) {
             this.userId = userId;
             this.userName = userName;
-            this.sheetOpen = window.innerWidth < 769;
+            this.isAbsent = isAbsent || false;
+            this.modalOpen = true;
         },
         closeSheet() {
-            this.sheetOpen = false;
-            this.resetSelection();
+            this.modalOpen = false;
+            this.userId = "";
+            this.userName = "";
+            this.isAbsent = false;
         },
         addPenalty(catalogId) {
-            if (!this.userId) return;
+            if (!this.userId || this.isAbsent) return;
             htmx.ajax("POST", `/group/${groupId}/sessions/${sessionId}/penalty`, {
                 target: "#member-entry-" + this.userId,
                 swap: "outerHTML",
                 values: { user_id: this.userId, catalog_id: catalogId },
+            });
+            this.closeSheet();
+        },
+        markArrived() {
+            if (!this.userId) return;
+            htmx.ajax("POST", `/group/${groupId}/sessions/${sessionId}/mark-arrived`, {
+                target: "#member-entry-" + this.userId,
+                swap: "outerHTML",
+                values: { user_id: this.userId },
             });
             this.closeSheet();
         },

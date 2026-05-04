@@ -163,7 +163,9 @@ def _get_or_create_debt_doc(user_id: str, group_id: str, db: CosmosDB) -> dict:
 
 
 def _enrich_entry(entry: dict, catalog_by_id: dict, user_names: dict) -> dict:
-    entry["_total"] = round(_entry_penalty_total(entry), 2)
+    penalty_total = _entry_penalty_total(entry)
+    late_avg = entry.get("late_arrival_avg", 0) if entry.get("late_arrival") else 0
+    entry["_total"] = round(penalty_total + late_avg, 2)
     entry["_name"] = user_names.get(entry["user_id"], entry["user_id"])
     for p in entry.get("penalties", []):
         cat = catalog_by_id.get(p.get("catalog_id"), {})
@@ -502,6 +504,44 @@ async def mark_late(
         return HTMLResponse("", status_code=404)
 
     entry["late_arrival"] = not entry.get("late_arrival", False)
+    db.upsert_item("sessions", session_doc)
+    return _member_card_response(request, group_id, session_id, entry, db)
+
+
+# ── HTMX: mark arrived (absent → late arrival with current avg) ───────────────
+
+@router.post("/{session_id}/mark-arrived")
+async def mark_arrived(
+    request: Request,
+    group_id: str,
+    session_id: str,
+    user_id: str = Form(...),
+    current_user: User = Depends(require_auth),
+    db: CosmosDB = Depends(get_db),
+):
+    group_doc = _get_group_as_member(group_id, current_user, db)
+    if not group_doc:
+        return HTMLResponse("", status_code=403)
+
+    session_doc = db.read_item("sessions", session_id, group_id)
+    if not session_doc or session_doc.get("status") != SessionStatus.draft:
+        return HTMLResponse("", status_code=400)
+
+    entry = next((e for e in session_doc.get("entries", []) if e["user_id"] == user_id), None)
+    if not entry:
+        return HTMLResponse("", status_code=404)
+
+    present_totals = [
+        _entry_penalty_total(e)
+        for e in session_doc.get("entries", [])
+        if not e.get("absent") and e["user_id"] != user_id
+    ]
+    avg = round(sum(present_totals) / len(present_totals), 2) if present_totals else 0.0
+
+    entry["absent"] = False
+    entry["late_arrival"] = True
+    entry["late_arrival_avg"] = avg
+
     db.upsert_item("sessions", session_doc)
     return _member_card_response(request, group_id, session_id, entry, db)
 
