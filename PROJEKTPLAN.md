@@ -8,96 +8,62 @@ Eine moderne Azure-Webapp für Kegelclubs zur Verwaltung von Strafen, Mitglieder
 
 ---
 
-## Design-Konzept: Bowling Atmosphere
+## Design-Konzept
 
-Das Design transportiert die Atmosphäre einer modernen Kegelanlage — gedämpftes Licht, lackierte Holzbahnen, das Schimmern der Kegelkugel. Kein generisches SaaS-Dashboard, sondern eine App, die sich nach Kegelclub anfühlt.
+Das detaillierte visuelle Design, inklusive Farbpalette, Typografie, Komponenten und Stil-Richtlinien, wird separat gepflegt und ist im Ordner `design_handoff_kegelkasse/` zu finden.
 
-### Farbpalette
+Die `design/README.md` dient als zentraler Einstiegspunkt und Referenz für das aktuelle Design. Die `README.md` bleibt jedoch der Wegweiser zum jeweils gültigen Design-System.
 
-| Token | Wert | Verwendung |
-|---|---|---|
-| `--color-bg` | `#0D0D0F` | Haupt-Hintergrund |
-| `--color-surface` | `#1A1A1F` | Karten, Panels |
-| `--color-surface-elevated` | `#242430` | Hover-State, aktive Karten |
-| `--color-accent` | `#E08020` | Amber-Orange — Kegelkugel-Farbe, CTAs, Highlights |
-| `--color-accent-muted` | `#7A4510` | Deaktivierte Akzente, Hintergrundtönung |
-| `--color-text-primary` | `#F0EEE8` | Haupttext (warm-weiß, kein hartes #FFFFFF) |
-| `--color-text-secondary` | `#8A8880` | Untertitel, Metadaten |
-| `--color-danger` | `#C84040` | Schulden-Rot |
-| `--color-success` | `#4A9060` | Bezahlt-Grün |
-| `--color-border` | `rgba(255,255,255,0.06)` | Subtile Trennlinien |
+### Menü- & Navigationsstruktur
 
-### Typografie
+Die Navigationsstruktur der Anwendung wird für mobile Endgeräte und Desktop-Ansichten optimiert, um eine intuitive und rollenbasierte Benutzerführung zu gewährleisten.
 
-- **Headings:** `Syne` (Google Fonts) — markante Groteskschrift mit eigenem Charakter
-- **Body / UI:** `Inter` — maximale Lesbarkeit auf allen Screens
-- **Mono / Beträge:** `JetBrains Mono` — Zahlen in Kassenbuch und Schuldenübersicht tabellarisch ausgerichtet (`font-variant-numeric: tabular-nums`)
-- Schriftgrößen: 6-stufige Skala (12 / 14 / 16 / 20 / 28 / 40 px)
+#### Mobile Ansicht (Hamburger-Menü)
 
-### Hintergrundbilder — Atmosphäre durch Kontext
+Für kleinere Bildschirme wird ein klassisches Hamburger-Menü verwendet, das die Navigation übersichtlich strukturiert:
 
-Strategisch eingesetzte Hero-Bilder schaffen Wiedererkennungswert und emotionale Tiefe, ohne den Content zu überwältigen. Alle Fotos werden mit einem dunklen Gradient-Overlay abgedeckt (`rgba(13,13,15,0.72) → rgba(13,13,15,0.95)`), sodass Text immer lesbar bleibt.
+-   **Dashboard:** Übersicht, anstehende Termine, letzter Kegelabend.
+-   **Kegelabende:**
+    -   Neuen Kegelabend starten
+    -   Vergangene Kegelabende (Liste)
+-   **Kassenbuch:** (Nur Kassenwart/Admin)
+    -   Übersicht & Saldo
+    -   Einzahlungen
+    -   Ausgaben
+-   **Strafenkatalog:**
+    -   Katalog anzeigen
+    -   Katalog bearbeiten (Admin/Kassenwart)
+-   **Mitglieder:**
+    -   Mitgliederliste
+    -   Einladungen verwalten
+-   **Termine:** Liste der anstehenden und vergangenen Termine.
+-   **Club-Einstellungen:** (Nur Admin/Kassenwart)
+    -   Allgemeine Einstellungen
+    -   Mitglieder verwalten
+-   **Profil:**
+    -   Eigene Daten
+    -   Logout
 
-**Bildquellen:** Unsplash (kostenlos, lizenzfrei) oder eigene Fotos der Kegelanlage. Empfohlene Suchbegriffe: *bowling alley*, *bowling pins*, *bowling ball*, *kegelbahn*.
+#### Desktop Ansicht (Sidebar & User-Menü)
 
-| Screen / Bereich | Bildmotiv | Behandlung |
-|---|---|---|
-| **Login & Register** | Nahaufnahme glänzender Kegelkugeln auf dem Gestell, Kegelanlage im Abendlicht | Split-Layout: links 55 % Bild (full-bleed), rechts Form-Panel mit `backdrop-blur`; auf Mobile: Bild-Banner oben (30 vh), Form darunter |
-| **Dashboard Hero** | Kegelanlage-Vogelperspektive, aufgestellte Pins, Unschärfe an den Rändern | Schmales Hero-Banner (18 vh) mit subtiler Parallax beim Scrollen; Kassenstand-Kachel und Vereinsname als Overlay |
-| **Kalender-Header** | Kegelball rollt auf Pins zu — Bewegungsunschärfe | Breites Hero-Banner oben im Kalender (20 vh); nächster Termin als prominente Card davor |
-| **Kegelabend erfassen** | Totale einer beleuchteten Kegelbahn, Seitenlichter, Holzstruktur | Fixiertes Bild-Banner (22 vh) oben; Erfassungs-UI scrollt darunter; Bottom Sheet über dem Bild |
-| **Awards & Ewige Tabelle** | Siegerpodest, Trophäe oder Pins in einer Reihe | Vollbreites Banner hinter dem Seitentitel |
-| **Leer-Zustände** | Einzelner Kegelpin als SVG-Illustration (kein Foto) | Zentriert, lockerer Ton bei "noch keine Daten" |
+Die Desktop-Ansicht nutzt eine Kombination aus einer permanent sichtbaren Sidebar für die Hauptnavigation und einem User-Menü für sekundäre Aktionen, um den verfügbaren Platz optimal zu nutzen.
 
-> **Performance auf Mobile (`< 640px`):** Hero-Bilder werden auf `12vh` reduziert oder durch einen einfachen Farbgradienten aus der Farbpalette ersetzt — kein Laden großer Bilder auf schmalem Datenvolumen.
+-   **Hauptnavigation (Sidebar):**
+    -   **Dashboard:** Direkter Einstiegspunkt.
+    -   **Kegelabende:** Führt zu einer Seite, auf der man vergangene Abende sieht und einen neuen starten kann.
+    -   **Kassenbuch:** Übersicht über die Finanzen (Nur Kassenwart/Admin).
+    -   **Termine:** Die Terminliste.
 
-### Komponentendesign
+-   **User-Menü (Dropdown unter Nutzer-Avatar oben rechts):**
+    -   **Profil:** Eigene Profileinstellungen.
+    -   **Club-Verwaltung:** (Sichtbar nur für Admin/Kassenwart)
+        -   Allgemeine Einstellungen
+        -   Mitglieder verwalten
+        -   Strafenkatalog bearbeiten
+    -   **Logout**
 
-**Cards:**
-- `border-radius: 12px`, kein harter Drop-Shadow — stattdessen `border: 1px solid var(--color-border)` + `box-shadow: 0 1px 3px rgba(0,0,0,0.4)`
-- Hover: Background wechselt auf `--color-surface-elevated`, keine Translation
-- Amber-Akzentlinie links (`3px solid var(--color-accent)`) für hervorgehobene Cards (offene Schulden, nächster Termin)
+Diese Struktur stellt sicher, dass die wichtigsten Funktionen schnell erreichbar sind, während administrative und seltener genutzte Bereiche klar getrennt und nur für berechtigte Nutzer sichtbar sind.
 
-**Buttons:**
-- Primary: `bg-accent text-black font-semibold` — klarer CTA
-- Secondary: `bg-surface border border-color-border text-primary` — zurückhaltend
-- Destructive: `bg-danger/10 text-danger border border-danger/30` — erkennbar, ohne zu schreien
-- Mindest-Touch-Fläche: 44×44 px auf allen Geräten (iOS HIG-konform)
-
-**Navigation:**
-- Desktop: Linke Sidebar (240 px), collapsible auf Icon-Only-Modus (64 px)
-- Mobile: Bottom Tab Bar mit 5 Icons: Dashboard · Kalender · Abend erfassen (zentraler FAB in Amber) · Schulden · Mehr
-- Active State: Amber-Unterstrich + subtiler Glow-Effekt
-
-**Strafen-Erfassung (Touch-optimiert):**
-- Mitglied-Kacheln: 80×80 px Avatar, Name darunter, Strafensumme als Badge
-- **Mobile:** Bottom Sheet (Swipe-to-dismiss) mit Strafenkatalog als großem Icon-Grid
-- Erfasste Strafen erscheinen als Chips unterhalb des Avatars — Tap zum Stornieren
-- Floating Action Button (amber, 56 px) unten rechts: „Abend einreichen"
-
-**Glassmorphism (sparsam, nur für Overlays):**
-- Modals, Drawers, Floating-Panels: `backdrop-filter: blur(16px)` + `background: rgba(26,26,31,0.85)`
-- Nicht für reguläre Cards — Glassmorphism verliert seine Wirkung bei Übernutzung
-
-**Micro-Animationen (ausschließlich CSS):**
-- Neue Strafe eingetragen: kurzes `scale(1.05)` auf dem Avatar, Badge-Zahl zählt hoch
-- Award erhalten: einmalige `@keyframes glow` Puls-Animation auf der Badge
-- Schuldenbetrag beim Seitenlade: Zähler-Animation via `@property --num` (CSS Houdini)
-- Übergänge: 150 ms `ease-out` — schnell, nie träge
-
-### Seiten-spezifisches Design
-
-**Login / Register:**
-Split-Screen. Links: Bowling-Foto mit dunklem Overlay, Logo und Claim *„Dein Kegelclub. Digital."* zentriert im Bild. Rechts: Form-Card mit `backdrop-blur`, schwebend über dem Hintergrund. Mobile: Bild-Banner (30 vh) + Form scrollbar darunter.
-
-**Dashboard:**
-Oben: schmaler Hero mit Vereinsname und aktuellem Datum. Darunter: 3-spaltige Kachelreihe (Meine Schulden | Nächster Termin | Letzter Abend). Dann: Aktivitätsfeed und Awards-Preview-Strip. Kassenstand als dezenter Chip (sichtbar für alle Mitglieder): *„Vereinskasse: 142,50 €"*.
-
-**Kegelabend erfassen:**
-Focus-Mode: schmale Topbar mit Termin-Datum und Fortschritts-Indikator (*„7 von 12 Mitgliedern erfasst"*). Mitglieder-Grid dominiert den Viewport. FAB (amber) unten rechts. Kein ablenkender Sidebar-Kontext.
-
-**Schulden-Übersicht (Kassenwart):**
-Tabelle mit Zebra-Striping in `--color-surface` / `--color-surface-elevated`. Beträge rechtsbündig in JetBrains Mono. Farbige Status-Badges (grün / gelb / rot). Bulk-Select-Checkbox für „alle als bezahlt markieren".
 
 ---
 
@@ -142,7 +108,7 @@ kegelkasse/
 ├── tests/
 ├── requirements.txt
 ├── Dockerfile
-└── .github/workflows/deploy.yml
+└── .github/workflows/main_penalty-webapp.yml
 ```
 
 ### 1.2 Cosmos DB Datenmodell
@@ -257,25 +223,25 @@ kegelkasse/
   "date": "iso8601",
   "status": "draft|submitted|approved",
   "recorded_by": "user_id",
-  "entries": [
+  "participants": [
     {
       "user_id": "...",
       "penalties": [{ "catalog_id": "...", "count": 2, "amount": 0.20 }],
-      "absent": false,
-      "late_arrival": false,
-      "late_arrival_avg": 0.00
-    }
-  ],
-  "guest_entries": [
+      "is_guest": false,
+      "is_late": false
+    },
     {
       "guest_id": "temp_uuid",
       "name": "Max Gast",
       "penalties": [{ "catalog_id": "...", "count": 1, "amount": 0.10 }],
+      "is_guest": true,
+      "is_late": false,
       "debt_total": 0.10,
       "paid": false,
       "paid_at": "iso8601"
     }
   ],
+  "absent_members": ["user_id_1", "user_id_2"],
   "submitted_at": "...",
   "approved_by": "...",
   "approved_at": "..."
@@ -299,6 +265,7 @@ kegelkasse/
     "until": "iso8601"
   },
   "rsvp_deadline_hours": 48,
+  "rsvp_mode": "opt_in|opt_out",
   "created_by": "user_id",
   "rsvp_entries": [
     {
@@ -559,29 +526,31 @@ Nicht berechtigte Sektionen werden ausgeblendet, nicht nur gesperrt — Kassenwa
 ### Features
 
 **Reguläre Erfassung:**
-- Termin starten → Ansicht aller Mitglieder (optional: Verknüpfung mit einem Kalender-Event)
-- **Klick auf Mitglied → Strafe-Auswahl als Bottom-Sheet (Mobile) / Modal (Desktop)**
-- Jede erfasste Strafe wird sofort via HTMX-Request im `sessions`-Dokument gespeichert (Draft-Status) — kein Datenverlust bei Browser-Neustart
-- Mitglieder als abwesend markieren
-- Verspätete Ankunft erfassen → Durchschnitt wird automatisch berechnet und zugeordnet
-- Abwesende erhalten den Durchschnitt der Anwesenden automatisch
-- Zusammenfassung am Ende → "Einreichen"-Button (Status: `submitted`)
-- Kassenwart/Admin sieht Einreichungen in der Übersicht → Prüfen & Akzeptieren → Status: `approved` → Schulden werden eingebucht
-- Storno einzelner Posten (mit Pflichtkommentar) → Gegenbuchung in `debts`
-- Korrektur: Storno + neue Buchung
+- **Kegelabend starten:** Der Start ist auf drei Wegen möglich:
+  - **Menü-gesteuert:** Über einen dedizierten Menüpunkt (z.B. "Kegelabend starten") gelangt der Nutzer zu einer Liste der anstehenden Kalender-Events. Nach Auswahl eines Events startet die Konfiguration.
+  - **Kalender-gesteuert:** Direkt aus der Detailansicht eines Kalender-Events heraus kann die zugehörige Session gestartet werden.
+  - **Dashboard-gesteuert:** Findet am aktuellen Tag ein Event statt, erscheint auf dem Dashboard ein prominenter "Kegelabend starten"-Button.
+- **Konfiguration:** Vor dem Start werden die Teilnehmer für die Session konfiguriert (wer ist anwesend, wer fehlt, welche Gäste sind da?).
+- **Laufende Erfassung:**
+  - Die Ansicht zeigt eine einheitliche Liste aller anwesenden Mitglieder und Gäste.
+  - Durch Klick/Tap auf eine Person öffnet sich die Strafenauswahl (Bottom-Sheet/Modal).
+  - Jede Strafe wird sofort gespeichert (Draft-Status).
+- **Verspätete Teilnehmer hinzufügen:**
+  - Ein Button (z.B. "Nachzügler hinzufügen") ist jederzeit sichtbar.
+  - Bei Klick erscheint eine Liste der zu Beginn als "abwesend" markierten Mitglieder.
+  - Nach Auswahl eines Mitglieds wird dieses der aktiven Teilnehmerliste mit einem "verspätet"-Marker hinzugefügt.
+  - **Automatische Strafe:** In diesem Moment wird der Durchschnitt aller bis dahin vergebenen Strafen berechnet und dem Nachzügler automatisch als eine Buchung zugewiesen.
+- **Abschluss:** Am Ende wird der Abend über einen Button "eingereicht" (Status: `submitted`).
+- **Genehmigung:** Kassenwart/Admin prüft die Einreichung und gibt sie frei (Status: `approved`), woraufhin die Schulden für alle Teilnehmer gebucht werden.
+- **Storno & Korrektur:** Einzelne Posten können mit einem Kommentar storniert werden, was eine Gegenbuchung auslöst.
 
-**Gastkegler-Management:**
-- Während einer aktiven Session können Gäste mit Namen hinzugefügt werden
-- Gäste erhalten Strafen wie reguläre Mitglieder (gleicher Strafenkatalog)
-- Gastschulden werden direkt in der Session als separates `guest_entries`-Array geführt — keine Einträge in `users` oder `debts`
-- Kein Monatsbeitragssystem für Gäste
-- Kassenwart/Admin kann Gastschulden in der Session-Ansicht als "bar bezahlt" markieren
-- Gäste erscheinen in der Abrechnung der Session sichtbar für alle, aber nicht im regulären Schulden-Dashboard
+**Gast- und Mitgliedsbehandlung:**
+- Gäste und Mitglieder erscheinen in einer **gemeinsamen Liste** während der Erfassung.
+- Gastschulden werden direkt in der Session verwaltet und können als "bar bezahlt" markiert werden. Sie fließen nicht in das reguläre Schulden-Dashboard des Vereins ein.
 
 ### UI-Screens
-- `/group/{id}/sessions/new` — Neuen Kegelabend starten
+- `/group/{id}/sessions/new` — Neuen Kegelabend starten & konfigurieren
 - `/group/{id}/sessions/{sid}` — Laufende Erfassung
-- `/group/{id}/sessions/{sid}/guests` — Gastkegler verwalten
 - `/group/{id}/sessions/pending` — Offene Einreichungen (Kassenwart/Admin)
 
 ---
@@ -593,12 +562,16 @@ Nicht berechtigte Sektionen werden ausgeblendet, nicht nur gesperrt — Kassenwa
 ### Features
 
 **Terminerstellung (Präsident & Admin):**
+- Die Auswahl des Termintyps (**Einzeltermin**, **Wiederkehrender Termin**, **Mehrtägiges Event**) erfolgt über ein Dropdown-Menü.
 - **Einzeltermin:** z.B. "Kegelausflug am 04.09.2026"
 - **Wiederkehrender Termin:** z.B. "Jeden 4. Samstag im Monat" — erzeugt automatisch Folgeeinträge
 - **Mehrtägiges Event:** z.B. "Kegeltour 23.–25.05.2026" mit Start- und Enddatum
 
 **RSVP-System:**
-- Mitglieder können per Klick zusagen, absagen oder auf "ausstehend" belassen
+- **RSVP-Modus (pro Event einstellbar):**
+  - **Opt-in (Standard):** Mitglieder müssen aktiv zusagen. Der initiale Status ist "ausstehend".
+  - **Opt-out:** Mitglieder sind automatisch auf "zugesagt" gesetzt und müssen nur aktiv absagen.
+- Mitglieder können ihren Status (Zusage/Absage) per Klick ändern.
 - Optionale Notiz zur Rückmeldung (z.B. "Komme 30 Minuten später")
 - Echtzeitanzeige: Wie viele sagen zu / ab / haben noch nicht geantwortet?
 - Admin/Präsident sieht alle Rückmeldungen auf einen Blick
@@ -608,16 +581,15 @@ Nicht berechtigte Sektionen werden ausgeblendet, nicht nur gesperrt — Kassenwa
 - Bei verspäteter Absage: automatischer Log-Eintrag; Kassenwart wird optional per E-Mail informiert; manuelle oder automatische Strafe kann ausgelöst werden
 
 **Kalenderansicht:**
-- Monatsansicht mit farblicher Unterscheidung nach Event-Typ
-- Listenansicht für mobile Nutzung
-- Vergangene Events bleiben sichtbar und verlinken zur zugehörigen Session (falls vorhanden)
+- Die Termine werden in einer **Listenansicht** dargestellt, optimiert für schnelle Übersicht und mobile Nutzung.
+- Vergangene Events bleiben sichtbar und verlinken zur zugehörigen Session (falls vorhanden).
 
 **Session-Verknüpfung:**
-- Beim Starten eines Kegelabends kann ein offener Kalender-Event ausgewählt und verknüpft werden
+- Beim Starten eines Kegelabends wird ein offener Kalender-Event ausgewählt und verknüpft.
 - Verknüpfte Sessions sind vom Kalender-Event aus zugänglich
 
 ### UI-Screens
-- `/group/{id}/calendar` — Kalenderansicht (Monat/Liste)
+- `/group/{id}/calendar` — Kalender (Listenansicht)
 - `/group/{id}/calendar/new` — Event anlegen
 - `/group/{id}/calendar/{eid}` — Event-Detail & RSVP
 - `/group/{id}/calendar/{eid}/edit` — Event bearbeiten
@@ -680,7 +652,7 @@ Basis ist die reale Exportdatei des Vereinskontos. Das Format ist dokumentiert u
 |---|---|---|
 | `GUTSCHR. UEBERW. DAUERAUFTR` | income | Dauerauftrag Monatsbeitrag |
 | `GUTSCHR. UEBERWEISUNG` | income | Manuelle Überweisung |
-| `ECHTZEIT-GUTSCHRIFT` | income | Echtzeit-Eingang |
+| `ECHTZEIT-GUTSCHRIFT` | income | Echtzeit- Eingangs |
 | `UEBERTRAG (UEBERWEISUNG)` | expense (wenn negativ) | Kassenwart zahlt z.B. Bahnmiete |
 | `ECHTZEIT-UEBERWEISUNG` | expense (wenn negativ) | Kassenwart-Ausgabe |
 | `ABSCHLUSS` | other_income | Quartalszinsen — kein Mitglied-Match; automatisch als `Kontozinsen` kategorisiert |
