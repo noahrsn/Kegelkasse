@@ -10,9 +10,9 @@ Eine moderne Azure-Webapp für Kegelclubs zur Verwaltung von Strafen, Mitglieder
 
 ## Design-Konzept
 
-Das detaillierte visuelle Design, inklusive Farbpalette, Typografie, Komponenten und Stil-Richtlinien, wird separat gepflegt und ist im Ordner `design_handoff_kegelkasse/` zu finden.
+Das UI/UX-Design und das Frontend werden vollständig, iterativ und direkt im Code mit **Claude Code** (unter Einsatz des Frontend-Skills und des UI/UX Pro Max Skills) entwickelt. 
 
-Die `design/README.md` dient als zentraler Einstiegspunkt und Referenz für das aktuelle Design. Die `README.md` bleibt jedoch der Wegweiser zum jeweils gültigen Design-System.
+Ein extern ausgelagertes Design-Dokument entfällt. Der Design-Prozess startet zunächst mit dem Entwurf und der Implementierung der Landing Page und wird von dort aus ansichten- und komponentenweise (Tailwind CSS, Alpine.js, Jinja-Templates) für die gesamte Webapp iterativ fortgeführt.
 
 ### Menü- & Navigationsstruktur
 
