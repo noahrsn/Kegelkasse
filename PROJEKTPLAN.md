@@ -6,7 +6,7 @@ Webapp für Kegelclubs zur Verwaltung von Strafen, Mitgliedern, Beiträgen, Term
 
 **Stack:** Python (FastAPI) · Supabase (PostgreSQL) · Jinja2 / HTMX / Alpine.js · Tailwind CSS (PostCSS)
 
-**Entwicklung:** Ausschließlich localhost. Kein Cloud-Hosting, kein Azure.
+**Entwicklung:** Lokale Entwicklung via localhost. Frontend-Prototyp als statische App auf **Render** gehostet (kostenlos). Backend ab Phase 3 ebenfalls auf Render (Free Tier). Kein Azure.
 
 ---
 
@@ -113,7 +113,7 @@ prototype/
 │       └── data.js           # Alle Mock-Daten (Mitglieder, Sessions, Strafen, …)
 ```
 
-### Starten
+### Starten (lokal)
 
 ```bash
 cd prototype
@@ -121,6 +121,21 @@ npm install
 npm run dev
 # → http://localhost:5173
 ```
+
+### Deployment auf Render (Static Web Service)
+
+Der Prototyp kann ohne Backend als kostenlose statische App auf Render gehostet werden.
+
+**Einmaliges Setup auf render.com:**
+1. "New → Static Site" → GitHub-Repo verbinden
+2. Root Directory: `prototype`
+3. Build Command: `npm install && npm run build`
+4. Publish Directory: `dist`
+5. Deploy → öffentliche URL erhalten
+
+**SPA-Routing:** Die Datei `prototype/public/_redirects` sorgt dafür, dass alle URL-Pfade (z.B. `/dashboard`, `/sessions/new`) korrekt auf `index.html` umgeleitet werden.
+
+**Hinweis:** Render baut automatisch neu, sobald ein Commit auf `main` gepusht wird.
 
 ---
 
@@ -877,3 +892,5 @@ Phase 10 →  Hardening, Tests, Sicherheit
 | Markdown | python-markdown oder mistune | Vereinsregelwerk-Rendering |
 | CSV-Parsing | Python stdlib `csv` | Sparkasse-CSV-Import, kein Pandas-Overhead |
 | Prototyp | React + Vite | JSX-kompatibel mit Design-System (calm.jsx) |
+| Hosting (Frontend) | Render Static Web Service | Kostenlos, Git-Integration, auto-deploy bei Push |
+| Hosting (Backend) | Render Web Service (Free Tier) | Ab Phase 3, FastAPI via Uvicorn |

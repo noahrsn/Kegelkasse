@@ -55,3 +55,11 @@ local.settings.json
 
 # Tailwind (generated output, not source)
 app/static/css/output.css
+
+# Node
+node_modules/
+prototype/dist/
+
+# Claude Code (local memory, not for repo)
+.claude/
+skills-lock.json
