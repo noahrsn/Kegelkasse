@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
-import { pal, btn } from '../design/calm.js';
+import { pal, CAR, btn } from '../design/calm.js';
 
-export default function Modal({ open, onClose, title, children, width = 480 }) {
+export default function Modal({ open, onClose, title, children, width = 560 }) {
   useEffect(() => {
     if (!open) return;
     const onKey = e => { if (e.key === 'Escape') onClose(); };
@@ -16,43 +16,43 @@ export default function Modal({ open, onClose, title, children, width = 480 }) {
       onClick={onClose}
       style={{
         position: 'fixed', inset: 0, zIndex: 200,
-        background: 'rgba(28,26,23,0.45)',
+        background: 'rgba(28,26,23,0.5)',
         backdropFilter: 'blur(4px)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: 20,
+        padding: 24,
       }}
     >
       <div
         onClick={e => e.stopPropagation()}
         style={{
           background: pal.card,
-          borderRadius: 20,
+          borderRadius: 24,
           width: '100%',
           maxWidth: width,
-          maxHeight: '90vh',
+          maxHeight: '85vh',
           overflow: 'auto',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+          boxShadow: '0 24px 72px rgba(0,0,0,0.22)',
         }}
       >
         {title && (
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '18px 20px 14px',
+            padding: '20px 24px 16px',
             borderBottom: `1px solid ${pal.cardEdge}`,
           }}>
-            <h2 style={{ fontSize: 15, fontWeight: 700, color: pal.ink }}>{title}</h2>
+            <h2 style={{ fontSize: CAR.fontSize.md, fontWeight: 700, color: pal.ink }}>{title}</h2>
             <button
               onClick={onClose}
               style={{
-                width: 28, height: 28, borderRadius: '50%',
+                width: 40, height: 40, borderRadius: '50%',
                 border: 'none', background: pal.bg,
-                cursor: 'pointer', fontSize: 16, color: pal.inkDim,
+                cursor: 'pointer', fontSize: 20, color: pal.inkDim,
                 display: 'grid', placeItems: 'center',
               }}
             >×</button>
           </div>
         )}
-        <div style={{ padding: 20 }}>
+        <div style={{ padding: 24 }}>
           {children}
         </div>
       </div>
@@ -75,7 +75,7 @@ export function BottomSheet({ open, onClose, title, children }) {
       onClick={onClose}
       style={{
         position: 'fixed', inset: 0, zIndex: 200,
-        background: 'rgba(28,26,23,0.45)',
+        background: 'rgba(28,26,23,0.5)',
         backdropFilter: 'blur(4px)',
         display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
       }}
@@ -84,25 +84,26 @@ export function BottomSheet({ open, onClose, title, children }) {
         onClick={e => e.stopPropagation()}
         style={{
           background: pal.card,
-          borderRadius: '20px 20px 0 0',
+          borderRadius: '24px 24px 0 0',
           width: '100%',
-          maxWidth: 600,
-          maxHeight: '85vh',
+          maxWidth: 700,
+          maxHeight: '80vh',
           overflow: 'auto',
-          boxShadow: '0 -8px 40px rgba(0,0,0,0.15)',
+          boxShadow: '0 -12px 48px rgba(0,0,0,0.18)',
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 20px 0' }}>
-          <div style={{ width: 36, height: 4, borderRadius: 2, background: pal.cardEdge }} />
+        {/* Drag handle */}
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '14px 24px 0' }}>
+          <div style={{ width: 44, height: 5, borderRadius: 3, background: pal.cardEdge }} />
         </div>
         {title && (
           <div style={{
-            padding: '14px 20px 12px',
+            padding: '16px 24px 14px',
             borderBottom: `1px solid ${pal.cardEdge}`,
-            fontSize: 15, fontWeight: 700, color: pal.ink,
+            fontSize: CAR.fontSize.md, fontWeight: 700, color: pal.ink,
           }}>{title}</div>
         )}
-        <div style={{ padding: 20 }}>
+        <div style={{ padding: 24 }}>
           {children}
         </div>
       </div>
