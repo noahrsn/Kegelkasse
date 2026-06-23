@@ -699,7 +699,7 @@ Nicht berechtigte Sektionen werden ausgeblendet, nicht nur gesperrt.
 **Laufende Erfassung:**
 - Einheitliche Liste aller anwesenden Mitglieder und Gäste
 - **Zwei Erfassungsmodi (umschaltbar, Schnell ist Standard):**
-  - **Schnell:** Tap auf Person → Bottom-Sheet mit Strafen-Raster → ein Tap pro Strafe rechnet sie sofort drauf (minimale Klicks); zuletzt erfasste Strafen als Undo-Chips
+  - **Schnell:** Tap auf Person → Bottom-Sheet mit Strafen-Raster → ein Tap auf die Strafe übernimmt sie sofort und schließt das Sheet (**nur 2 Klicks pro Strafe**); beim erneuten Öffnen einer Person sind die zuletzt erfassten Strafen als Undo-Chips verfügbar
   - **Detailliert:** Tap auf Person → Strafen mit +/−-Stepper exakt einstellen
 - **Manuelle Beträge:** Strafen ohne festen Betrag (z. B. „Glas umgeworfen") fragen beim Antippen den Betrag ab
 - **Nachzügler:** Button "Nachzügler hinzufügen" → Liste der abwesenden Mitglieder → Auswahl → automatische Durchschnittsstrafe wird zugewiesen

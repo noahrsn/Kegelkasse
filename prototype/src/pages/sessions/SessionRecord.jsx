@@ -52,21 +52,25 @@ export default function SessionRecord() {
       }),
     )
 
-  // Strafe antippen — bei manuellem Betrag erst Eingabe öffnen
+  // Strafe antippen — bei manuellem Betrag erst Eingabe öffnen.
+  // Im Schnell-Modus schließt sich das Sheet direkt → nur 2 Klicks pro Strafe.
   const tap = (penId) => {
     const pen = activePenalties.find((p) => p.id === penId)
     if (pen.manual) {
       setManualVal('')
       setManualFor(penId)
-    } else {
-      addEntry(active, penId, pen.amount)
+      return
     }
+    addEntry(active, penId, pen.amount)
+    if (mode === 'fast') setActive(null)
   }
   const confirmManual = () => {
     const amount = parseFloat((manualVal || '').replace(',', '.'))
-    if (amount > 0) addEntry(active, manualFor, amount)
+    if (!(amount > 0)) return
+    addEntry(active, manualFor, amount)
     setManualFor(null)
     setManualVal('')
+    if (mode === 'fast') setActive(null)
   }
 
   const absentMembers = members.filter((m) => !roster.some((r) => r.id === m.id))
@@ -110,7 +114,7 @@ export default function SessionRecord() {
           <div className="text-[12px] font-semibold text-ink-soft">Erfassungsmodus</div>
           <div className="text-[12px] text-ink-dim">
             {mode === 'fast'
-              ? 'Schnell: Person → Strafe antippen, fertig. Wenig Klicks.'
+              ? 'Schnell: Person → Strafe = fertig. Nur 2 Klicks pro Strafe.'
               : 'Detailliert: Person → Strafen mit Anzahl exakt einstellen.'}
           </div>
         </div>
@@ -187,17 +191,25 @@ export default function SessionRecord() {
           setManualFor(null)
         }}
         title={current?.name}
-        subtitle={current ? `Aktuell ${eur(sumFor(current))} € · ${current.entries.length} Strafen` : ''}
+        subtitle={
+          current
+            ? mode === 'fast' && !manualFor
+              ? 'Strafe antippen — wird sofort übernommen'
+              : `Aktuell ${eur(sumFor(current))} € · ${current.entries.length} Strafen`
+            : ''
+        }
         footer={
-          <Button
-            className="w-full"
-            onClick={() => {
-              setActive(null)
-              setManualFor(null)
-            }}
-          >
-            Fertig
-          </Button>
+          mode === 'detailed' && !manualFor ? (
+            <Button
+              className="w-full"
+              onClick={() => {
+                setActive(null)
+                setManualFor(null)
+              }}
+            >
+              Fertig
+            </Button>
+          ) : undefined
         }
       >
         {/* Manuelle Betragseingabe */}
