@@ -60,6 +60,11 @@ app/static/css/output.css
 node_modules/
 prototype/dist/
 
+# Supabase (lokale CLI-Artefakte, nicht ins Repo)
+supabase/.branches/
+supabase/.temp/
+supabase/.env
+
 # Claude Code (local memory, not for repo)
 .claude/
 skills-lock.json

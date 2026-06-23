@@ -162,9 +162,22 @@ export default function Members() {
   )
 }
 
-export function InviteBox() {
-  const link = 'https://kegelkasse.de/join/pinroyal-7f3a9c'
+export function InviteBox({ token, onReset, canReset = false }) {
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://kegelkasse.de'
+  const link = `${origin}/join/${token || 'pinroyal-7f3a9c'}`
   const [copied, setCopied] = useState(false)
+  const [resetting, setResetting] = useState(false)
+
+  async function handleReset() {
+    if (!onReset) return
+    setResetting(true)
+    try {
+      await onReset()
+    } finally {
+      setResetting(false)
+    }
+  }
+
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2 rounded-2xl bg-bg p-3">
@@ -184,9 +197,19 @@ export function InviteBox() {
         <Button variant="soft">Per E-Mail senden</Button>
         <Button variant="soft">QR-Code zeigen</Button>
       </div>
-      <p className="text-center text-[11px] text-ink-dim">
-        Link kann jederzeit vom Admin zurückgesetzt werden.
-      </p>
+      {canReset ? (
+        <button
+          onClick={handleReset}
+          disabled={resetting}
+          className="w-full text-center text-[11px] font-semibold text-terra hover:underline disabled:opacity-50"
+        >
+          {resetting ? 'Wird zurückgesetzt…' : 'Einladungslink zurücksetzen'}
+        </button>
+      ) : (
+        <p className="text-center text-[11px] text-ink-dim">
+          Link kann jederzeit vom Admin zurückgesetzt werden.
+        </p>
+      )}
     </div>
   )
 }

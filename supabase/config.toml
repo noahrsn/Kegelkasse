@@ -1,0 +1,59 @@
+# Supabase CLI Konfiguration — Kegelkasse
+# Doku: https://supabase.com/docs/guides/local-development/cli/config
+
+project_id = "kegelkasse"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+# Lokaler Mailserver (Inbucket) — fängt alle Mails im Dev ab.
+[inbucket]
+enabled = true
+port = 54324
+
+[auth]
+enabled = true
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:5173"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = true
+
+# Edge Functions (Deno/TypeScript)
+[functions.session-approve]
+verify_jwt = true
+
+[functions.csv-import]
+verify_jwt = true
+
+[functions.awards-calculate]
+verify_jwt = true
+
+# Geplante Jobs (via pg_cron getriggert) — kein User-JWT.
+[functions.monthly-fee]
+verify_jwt = false
+
+[functions.debt-reminder]
+verify_jwt = false
+
+[functions.send-email]
+verify_jwt = false

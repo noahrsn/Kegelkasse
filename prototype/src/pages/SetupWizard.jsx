@@ -1,23 +1,122 @@
+import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Button, Field, Input, Select, Toggle, Card } from '../components/ui'
 import { cx, eur } from '../design/calm'
-import { wizardSteps, penalties } from '../mock/data'
-import { useState } from 'react'
+import { wizardSteps } from '../mock/data'
+import { useAuth } from '../context/AuthContext.jsx'
+import {
+  STARTER_PENALTIES,
+  getGroup,
+  updateGroup,
+  listPenalties,
+  insertPenalties,
+  insertEvent,
+  recurrenceFromPreset,
+} from '../lib/api.js'
 import { InviteBox } from './Members'
+
+const DEFAULT_RULEBOOK = `# Regelwerk\n\n## §1 Kegelabend\nJeder 4. Samstag im Monat. Beginn 19:30 Uhr.\n\n## §2 Strafen\nStrafen werden gemäß Katalog erfasst und sind bis zur Frist zu begleichen.\n\n## §3 Beiträge\nDer Monatsbeitrag wird am 1. des Monats gebucht.`
 
 export default function SetupWizard() {
   const { step } = useParams()
   const navigate = useNavigate()
+  const { mockMode, activeGroupId, user, refresh } = useAuth()
   const n = Math.min(6, Math.max(1, parseInt(step || '1', 10)))
   const current = wizardSteps[n - 1]
 
+  const [form, setForm] = useState({
+    name: '',
+    monthlyFee: '5.00',
+    openingBalance: '0.00',
+    feeDay: '1',
+    iban: '',
+    paypal: '',
+    lateFee: '2.00',
+    createEvent: true,
+    recurrence: '4-sat',
+    time: '19:30',
+    rulebook: DEFAULT_RULEBOOK,
+  })
+  const [token, setToken] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v?.target ? v.target.value : v }))
+
+  // Echtmodus: bestehende Gruppendaten laden (Name aus create_group, Token).
+  useEffect(() => {
+    if (mockMode || !activeGroupId) return
+    getGroup(activeGroupId)
+      .then((g) => {
+        if (!g) return
+        setToken(g.invite_token)
+        setForm((f) => ({
+          ...f,
+          name: g.name ?? f.name,
+          monthlyFee: g.monthly_fee ?? f.monthlyFee,
+          openingBalance: g.treasury_opening_balance ?? f.openingBalance,
+          feeDay: g.fee_day ?? f.feeDay,
+          iban: g.payment_iban ?? '',
+          paypal: g.payment_paypal ?? '',
+          lateFee: g.late_payment_fee ?? f.lateFee,
+          rulebook: g.rulebook_content || f.rulebook,
+        }))
+      })
+      .catch(() => {})
+  }, [mockMode, activeGroupId])
+
   const go = (to) => navigate(`/setup/${to}`)
-  const next = () => (n < 6 ? go(n + 1) : navigate('/dashboard'))
-  const prev = () => (n > 1 ? go(n - 1) : navigate('/register'))
+  const prev = () => (n > 1 ? go(n - 1) : navigate('/groups/new'))
+
+  async function finish() {
+    if (mockMode) {
+      navigate('/dashboard')
+      return
+    }
+    setSaving(true)
+    setError('')
+    try {
+      await updateGroup(activeGroupId, {
+        name: form.name.trim(),
+        monthly_fee: Number(form.monthlyFee) || 0,
+        treasury_opening_balance: Number(form.openingBalance) || 0,
+        fee_day: Number(form.feeDay) || 1,
+        payment_iban: form.iban || null,
+        payment_paypal: form.paypal || null,
+        late_payment_fee: Number(form.lateFee) || 0,
+        rulebook_content: form.rulebook || '',
+        wizard_step: 6,
+      })
+
+      // Starter-Strafenkatalog nur anlegen, wenn noch keiner existiert.
+      const existing = await listPenalties(activeGroupId)
+      if (existing.length === 0) await insertPenalties(activeGroupId, STARTER_PENALTIES)
+
+      if (form.createEvent) {
+        const [hh, mm] = (form.time || '19:30').split(':')
+        const start = new Date()
+        start.setHours(Number(hh) || 19, Number(mm) || 30, 0, 0)
+        await insertEvent(activeGroupId, user.id, {
+          title: 'Kegelabend',
+          type: 'recurring',
+          start_date: start.toISOString(),
+          rsvp_mode: 'opt_in',
+          ...recurrenceFromPreset(form.recurrence),
+        })
+      }
+
+      await refresh()
+      navigate('/dashboard', { replace: true })
+    } catch (err) {
+      setError(err.message || 'Speichern fehlgeschlagen.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const next = () => (n < 6 ? go(n + 1) : finish())
 
   return (
     <div className="min-h-dvh">
-      {/* Kopf mit Fortschritt */}
       <header className="sticky top-0 z-10 border-b border-card-edge/70 bg-bg/85 backdrop-blur">
         <div className="mx-auto flex max-w-2xl items-center gap-3 px-5 py-4">
           <div className="grid h-9 w-9 place-items-center rounded-xl bg-ink font-bold text-bg">K</div>
@@ -29,7 +128,6 @@ export default function SetupWizard() {
             Überspringen
           </button>
         </div>
-        {/* Schrittpunkte */}
         <div className="mx-auto flex max-w-2xl gap-1.5 px-5 pb-3">
           {wizardSteps.map((s) => (
             <button
@@ -47,20 +145,22 @@ export default function SetupWizard() {
 
       <main className="mx-auto max-w-2xl px-5 py-8">
         <div className="animate-rise">
-          {n === 1 && <StepClub />}
-          {n === 2 && <StepFinance />}
+          {n === 1 && <StepClub form={form} set={set} />}
+          {n === 2 && <StepFinance form={form} set={set} />}
           {n === 3 && <StepPenalties />}
-          {n === 4 && <StepEvents />}
-          {n === 5 && <StepRulebook />}
-          {n === 6 && <StepInvite />}
+          {n === 4 && <StepEvents form={form} set={set} />}
+          {n === 5 && <StepRulebook form={form} set={set} />}
+          {n === 6 && <StepInvite token={token} mockMode={mockMode} />}
         </div>
 
+        {error && <p className="mt-4 text-[12px] font-medium text-terra">{error}</p>}
+
         <div className="mt-8 flex items-center justify-between">
-          <Button variant="soft" size="lg" onClick={prev}>
+          <Button variant="soft" size="lg" onClick={prev} disabled={saving}>
             ← Zurück
           </Button>
-          <Button size="lg" onClick={next}>
-            {n < 6 ? 'Weiter →' : '✓ Fertig & loslegen'}
+          <Button size="lg" onClick={next} disabled={saving}>
+            {n < 6 ? 'Weiter →' : saving ? 'Speichert…' : '✓ Fertig & loslegen'}
           </Button>
         </div>
       </main>
@@ -72,7 +172,7 @@ function Intro({ children }) {
   return <p className="mb-6 text-[14px] leading-relaxed text-ink-soft">{children}</p>
 }
 
-function StepClub() {
+function StepClub({ form, set }) {
   return (
     <div>
       <Intro>Wie heißt dein Kegelclub? Das siehst nur du und deine Mitglieder.</Intro>
@@ -82,34 +182,34 @@ function StepClub() {
           <button className="text-[13px] font-semibold text-sage">Club-Avatar wählen (optional)</button>
         </div>
         <Field label="Vereinsname" hint="Pflichtfeld">
-          <Input autoFocus placeholder="z. B. KC Pin Royal" defaultValue="KC Pin Royal" />
+          <Input autoFocus placeholder="z. B. KC Pin Royal" value={form.name} onChange={set('name')} />
         </Field>
       </Card>
     </div>
   )
 }
 
-function StepFinance() {
+function StepFinance({ form, set }) {
   return (
     <div>
       <Intro>Lege Beitrag und Zahlungsdaten fest. Alles optional und später änderbar.</Intro>
       <Card className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Monatsbeitrag (€)">
-            <Input type="number" step="0.5" defaultValue="5.00" />
+            <Input type="number" step="0.5" value={form.monthlyFee} onChange={set('monthlyFee')} />
           </Field>
           <Field label="Eröffnungssaldo (€)">
-            <Input type="number" defaultValue="850.00" />
+            <Input type="number" value={form.openingBalance} onChange={set('openingBalance')} />
           </Field>
         </div>
         <Field label="IBAN">
-          <Input placeholder="DE.." className="font-mono" />
+          <Input placeholder="DE.." className="font-mono" value={form.iban} onChange={set('iban')} />
         </Field>
         <Field label="PayPal-Link">
-          <Input placeholder="paypal.me/.." />
+          <Input placeholder="paypal.me/.." value={form.paypal} onChange={set('paypal')} />
         </Field>
         <Field label="Verspätungsstrafe (€)">
-          <Input type="number" step="0.5" defaultValue="2.00" />
+          <Input type="number" step="0.5" value={form.lateFee} onChange={set('lateFee')} />
         </Field>
       </Card>
     </div>
@@ -119,41 +219,47 @@ function StepFinance() {
 function StepPenalties() {
   return (
     <div>
-      <Intro>Wir haben gängige Strafen vorbereitet. Du kannst sie jetzt oder später anpassen.</Intro>
+      <Intro>Wir haben gängige Strafen vorbereitet. Du kannst sie später jederzeit anpassen.</Intro>
       <div className="space-y-2">
-        {penalties.filter((p) => p.active).map((p) => (
-          <Card key={p.id} className="flex items-center gap-3 py-3">
+        {STARTER_PENALTIES.map((p) => (
+          <Card key={p.name} className="flex items-center gap-3 py-3">
             <span className="grid h-10 w-10 place-items-center rounded-xl bg-bg text-xl">{p.icon}</span>
             <span className="flex-1 font-medium">{p.name}</span>
-            <span className="font-mono font-semibold tnum">{eur(p.amount)} €</span>
+            <span className="font-mono font-semibold tnum">
+              {p.manual_amount ? 'manuell' : `${eur(p.amount)} €`}
+            </span>
           </Card>
         ))}
       </div>
-      <button className="mt-3 w-full rounded-2xl border border-dashed border-card-edge py-3 text-[13px] font-semibold text-ink-soft">
-        + Eigene Strafe hinzufügen
-      </button>
+      <p className="mt-3 text-center text-[12px] text-ink-dim">
+        Wird beim Abschluss in deinen Strafenkatalog übernommen.
+      </p>
     </div>
   )
 }
 
-function StepEvents() {
-  const [on, setOn] = useState(true)
+function StepEvents({ form, set }) {
   return (
     <div>
       <Intro>Richte einen wiederkehrenden Kegelabend ein – das spart später Arbeit.</Intro>
       <Card className="space-y-4">
-        <Toggle checked={on} onChange={setOn} label="Regeltermin anlegen" hint="Automatisch im Kalender" />
-        {on && (
+        <Toggle
+          checked={form.createEvent}
+          onChange={set('createEvent')}
+          label="Regeltermin anlegen"
+          hint="Automatisch im Kalender"
+        />
+        {form.createEvent && (
           <div className="grid grid-cols-2 gap-3">
             <Field label="Wiederholung">
-              <Select defaultValue="4-sat">
+              <Select value={form.recurrence} onChange={set('recurrence')}>
                 <option value="4-sat">Jeden 4. Samstag</option>
-                <option value="weekly">Wöchentlich</option>
+                <option value="weekly">Wöchentlich (Samstag)</option>
                 <option value="1-fri">Jeden 1. Freitag</option>
               </Select>
             </Field>
             <Field label="Uhrzeit">
-              <Input type="time" defaultValue="19:30" />
+              <Input type="time" value={form.time} onChange={set('time')} />
             </Field>
           </div>
         )}
@@ -162,26 +268,27 @@ function StepEvents() {
   )
 }
 
-function StepRulebook() {
+function StepRulebook({ form, set }) {
   return (
     <div>
       <Intro>Optionaler Starttext für euer Vereinsregelwerk. Markdown wird unterstützt.</Intro>
       <Card>
         <textarea
           className="h-56 w-full resize-none rounded-2xl border border-card-edge bg-card p-4 font-mono text-[13px] outline-none focus:border-ink"
-          defaultValue={`# Regelwerk\n\n## §1 Kegelabend\n…`}
+          value={form.rulebook}
+          onChange={set('rulebook')}
         />
       </Card>
     </div>
   )
 }
 
-function StepInvite() {
+function StepInvite({ token, mockMode }) {
   return (
     <div>
       <Intro>Fast geschafft! Lade deine Mitglieder ein – oder hole das später nach.</Intro>
       <Card>
-        <InviteBox />
+        <InviteBox token={mockMode ? undefined : token} />
       </Card>
     </div>
   )

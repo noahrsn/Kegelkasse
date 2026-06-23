@@ -2,7 +2,14 @@ import { useState } from 'react'
 import { NavLink, useLocation, useNavigate, Link } from 'react-router-dom'
 import { cx, pal } from '../design/calm'
 import { Avatar } from './ui'
-import { currentUser, clubs } from '../mock/data'
+import { useAuth } from '../context/AuthContext.jsx'
+
+const roleLabels = {
+  admin: 'Admin',
+  präsident: 'Präsident',
+  kassenwart: 'Kassenwart',
+  mitglied: 'Mitglied',
+}
 
 /* Primärnavigation (Desktop-Sidebar + Mobile Bottom-Bar) */
 const primary = [
@@ -65,7 +72,7 @@ export default function Layout({ children }) {
           </div>
           <div className="flex-1" />
           <Link to="/profile">
-            <Avatar name={currentUser.name} size={36} />
+            <TopbarAvatar />
           </Link>
         </header>
 
@@ -120,9 +127,15 @@ function Brand() {
   )
 }
 
+function clubInitial(name) {
+  return (name?.replace(/^KC\s*/i, '').trim()[0] || name?.[0] || 'K').toUpperCase()
+}
+
 function ClubSwitcher() {
   const [open, setOpen] = useState(false)
-  const club = clubs[0]
+  const { memberships, activeGroup, setActiveGroup } = useAuth()
+  const club = activeGroup || memberships[0]
+  if (!club) return null
   return (
     <div className="relative mt-5">
       <button
@@ -133,27 +146,30 @@ function ClubSwitcher() {
           className="grid h-8 w-8 place-items-center rounded-[10px] text-[13px] font-bold"
           style={{ background: pal.terraBg, color: pal.terra }}
         >
-          {club.name[3] || 'K'}
+          {clubInitial(club.name)}
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-[11px] font-medium text-ink-dim">Club</div>
           <div className="truncate text-[13px] font-semibold">{club.name}</div>
         </div>
-        <span className="text-ink-dim">⇅</span>
+        {memberships.length > 1 && <span className="text-ink-dim">⇅</span>}
       </button>
-      {open && (
+      {open && memberships.length > 1 && (
         <div className="absolute inset-x-0 top-full z-20 mt-1 rounded-2xl border border-card-edge bg-card p-1.5 shadow-lg animate-pop">
-          {clubs.map((c) => (
+          {memberships.map((c) => (
             <button
               key={c.id}
-              onClick={() => setOpen(false)}
+              onClick={() => {
+                setActiveGroup(c.id)
+                setOpen(false)
+              }}
               className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-[13px] hover:bg-bg"
             >
               <span
                 className="grid h-7 w-7 place-items-center rounded-lg text-[12px] font-bold"
                 style={{ background: pal.navyBg, color: pal.navy }}
               >
-                {c.name[3] || 'K'}
+                {clubInitial(c.name)}
               </span>
               <span className="flex-1 truncate font-medium">{c.name}</span>
               {c.id === club.id && <span className="text-sage">✓</span>}
@@ -220,9 +236,22 @@ function BottomLink({ to, label, icon: Icon, tag }) {
   )
 }
 
+function TopbarAvatar() {
+  const { profile } = useAuth()
+  return <Avatar name={profile?.name || '—'} size={36} />
+}
+
 function UserCard() {
   const [open, setOpen] = useState(false)
   const navigate = useNavigate()
+  const { profile, role, signOut } = useAuth()
+
+  async function logout() {
+    setOpen(false)
+    await signOut()
+    navigate('/login')
+  }
+
   return (
     <div className="relative">
       {open && (
@@ -245,7 +274,7 @@ function UserCard() {
           ))}
           <div className="my-1 h-px bg-card-edge" />
           <button
-            onClick={() => navigate('/login')}
+            onClick={logout}
             className="block w-full rounded-xl px-3 py-2 text-left text-[13px] text-terra hover:bg-terra-bg"
           >
             Abmelden
@@ -256,10 +285,10 @@ function UserCard() {
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center gap-3 rounded-2xl bg-sage-bg p-3 text-left"
       >
-        <Avatar name={currentUser.name} size={36} />
+        <Avatar name={profile?.name || '—'} size={36} />
         <div className="flex-1 min-w-0">
-          <div className="truncate text-[13px] font-semibold leading-tight">{currentUser.name}</div>
-          <div className="text-[10px] font-semibold text-sage">Kassenwart</div>
+          <div className="truncate text-[13px] font-semibold leading-tight">{profile?.name || '—'}</div>
+          <div className="text-[10px] font-semibold text-sage">{roleLabels[role] || 'Mitglied'}</div>
         </div>
         <span className="text-ink-dim">⋯</span>
       </button>
@@ -270,9 +299,15 @@ function UserCard() {
 function Drawer({ onClose }) {
   const navigate = useNavigate()
   const loc = useLocation()
+  const { signOut } = useAuth()
   const go = (to) => {
     navigate(to)
     onClose()
+  }
+  const logout = async () => {
+    onClose()
+    await signOut()
+    navigate('/login')
   }
   const all = [...primary, ...more]
   return (
@@ -315,7 +350,7 @@ function Drawer({ onClose }) {
           })}
         </nav>
         <button
-          onClick={() => go('/login')}
+          onClick={logout}
           className="mt-2 rounded-xl px-3 py-3 text-left text-[14px] font-medium text-terra"
         >
           Abmelden
