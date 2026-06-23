@@ -1,23 +1,29 @@
 // Calm Bento — Design-Tokens & Helfer
 // Warmes Off-White, große gerundete Karten, zurückhaltende Farbblöcke.
 
+// pal verweist auf CSS-Variablen → Inline-Styles färben sich im Dark Mode automatisch mit.
 export const pal = {
-  bg: '#f3f0eb',
-  ink: '#1c1a17',
-  inkSoft: '#5c574e',
-  inkDim: '#9a948a',
-  card: '#fbfaf6',
-  cardEdge: '#e5e1d8',
-  sage: '#5e7a5a',
-  sageBg: '#e2ead8',
-  terra: '#b56546',
-  terraBg: '#f5dccd',
-  navy: '#2b3a55',
-  navyBg: '#d8dde7',
-  cream: '#efe4d0',
-  amber: '#b07e2a',
-  amberBg: '#f7eacf',
+  bg: 'var(--color-bg)',
+  ink: 'var(--color-ink)',
+  inkSoft: 'var(--color-ink-soft)',
+  inkDim: 'var(--color-ink-dim)',
+  card: 'var(--color-card)',
+  cardEdge: 'var(--color-card-edge)',
+  sage: 'var(--color-sage)',
+  sageBg: 'var(--color-sage-bg)',
+  terra: 'var(--color-terra)',
+  terraBg: 'var(--color-terra-bg)',
+  navy: 'var(--color-navy)',
+  navyBg: 'var(--color-navy-bg)',
+  navySurface: 'var(--color-navy-surface)',
+  cream: 'var(--color-cream)',
+  amber: 'var(--color-amber)',
+  amberBg: 'var(--color-amber-bg)',
 }
+
+// Feste Helligkeiten für Akzente auf der dunklen Navy-Fläche (in beiden Themes gleich):
+export const creamLight = '#efe4d0' // helle Schrift/Buttons auf Navy
+export const navyInk = '#2b3a55' // dunkle Schrift auf hellen Cream-Buttons
 
 // Akzentfarbe pro Person (stabil über den Namen gehasht)
 const accents = [pal.sage, pal.terra, pal.navy, pal.amber]

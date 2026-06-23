@@ -5,7 +5,7 @@ export function Card({ children, className = '', tone: t, as: As = 'section', ..
   const toneClass = {
     sage: 'bg-sage-bg border-transparent',
     terra: 'bg-terra-bg border-transparent',
-    navy: 'bg-navy text-white border-transparent',
+    navy: 'bg-navy-surface text-white border-transparent',
     cream: 'bg-cream border-transparent',
     amber: 'bg-amber-bg border-transparent',
   }[t]
@@ -109,7 +109,7 @@ export function Avatar({ name, size = 36, ring }) {
   )
 }
 
-export function AvatarStack({ names = [], max = 4, ringColor = '#fbfaf6' }) {
+export function AvatarStack({ names = [], max = 4, ringColor = 'var(--color-card)' }) {
   const shown = names.slice(0, max)
   const extra = names.length - shown.length
   return (
@@ -126,7 +126,7 @@ export function AvatarStack({ names = [], max = 4, ringColor = '#fbfaf6' }) {
             width: 26,
             height: 26,
             marginLeft: -8,
-            background: '#efe4d0',
+            background: 'var(--color-cream)',
             boxShadow: `0 0 0 2px ${ringColor}`,
           }}
         >
@@ -260,7 +260,7 @@ export function Tabs({ tabs, active, onChange }) {
 /* ── Fortschrittsbalken ───────────────────────────────────────────────── */
 export function Bar({ value = 0, color }) {
   return (
-    <div className="h-1.5 w-full overflow-hidden rounded-full bg-black/8">
+    <div className="h-1.5 w-full overflow-hidden rounded-full bg-ink/10">
       <div
         className="h-full rounded-full transition-all"
         style={{ width: `${Math.min(100, value * 100)}%`, background: color }}

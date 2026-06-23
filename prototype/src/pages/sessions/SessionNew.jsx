@@ -124,7 +124,7 @@ export default function SessionNew() {
         <div className="space-y-2">
           {guests.map((g) => (
             <Card key={g.id} tone="cream" className="flex items-center gap-3 py-3">
-              <span className="grid h-9 w-9 place-items-center rounded-full bg-white/70 text-sm">👤</span>
+              <span className="grid h-9 w-9 place-items-center rounded-full bg-bg/70 text-sm">👤</span>
               <span className="flex-1 text-[14px] font-medium">{g.name}</span>
               <button
                 className="text-[12px] font-semibold text-terra"

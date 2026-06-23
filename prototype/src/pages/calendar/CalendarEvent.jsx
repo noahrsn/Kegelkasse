@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Button, Badge, Avatar, Field, Textarea, Input } from '../../components/ui'
 import { Sheet } from '../../components/Modal'
-import { cx, pal } from '../../design/calm'
+import { cx, pal, creamLight } from '../../design/calm'
 import { eventDetail, currentUser } from '../../mock/data'
 
 export const RSVP = {
@@ -68,11 +68,13 @@ export default function CalendarEvent() {
       <Card tone="navy" className="space-y-4">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <Badge tone="sage" className="bg-white/15 text-cream">Regeltermin</Badge>
+            <Badge tone="sage" className="bg-white/15">
+              <span style={{ color: creamLight }}>Regeltermin</span>
+            </Badge>
             <h1 className="mt-2 font-display text-3xl font-medium tracking-tight">{ev.title}</h1>
           </div>
           <div className="text-right">
-            <div className="font-display text-5xl font-medium leading-none" style={{ color: pal.cream }}>27</div>
+            <div className="font-display text-5xl font-medium leading-none" style={{ color: creamLight }}>27</div>
             <div className="mt-1 text-[12px] text-white/70">Juni</div>
           </div>
         </div>

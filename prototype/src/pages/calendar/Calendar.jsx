@@ -76,7 +76,7 @@ function DateChip({ d, muted }) {
   return (
     <div
       className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-2xl"
-      style={{ background: muted ? pal.bg : pal.navy, color: muted ? pal.ink : '#fff' }}
+      style={{ background: muted ? pal.bg : pal.navySurface, color: muted ? pal.ink : '#fff' }}
     >
       <span className="font-display text-xl font-medium leading-none">{new Date(d).getDate()}</span>
       <span className={cx('text-[10px] uppercase', muted ? 'text-ink-dim' : 'text-white/70')}>

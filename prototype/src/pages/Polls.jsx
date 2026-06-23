@@ -141,7 +141,7 @@ function PollCard({ poll, onVote }) {
                     {o.votes} · {pct}%
                   </span>
                 </div>
-                <div className="h-2.5 overflow-hidden rounded-full bg-black/8">
+                <div className="h-2.5 overflow-hidden rounded-full bg-ink/10">
                   <div
                     className="h-full rounded-full transition-all"
                     style={{ width: `${pct}%`, background: win ? pal.sage : pal.navy }}

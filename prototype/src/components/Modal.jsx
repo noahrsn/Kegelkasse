@@ -22,7 +22,7 @@ export function Sheet({ open, onClose, title, subtitle, children, footer, maxW =
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
-      <div className="absolute inset-0 bg-ink/40 animate-fade" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/50 animate-fade" onClick={onClose} />
       <div
         className={cx(
           'relative w-full bg-card shadow-2xl',

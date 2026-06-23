@@ -92,7 +92,7 @@ Die **mobile Nutzung hat absolute Priorität.** Die App wird primär von Mitglie
 | 17 | Setup-Wizard | `/setup/:step` | Alle 6 Schritte klickbar durchlaufen |
 | 18 | Statistiken | `/stats` | Awards, Top-Listen, Monatsdiagramm |
 | 19 | Ewige Tabelle | `/stats/alltime` | Historisches Ranking |
-| 20 | Profil | `/profile` | Eigene Daten, aktive Titel, Benachrichtigungs-Toggles |
+| 20 | Profil | `/profile` | Eigene Daten, aktive Titel, Benachrichtigungs-Toggles, **Darstellung: Hell / Dunkel / System** |
 | 21 | Abstimmungen | `/polls` | Offene und abgeschlossene Abstimmungen, Abstimmen-Modal |
 
 ### Verzeichnisstruktur
@@ -922,7 +922,7 @@ Phase 10 →  Hardening, Tests, Sicherheit
 | Feature | Beschreibung |
 |---|---|
 | **Event-Fotos** | Fotos pro Kalender-Event (Supabase Storage) |
-| **Dark/Light Mode Toggle** | CSS-Custom-Properties + `prefers-color-scheme` |
+| ~~Dark/Light Mode Toggle~~ | ✅ Umgesetzt im Prototyp: klassen-basiertes Theme über CSS-Variablen (`.dark`), umschaltbar im Profil (Hell / Dunkel / System), persistiert in `localStorage` |
 | **Digitaler Mitgliedsausweis** | Screenshot-teilbare Profilkarte mit Titeln |
 
 ### Größerer Aufwand

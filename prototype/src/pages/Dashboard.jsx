@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { Card, Badge, Button, AvatarStack, Avatar, Bar } from '../components/ui'
-import { pal, eur } from '../design/calm'
+import { pal, eur, creamLight, navyInk } from '../design/calm'
 import { activity, members, club, events, topPudler, currentUser } from '../mock/data'
 
 export default function Dashboard() {
@@ -39,7 +39,7 @@ export default function Dashboard() {
         >
           <div className="flex items-center justify-between">
             <div className="text-[12px] font-semibold tracking-wide text-terra">Meine Schulden</div>
-            <Badge tone="terra" className="bg-white/70">
+            <Badge tone="terra" className="bg-bg/70">
               Frist 21.06.
             </Badge>
           </div>
@@ -48,7 +48,7 @@ export default function Dashboard() {
           </div>
           <div className="mt-1.5 text-[12px] text-terra">14 Strafen · 2 Beiträge offen</div>
           <div className="flex-1" />
-          <div className="mt-5 flex items-center gap-3 rounded-2xl bg-white/60 p-3">
+          <div className="mt-5 flex items-center gap-3 rounded-2xl bg-bg/60 p-3">
             <div className="min-w-0 flex-1">
               <div className="text-[10px] font-semibold uppercase tracking-wide text-terra">IBAN</div>
               <div className="truncate font-mono text-[11.5px] text-ink">{club.iban}</div>
@@ -74,11 +74,11 @@ export default function Dashboard() {
           style={{ animationDelay: '80ms' }}
         >
           <div className="flex items-center justify-between">
-            <div className="text-[12px] font-semibold text-cream">Nächster Abend</div>
+            <div className="text-[12px] font-semibold" style={{ color: creamLight }}>Nächster Abend</div>
             <span className="text-[11px] text-white/70">in 4 Tagen</span>
           </div>
           <div className="mt-4 flex items-end gap-3.5">
-            <div className="font-display text-7xl font-medium leading-[0.8] tracking-tight" style={{ color: pal.cream }}>
+            <div className="font-display text-7xl font-medium leading-[0.8] tracking-tight" style={{ color: creamLight }}>
               27
             </div>
             <div className="pb-1.5">
@@ -88,7 +88,7 @@ export default function Dashboard() {
           </div>
           <div className="flex-1" />
           <div className="mt-4 flex items-center gap-2.5">
-            <AvatarStack names={members.slice(0, 4).map((m) => m.name)} ringColor={pal.navy} />
+            <AvatarStack names={members.slice(0, 4).map((m) => m.name)} ringColor={pal.navySurface} />
             <div className="text-[11px] text-white/75">8 zugesagt · 2 keine Antwort</div>
           </div>
           <div className="mt-3.5 flex gap-2">
@@ -98,7 +98,7 @@ export default function Dashboard() {
                 navigate('/calendar/e1')
               }}
               className="flex-1 rounded-full py-2.5 text-[12px] font-semibold"
-              style={{ background: pal.cream, color: pal.navy }}
+              style={{ background: creamLight, color: navyInk }}
             >
               Zusagen
             </button>
@@ -196,7 +196,7 @@ export default function Dashboard() {
           </div>
           <div className="mt-3.5 flex flex-wrap gap-1.5">
             {members.slice(0, 7).map((m) => (
-              <div key={m.id} className="flex items-center gap-1.5 rounded-full bg-white/70 py-1 pl-1 pr-2.5">
+              <div key={m.id} className="flex items-center gap-1.5 rounded-full bg-bg/70 py-1 pl-1 pr-2.5">
                 <Avatar name={m.name} size={20} />
                 <span className="text-[11px] font-medium">{m.name.split(' ')[0]}</span>
               </div>
@@ -206,7 +206,7 @@ export default function Dashboard() {
             </span>
           </div>
           <div className="flex-1" />
-          <div className="mt-4 border-t border-black/10 pt-4">
+          <div className="mt-4 border-t border-ink/10 pt-4">
             <button
               onClick={(e) => {
                 e.stopPropagation()
@@ -233,12 +233,13 @@ export default function Dashboard() {
 }
 
 function Sparkline() {
+  // currentColor + text-sage → adaptiert sich an das Theme (var() geht nicht in SVG-Attributen)
   return (
-    <svg viewBox="0 0 280 50" className="mt-3.5 w-full">
+    <svg viewBox="0 0 280 50" className="mt-3.5 w-full text-sage">
       <defs>
         <linearGradient id="spark" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor={pal.sage} stopOpacity="0.25" />
-          <stop offset="100%" stopColor={pal.sage} stopOpacity="0" />
+          <stop offset="0%" stopColor="currentColor" stopOpacity="0.25" />
+          <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
         </linearGradient>
       </defs>
       <path
@@ -248,11 +249,11 @@ function Sparkline() {
       <path
         d="M0,40 L20,36 L40,38 L60,32 L80,28 L100,30 L120,22 L140,24 L160,18 L180,14 L200,16 L220,10 L240,8 L260,6 L280,5"
         fill="none"
-        stroke={pal.sage}
+        stroke="currentColor"
         strokeWidth="2"
         strokeLinecap="round"
       />
-      <circle cx="280" cy="5" r="3.5" fill={pal.sage} />
+      <circle cx="280" cy="5" r="3.5" fill="currentColor" />
     </svg>
   )
 }

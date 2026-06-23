@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Button, Badge, PageTitle, Avatar, Field, Input, Toggle } from '../components/ui'
-import { eur, pal } from '../design/calm'
+import { eur, pal, cx } from '../design/calm'
 import { currentUser, club, myDebts, awards } from '../mock/data'
+import { getTheme, setTheme } from '../theme'
 
 const NOTIFS = [
   ['new_penalty', 'Neue Strafe', true],
@@ -48,6 +49,9 @@ export default function Profile() {
         </div>
       </Card>
 
+      {/* Darstellung / Theme */}
+      <ThemeCard />
+
       {/* Schulden */}
       <Card tone={total > 0 ? 'terra' : 'sage'}>
         <div className="flex items-end justify-between">
@@ -60,7 +64,7 @@ export default function Profile() {
             </div>
           </div>
           {total > 0 && (
-            <div className="rounded-2xl bg-white/60 p-3 text-right">
+            <div className="rounded-2xl bg-bg/60 p-3 text-right">
               <div className="text-[10px] font-semibold uppercase text-terra">IBAN</div>
               <div className="font-mono text-[11px]">{club.iban}</div>
             </div>
@@ -68,7 +72,7 @@ export default function Profile() {
         </div>
         <div className="mt-4 space-y-1.5">
           {openDebts.map((d) => (
-            <div key={d.id} className="flex items-center justify-between rounded-xl bg-white/50 px-3 py-2 text-[13px]">
+            <div key={d.id} className="flex items-center justify-between rounded-xl bg-bg/50 px-3 py-2 text-[13px]">
               <span>{d.desc}</span>
               <span className="font-mono font-semibold tnum">{eur(d.amount)} €</span>
             </div>
@@ -127,5 +131,49 @@ export default function Profile() {
         ))}
       </Card>
     </div>
+  )
+}
+
+/* ── Darstellung / Theme-Umschalter ───────────────────────────────────── */
+const THEMES = [
+  { key: 'light', label: 'Hell', icon: '☀️', hint: 'Warmes Off-White' },
+  { key: 'dark', label: 'Dunkel', icon: '🌙', hint: 'Sanftes Nachtdesign' },
+  { key: 'system', label: 'System', icon: '🖥️', hint: 'Folgt dem Gerät' },
+]
+
+function ThemeCard() {
+  const [theme, setLocal] = useState(getTheme())
+  const choose = (t) => {
+    setLocal(t)
+    setTheme(t)
+  }
+  return (
+    <Card className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="text-[12px] font-semibold text-ink-soft">Darstellung</div>
+        <Badge tone="neutral">Calm Bento</Badge>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        {THEMES.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => choose(t.key)}
+            className={cx(
+              'flex flex-col items-center gap-1 rounded-2xl border p-3 text-center transition',
+              theme === t.key ? 'border-ink bg-bg' : 'border-card-edge hover:border-ink/30',
+            )}
+          >
+            <span className="text-2xl">{t.icon}</span>
+            <span className="text-[13px] font-semibold">{t.label}</span>
+            <span className="text-[10px] leading-tight text-ink-dim">{t.hint}</span>
+            {theme === t.key && (
+              <span className="mt-0.5 grid h-4 w-4 place-items-center rounded-full bg-sage text-[10px] text-white">
+                ✓
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+    </Card>
   )
 }

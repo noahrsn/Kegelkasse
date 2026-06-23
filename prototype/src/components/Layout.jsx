@@ -277,7 +277,7 @@ function Drawer({ onClose }) {
   const all = [...primary, ...more]
   return (
     <div className="fixed inset-0 z-50 lg:hidden">
-      <div className="absolute inset-0 bg-ink/40 animate-fade" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/50 animate-fade" onClick={onClose} />
       <div className="absolute inset-y-0 left-0 flex w-[82%] max-w-xs flex-col bg-bg p-5 shadow-2xl animate-sheet">
         <div className="flex items-center justify-between">
           <Brand />

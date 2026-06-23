@@ -15,6 +15,7 @@
   --color-terra-bg: #f5dccd;
   --color-navy: #2b3a55;
   --color-navy-bg: #d8dde7;
+  --color-navy-surface: #2b3a55;
   --color-cream: #efe4d0;
   --color-amber: #b07e2a;
   --color-amber-bg: #f7eacf;
@@ -25,6 +26,34 @@
 
   --radius-card: 24px;
   --radius-soft: 16px;
+}
+
+/* ── Theme: Hell (Standard) / Dunkel ──────────────────────────────────── */
+:root {
+  color-scheme: light;
+}
+
+/* Dunkles Calm-Bento: warmes Fast-Schwarz, weiche Karten, gedämpfte Akzente */
+.dark {
+  color-scheme: dark;
+
+  --color-bg: #15130e;
+  --color-ink: #efe9dd;
+  --color-ink-soft: #b1aa9b;
+  --color-ink-dim: #7c7565;
+  --color-card: #201d16;
+  --color-card-edge: #322d24;
+
+  --color-sage: #7a9d72;
+  --color-sage-bg: #28321f;
+  --color-terra: #c47e5c;
+  --color-terra-bg: #382418;
+  --color-navy: #93a6cb;
+  --color-navy-bg: #283450;
+  --color-navy-surface: #2a3650;
+  --color-cream: #2c2417;
+  --color-amber: #bd9242;
+  --color-amber-bg: #362a16;
 }
 
 /* ── Base ─────────────────────────────────────────────────────────────── */
@@ -44,6 +73,7 @@ body {
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 button {
@@ -67,7 +97,7 @@ select {
   height: 10px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #d8d3c8;
+  background: var(--color-card-edge);
   border-radius: 100px;
   border: 3px solid var(--color-bg);
 }

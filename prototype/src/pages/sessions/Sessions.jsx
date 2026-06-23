@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { Card, Badge, Button, PageTitle, Avatar, AvatarStack } from '../../components/ui'
-import { eur, pal } from '../../design/calm'
+import { eur, pal, creamLight, navyInk } from '../../design/calm'
 import { sessions, events, eventDetail, members } from '../../mock/data'
 
 const STATUS = {
@@ -47,13 +47,15 @@ export default function Sessions() {
               🎳
             </span>
             <div className="min-w-0 flex-1">
-              <div className="text-[11px] uppercase tracking-wide text-cream">Nächster Termin</div>
+              <div className="text-[11px] uppercase tracking-wide" style={{ color: creamLight }}>
+                Nächster Termin
+              </div>
               <div className="truncate text-[15px] font-semibold">{next.title}</div>
               <div className="text-[12px] text-white/70">Sa, 27. Juni · 19:30 Uhr · {next.lane}</div>
             </div>
           </div>
           <div className="flex items-center gap-2.5">
-            <AvatarStack names={yesNames} ringColor={pal.navy} max={5} />
+            <AvatarStack names={yesNames} ringColor={pal.navySurface} max={5} />
             <span className="text-[12px] text-white/75">
               {yesNames.length} zugesagt{guestCount > 0 ? ` · ${guestCount} Gäste` : ''}
             </span>
@@ -61,7 +63,7 @@ export default function Sessions() {
           <button
             onClick={startFromEvent}
             className="w-full rounded-full py-3 text-[14px] font-semibold"
-            style={{ background: pal.cream, color: pal.navy }}
+            style={{ background: creamLight, color: navyInk }}
           >
             Kegelabend starten · Anwesenheit übernehmen
           </button>
@@ -75,7 +77,7 @@ export default function Sessions() {
       {/* Offene Einreichung hervorheben */}
       {sessions.some((s) => s.status === 'submitted') && (
         <Card tone="amber" className="flex flex-wrap items-center gap-3">
-          <span className="grid h-10 w-10 place-items-center rounded-full bg-white/70 text-lg">⏳</span>
+          <span className="grid h-10 w-10 place-items-center rounded-full bg-bg/70 text-lg">⏳</span>
           <div className="flex-1">
             <div className="text-[13px] font-semibold text-ink">Eine Einreichung wartet auf deine Freigabe</div>
             <div className="text-[12px] text-ink-soft">Kegelabend 09.05. · Hans Meier · 12 Teilnehmer</div>

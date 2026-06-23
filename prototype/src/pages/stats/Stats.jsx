@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { Card, Badge, PageTitle, Avatar, Bar, Button } from '../../components/ui'
-import { eur, pal } from '../../design/calm'
+import { eur, pal, creamLight } from '../../design/calm'
 import { awards, monthlyStats, topPudler } from '../../mock/data'
 
 export default function Stats() {
@@ -28,12 +28,15 @@ export default function Stats() {
           >
             <div className="flex items-start justify-between">
               <span className="text-3xl">{a.icon}</span>
-              <Badge tone={a.tone === 'navy' ? 'navy' : 'neutral'} className="bg-white/40">
+              <Badge tone={a.tone === 'navy' ? 'navy' : 'neutral'} className="bg-bg/40">
                 Mai
               </Badge>
             </div>
-            <div className={`mt-3 text-[13px] font-semibold ${a.tone === 'navy' ? 'text-cream' : 'text-ink'}`}>
-              {a.type}
+            <div
+              className="mt-3 text-[13px] font-semibold"
+              style={a.tone === 'navy' ? { color: creamLight } : undefined}
+            >
+              <span className={a.tone === 'navy' ? '' : 'text-ink'}>{a.type}</span>
             </div>
             <div className="mt-2 flex items-center gap-2">
               <Avatar name={a.holder} size={28} />

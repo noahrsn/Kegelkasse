@@ -1,4 +1,4 @@
-import { pal } from '../../design/calm'
+import { pal, creamLight } from '../../design/calm'
 
 /* Mobile-first: zentriertes Formular. Desktop: zweispaltig mit Bento-Schaufenster. */
 export default function AuthShell({ title, subtitle, children }) {
@@ -13,7 +13,7 @@ export default function AuthShell({ title, subtitle, children }) {
 
         <div className="grid grid-cols-2 gap-4">
           <Showcase tone={pal.terraBg} fg={pal.terra} label="Meine Schulden" big="17,60 €" sub="14 Strafen offen" />
-          <Showcase tone={pal.navy} fg={pal.cream} dark label="Nächster Abend" big="23" sub="Sa · 19:30 · Bahn 3+4" />
+          <Showcase tone={pal.navySurface} fg={creamLight} dark label="Nächster Abend" big="23" sub="Sa · 19:30 · Bahn 3+4" />
           <Showcase tone={pal.sageBg} fg={pal.sage} label="Vereinskasse" big="1.428 €" sub="▲ +6,2 % im Monat" />
           <Showcase tone={pal.cream} fg={pal.amber} label="Top Pudler" big="38" sub="Martin H. · Mai" />
         </div>

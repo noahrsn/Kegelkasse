@@ -118,7 +118,7 @@ export default function TreasuryImport() {
 
       {stage === 'done' && (
         <Card tone="sage" className="grid place-items-center gap-3 py-12 text-center animate-pop">
-          <span className="grid h-16 w-16 place-items-center rounded-full bg-white/70 text-3xl">✓</span>
+          <span className="grid h-16 w-16 place-items-center rounded-full bg-bg/70 text-3xl">✓</span>
           <div className="font-display text-2xl font-medium text-ink">Import abgeschlossen</div>
           <p className="max-w-sm text-[13px] text-ink-soft">
             {matched} Zahlungen wurden gebucht und mit offenen Schulden abgeglichen (älteste zuerst).
