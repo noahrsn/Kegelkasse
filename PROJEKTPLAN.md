@@ -8,6 +8,8 @@ Webapp für Kegelclubs zur Verwaltung von Strafen, Mitgliedern, Beiträgen, Term
 
 **Entwicklung:** Lokale Entwicklung via localhost. Frontend als statische App auf **Render** (Free Tier). Backend und Datenbank auf **Supabase Free Plan** (Edge Functions + Auth + PostgreSQL). Kein Azure, kein separater Backend-Server.
 
+> **Plattform-Fokus: Mobile First.** Der absolute Fokus der Webapp — und vor allem des Prototyps — liegt auf der **mobilen Nutzung**: Nutzer, die die Webapp vom Handy aus aufrufen, sind die primäre Zielgruppe. Jeder Screen wird zuerst für das Smartphone entworfen und optimiert. Der Aufruf vom Desktop aus muss dennoch ein **vernünftiges, sauber skaliertes Layout** liefern — Desktop ist sekundär, aber nicht vernachlässigt.
+
 ---
 
 ## Design-Konzept
@@ -15,6 +17,15 @@ Webapp für Kegelclubs zur Verwaltung von Strafen, Mitgliedern, Beiträgen, Term
 Das UI/UX-Design und das Frontend werden vollständig, iterativ und direkt im Code mit **Claude Code** entwickelt. Das Design basiert auf dem **Calm Bento**-Design-System (`design_system/calm.jsx`): warmes Off-White, große gerundete Karten, zurückhaltende Farbblöcke (Sage / Terracotta / Navy).
 
 > **Hinweis Frontend-Technologie:** HTMX + Jinja2/Alpine.js entfällt, da kein traditioneller Python-Server mehr existiert. Das Frontend ist eine React+Vite-SPA (identisch mit dem Prototyp aus Phase 1). Der Prototyp ist also nicht nur Wegwerfcode — er wird direkt zur Produktions-App weiterentwickelt.
+
+### Mobile First — Plattform-Priorität
+
+Die **mobile Nutzung hat absolute Priorität.** Die App wird primär von Mitgliedern am Smartphone bedient — am Kegelabend zum Erfassen von Strafen, unterwegs zum Zu-/Absagen von Terminen, für den schnellen Blick auf Schulden und Kassenstand. Daraus folgt für die gesamte Entwicklung — und insbesondere für den Prototyp (Phase 1):
+
+- **Smartphone zuerst:** Jeder Screen wird zuerst für kleine Touch-Displays entworfen, gebaut und getestet. Tap-Ziele, Bottom-Sheets, Hamburger-Navigation und Daumen-erreichbare Aktionen sind der Ausgangspunkt, nicht die Anpassung.
+- **Desktop sekundär, aber vernünftig:** Beim Aufruf vom Desktop muss ein sauberes, gut nutzbares Layout entstehen (Sidebar-Navigation, mehrspaltige Bento-Grids, sinnvolle maximale Inhaltsbreite). Desktop wird nicht vernachlässigt — aber Designentscheidungen im Konfliktfall fallen immer zugunsten der mobilen Erfahrung.
+- **Responsives Vorgehen:** Mobile-first Breakpoints (Tailwind: Basis = Mobile, `md:`/`lg:` erweitern für Desktop). Die Navigation wechselt zwischen Hamburger-Menü (Mobile) und Sidebar + User-Menü (Desktop) wie unten beschrieben.
+- **Prototyp-Test:** Der Phase-1-Prototyp wird primär in einer mobilen Viewport-Größe abgenommen; das Desktop-Layout wird zusätzlich geprüft.
 
 ### Menü- & Navigationsstruktur
 
