@@ -4,15 +4,43 @@ import { Card, Button, PageTitle, Field, Input, Textarea, Select, Toggle } from 
 import { cx } from '../../design/calm'
 
 const TYPES = [
-  { key: 'single', label: 'Einzeltermin', icon: '📅', hint: 'Ein einmaliger Termin' },
-  { key: 'recurring', label: 'Wiederkehrend', icon: '🔁', hint: 'z. B. jeden 4. Samstag' },
-  { key: 'multi_day', label: 'Mehrtägig', icon: '🗓️', hint: 'Turnier, Reise …' },
+  { key: 'single', label: 'Einzeltermin', icon: '📅' },
+  { key: 'recurring', label: 'Wiederkehrend', icon: '🔁' },
+  { key: 'multi_day', label: 'Mehrtägig', icon: '🗓️' },
+]
+
+const TURNUS = [
+  { key: 'daily', label: 'Täglich' },
+  { key: 'weekly', label: 'Wöchentlich' },
+  { key: 'biweekly', label: 'Alle 2 Wochen' },
+  { key: 'monthly', label: 'Monatlich' },
+  { key: 'quarterly', label: 'Vierteljährlich' },
+  { key: 'halfyearly', label: 'Halbjährlich' },
+  { key: 'yearly', label: 'Jährlich' },
+]
+
+const WEEKDAYS = [
+  ['1', 'Montag'],
+  ['2', 'Dienstag'],
+  ['3', 'Mittwoch'],
+  ['4', 'Donnerstag'],
+  ['5', 'Freitag'],
+  ['6', 'Samstag'],
+  ['0', 'Sonntag'],
+]
+const NTH = [
+  ['1', '1.'],
+  ['2', '2.'],
+  ['3', '3.'],
+  ['4', '4.'],
+  ['last', 'letzten'],
 ]
 
 export default function CalendarNew() {
   const navigate = useNavigate()
   const [type, setType] = useState('single')
   const [optOut, setOptOut] = useState(false)
+  const [noteRequired, setNoteRequired] = useState(true)
 
   return (
     <div className="space-y-5">
@@ -49,19 +77,7 @@ export default function CalendarNew() {
           </Field>
 
           {type === 'recurring' ? (
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Wiederholung">
-                <Select defaultValue="4-sat">
-                  <option value="weekly">Wöchentlich</option>
-                  <option value="2-week">Alle 2 Wochen</option>
-                  <option value="4-sat">Jeden 4. Samstag</option>
-                  <option value="1-fri">Jeden 1. Freitag</option>
-                </Select>
-              </Field>
-              <Field label="Uhrzeit">
-                <Input type="time" defaultValue="19:30" />
-              </Field>
-            </div>
+            <Recurrence />
           ) : type === 'multi_day' ? (
             <div className="grid grid-cols-2 gap-3">
               <Field label="Von">
@@ -90,21 +106,51 @@ export default function CalendarNew() {
           </Field>
         </Card>
 
+        {/* RSVP */}
         <Card className="space-y-4">
           <div className="text-[12px] font-semibold text-ink-soft">RSVP-Einstellungen</div>
+
+          <Field label="Standard-Status der Mitglieder">
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setOptOut(false)}
+                className={cx(
+                  'rounded-2xl border p-3 text-left transition',
+                  !optOut ? 'border-ink bg-card' : 'border-card-edge bg-card/50',
+                )}
+              >
+                <div className="text-[13px] font-semibold">Opt-in</div>
+                <div className="text-[11px] text-ink-dim">Müssen aktiv zusagen</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setOptOut(true)}
+                className={cx(
+                  'rounded-2xl border p-3 text-left transition',
+                  optOut ? 'border-ink bg-card' : 'border-card-edge bg-card/50',
+                )}
+              >
+                <div className="text-[13px] font-semibold">Opt-out</div>
+                <div className="text-[11px] text-ink-dim">Zugesagt, müssen absagen</div>
+              </button>
+            </div>
+          </Field>
+
           <Toggle
-            checked={optOut}
-            onChange={setOptOut}
-            label={optOut ? 'Opt-out: alle automatisch zugesagt' : 'Opt-in: aktiv zusagen nötig'}
-            hint="Bestimmt den Startstatus der Mitglieder."
+            checked={noteRequired}
+            onChange={setNoteRequired}
+            label="Notiz bei Absage & Vielleicht verpflichtend"
+            hint="Mitglieder müssen einen Grund angeben."
           />
-          <Field label="Absagefrist (Stunden vorher)">
-            <Select defaultValue="48">
-              <option value="24">24 Stunden</option>
-              <option value="48">48 Stunden</option>
-              <option value="72">72 Stunden</option>
-              <option value="168">1 Woche</option>
-            </Select>
+
+          <Field label="Absagefrist (Stunden vor dem Termin)" hint="Frei eingeben, z. B. 36">
+            <div className="relative">
+              <Input type="number" min="0" inputMode="numeric" defaultValue="48" className="pr-20" />
+              <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[13px] font-medium text-ink-dim">
+                Stunden
+              </span>
+            </div>
           </Field>
         </Card>
 
@@ -117,6 +163,115 @@ export default function CalendarNew() {
           </Button>
         </div>
       </form>
+    </div>
+  )
+}
+
+/* ── Flexible Wiederholung ────────────────────────────────────────────── */
+function Recurrence() {
+  const [turnus, setTurnus] = useState('weekly')
+  const [monthMode, setMonthMode] = useState('same_date') // same_date | nth_weekday
+
+  const isWeekly = turnus === 'weekly' || turnus === 'biweekly'
+  const isMonthly = ['monthly', 'quarterly', 'halfyearly', 'yearly'].includes(turnus)
+
+  return (
+    <div className="space-y-4 rounded-2xl bg-bg p-4">
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Turnus">
+          <Select value={turnus} onChange={(e) => setTurnus(e.target.value)}>
+            {TURNUS.map((t) => (
+              <option key={t.key} value={t.key}>
+                {t.label}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="Uhrzeit">
+          <Input type="time" defaultValue="19:30" />
+        </Field>
+      </div>
+
+      {/* Täglich: kein Modus nötig */}
+      {turnus === 'daily' && (
+        <p className="text-[12px] text-ink-dim">Findet jeden Tag zur gewählten Uhrzeit statt.</p>
+      )}
+
+      {/* Wöchentlich / 2-wöchentlich: Wochentag */}
+      {isWeekly && (
+        <Field label="Wochentag">
+          <Select defaultValue="6">
+            {WEEKDAYS.map(([v, l]) => (
+              <option key={v} value={v}>
+                {l}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      )}
+
+      {/* Monatlich+ : Modus */}
+      {isMonthly && (
+        <>
+          <Field label="Wiederholungsmuster">
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setMonthMode('same_date')}
+                className={cx(
+                  'rounded-xl border p-2.5 text-left text-[13px] font-semibold transition',
+                  monthMode === 'same_date' ? 'border-ink bg-card' : 'border-card-edge bg-card/50',
+                )}
+              >
+                Gleiches Datum
+                <span className="block text-[11px] font-normal text-ink-dim">z. B. immer am 15.</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMonthMode('nth_weekday')}
+                className={cx(
+                  'rounded-xl border p-2.5 text-left text-[13px] font-semibold transition',
+                  monthMode === 'nth_weekday' ? 'border-ink bg-card' : 'border-card-edge bg-card/50',
+                )}
+              >
+                Wochentag im Monat
+                <span className="block text-[11px] font-normal text-ink-dim">z. B. 4. Samstag</span>
+              </button>
+            </div>
+          </Field>
+
+          {monthMode === 'same_date' ? (
+            <Field label="Tag im Monat">
+              <Input type="number" min="1" max="31" defaultValue="15" />
+            </Field>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Wievielter">
+                <Select defaultValue="4">
+                  {NTH.map(([v, l]) => (
+                    <option key={v} value={v}>
+                      {l}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Wochentag">
+                <Select defaultValue="6">
+                  {WEEKDAYS.map(([v, l]) => (
+                    <option key={v} value={v}>
+                      {l}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            </div>
+          )}
+        </>
+      )}
+
+      <Field label="Startdatum">
+        <Input type="date" defaultValue="2026-07-04" />
+      </Field>
     </div>
   )
 }

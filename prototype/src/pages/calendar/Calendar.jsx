@@ -10,8 +10,9 @@ const TYPE = {
 }
 const RSVP = {
   yes: { label: 'Zugesagt', tone: 'sage' },
+  maybe: { label: 'Vielleicht', tone: 'amber' },
   no: { label: 'Abgesagt', tone: 'terra' },
-  pending: { label: 'Offen', tone: 'amber' },
+  no_answer: { label: 'Keine Antwort', tone: 'neutral' },
 }
 
 function fmt(d) {
@@ -103,7 +104,7 @@ function EventRow({ e, navigate }) {
           <div className="mt-2 flex items-center gap-2">
             <AvatarStack names={['Hans Meier', 'Karin Voss', 'Martin Haas', 'Petra Lang']} />
             <span className="text-[11px] text-ink-dim">
-              {e.rsvp.yes} zugesagt · {e.rsvp.pending} offen
+              {e.rsvp.yes} zugesagt · {e.rsvp.no_answer} keine Antwort
             </span>
           </div>
         </div>

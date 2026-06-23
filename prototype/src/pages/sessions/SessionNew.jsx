@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { Card, Button, PageTitle, Avatar, Field, Input } from '../../components/ui'
 import { Sheet } from '../../components/Modal'
 import { cx } from '../../design/calm'
@@ -7,11 +7,22 @@ import { members, events } from '../../mock/data'
 
 export default function SessionNew() {
   const navigate = useNavigate()
-  const [present, setPresent] = useState(() => new Set(members.slice(0, 8).map((m) => m.id)))
-  const [guests, setGuests] = useState([{ id: 'g1', name: 'Uwe (Gast von Hans)' }])
+  const location = useLocation()
+  const fromEvent = location.state?.fromEvent
+  const event = events.find((e) => !e.past)
+
+  const [present, setPresent] = useState(() =>
+    fromEvent
+      ? new Set(location.state.presentIds || [])
+      : new Set(members.slice(0, 8).map((m) => m.id)),
+  )
+  const [guests, setGuests] = useState(() =>
+    fromEvent
+      ? (location.state.guests || []).map((name, i) => ({ id: 'ge' + i, name }))
+      : [{ id: 'g1', name: 'Uwe (Gast von Hans)' }],
+  )
   const [guestOpen, setGuestOpen] = useState(false)
   const [guestName, setGuestName] = useState('')
-  const event = events.find((e) => !e.past)
 
   const toggle = (id) => {
     setPresent((prev) => {
@@ -24,18 +35,35 @@ export default function SessionNew() {
   const presentCount = present.size
   const absentCount = members.length - presentCount
 
+  const start = () => {
+    const presentMembers = members
+      .filter((m) => present.has(m.id))
+      .map((m) => ({ id: m.id, name: m.name, isGuest: false, late: false }))
+    const guestRoster = guests.map((g) => ({ id: g.id, name: g.name, isGuest: true, late: false }))
+    navigate('/sessions/live', { state: { roster: [...presentMembers, ...guestRoster] } })
+  }
+
   return (
     <div className="space-y-5 pb-4">
       <PageTitle kicker="Kegelabend starten" title="Wer ist dabei?" />
+
+      {/* Hinweis bei Übernahme aus Termin */}
+      {fromEvent && (
+        <Card tone="sage" className="flex items-center gap-3 py-3">
+          <span className="text-lg">✓</span>
+          <div className="flex-1 text-[12px] text-ink-soft">
+            <strong className="text-ink">Anwesenheit aus „{location.state.eventTitle}" übernommen.</strong>{' '}
+            Du kannst sie hier noch anpassen.
+          </div>
+        </Card>
+      )}
 
       {/* Event-Kontext */}
       <Card tone="navy" className="flex items-center gap-3">
         <span className="grid h-11 w-11 place-items-center rounded-2xl bg-white/10 text-xl">🎳</span>
         <div className="flex-1">
-          <div className="text-[13px] font-semibold">{event.title}</div>
-          <div className="text-[12px] text-white/70">
-            Sa, 23. Juni · 19:30 Uhr · {event.lane}
-          </div>
+          <div className="text-[13px] font-semibold">{fromEvent ? location.state.eventTitle : event.title}</div>
+          <div className="text-[12px] text-white/70">Sa, 27. Juni · 19:30 Uhr · {event.lane}</div>
         </div>
       </Card>
 
@@ -116,7 +144,7 @@ export default function SessionNew() {
 
       {/* Sticky-Start */}
       <div className="sticky bottom-24 lg:bottom-4">
-        <Button size="lg" className="w-full shadow-lg" onClick={() => navigate('/sessions/live')}>
+        <Button size="lg" className="w-full shadow-lg" onClick={start}>
           Erfassung starten · {presentCount + guests.length} Personen
         </Button>
       </div>

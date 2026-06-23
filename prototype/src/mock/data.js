@@ -46,16 +46,18 @@ export const members = [
   { id: 'u12', name: 'Ralf Berg', role: 'mitglied', debt: 9.0, attendance: 0.42, iban: '' },
 ]
 
+// manual: true → Betrag wird beim Erfassen eingegeben (kein fester Betrag)
 export const penalties = [
-  { id: 'p1', name: 'Rinnenwurf', amount: 0.5, icon: '🌊', active: true },
-  { id: 'p2', name: 'Fehlwurf (0 Holz)', amount: 0.3, icon: '🎯', active: true },
-  { id: 'p3', name: 'Verspätung', amount: 2.0, icon: '⏰', active: true },
-  { id: 'p4', name: 'Handy am Tisch', amount: 1.0, icon: '📱', active: true },
-  { id: 'p5', name: 'Falsche Bahn', amount: 0.5, icon: '↔️', active: true },
-  { id: 'p6', name: 'Fluchen', amount: 0.5, icon: '🤬', active: true },
-  { id: 'p7', name: 'Schuhe vergessen', amount: 1.5, icon: '👟', active: true },
-  { id: 'p8', name: 'Runde verloren', amount: 1.0, icon: '🍺', active: true },
-  { id: 'p9', name: 'Geburtstagsrunde', amount: 5.0, icon: '🎂', active: false },
+  { id: 'p1', name: 'Rinnenwurf', amount: 0.5, icon: '🌊', active: true, manual: false },
+  { id: 'p2', name: 'Fehlwurf (0 Holz)', amount: 0.3, icon: '🎯', active: true, manual: false },
+  { id: 'p3', name: 'Verspätung', amount: 2.0, icon: '⏰', active: true, manual: false },
+  { id: 'p4', name: 'Handy am Tisch', amount: 1.0, icon: '📱', active: true, manual: false },
+  { id: 'p5', name: 'Falsche Bahn', amount: 0.5, icon: '↔️', active: true, manual: false },
+  { id: 'p6', name: 'Fluchen', amount: 0.5, icon: '🤬', active: true, manual: false },
+  { id: 'p7', name: 'Schuhe vergessen', amount: 1.5, icon: '👟', active: true, manual: false },
+  { id: 'p8', name: 'Runde verloren', amount: 1.0, icon: '🍺', active: true, manual: false },
+  { id: 'p10', name: 'Glas umgeworfen', amount: null, icon: '🥃', active: true, manual: true },
+  { id: 'p9', name: 'Geburtstagsrunde', amount: 5.0, icon: '🎂', active: false, manual: false },
 ]
 
 export const sessions = [
@@ -101,35 +103,39 @@ export const csvPreview = [
   { id: 'r4', date: '2026-05-09', name: 'Rewe Markt GmbH', iban: 'DE55 1234 5678 9012 3456 78', amount: -22.5, match: 'none', matchedMember: null },
 ]
 
+// RSVP-Status: 'yes' | 'no' | 'maybe' | 'no_answer'
+// rsvpMode: 'opt_in' (Start = no_answer) | 'opt_out' (Start = yes)
 export const events = [
-  { id: 'e1', title: 'Kegelabend Mai', type: 'recurring', date: '2026-05-23T19:30', lane: 'Bahn 3+4', rsvp: { yes: 9, no: 1, pending: 2 }, myStatus: 'pending', deadlineH: 48 },
-  { id: 'e2', title: 'Pfingstkegeln', type: 'single', date: '2026-06-07T18:00', lane: 'Vereinsheim', rsvp: { yes: 7, no: 2, pending: 3 }, myStatus: 'yes', deadlineH: 72 },
-  { id: 'e3', title: 'Sommerturnier', type: 'multi_day', date: '2026-07-18T10:00', end: '2026-07-19T18:00', lane: 'Bowling Arena', rsvp: { yes: 4, no: 0, pending: 8 }, myStatus: 'pending', deadlineH: 168 },
-  { id: 'e4', title: 'Kegelabend April', type: 'recurring', date: '2026-04-25T19:30', lane: 'Bahn 3+4', past: true, sessionId: 's2', rsvp: { yes: 11, no: 1, pending: 0 }, myStatus: 'yes' },
-  { id: 'e5', title: 'Kegelabend März', type: 'recurring', date: '2026-03-28T19:30', lane: 'Bahn 3+4', past: true, sessionId: 's4', rsvp: { yes: 12, no: 0, pending: 0 }, myStatus: 'yes' },
+  { id: 'e1', title: 'Kegelabend Juni', type: 'recurring', date: '2026-06-27T19:30', lane: 'Bahn 3+4', rsvp: { yes: 8, no: 1, maybe: 1, no_answer: 2 }, myStatus: 'no_answer', deadlineH: 48 },
+  { id: 'e2', title: 'Pfingstkegeln', type: 'single', date: '2026-07-07T18:00', lane: 'Vereinsheim', rsvp: { yes: 7, no: 2, maybe: 0, no_answer: 3 }, myStatus: 'yes', deadlineH: 72 },
+  { id: 'e3', title: 'Sommerturnier', type: 'multi_day', date: '2026-07-18T10:00', end: '2026-07-19T18:00', lane: 'Bowling Arena', rsvp: { yes: 4, no: 0, maybe: 2, no_answer: 6 }, myStatus: 'maybe', deadlineH: 168 },
+  { id: 'e4', title: 'Kegelabend April', type: 'recurring', date: '2026-04-25T19:30', lane: 'Bahn 3+4', past: true, sessionId: 's2', rsvp: { yes: 11, no: 1, maybe: 0, no_answer: 0 }, myStatus: 'yes' },
+  { id: 'e5', title: 'Kegelabend März', type: 'recurring', date: '2026-03-28T19:30', lane: 'Bahn 3+4', past: true, sessionId: 's4', rsvp: { yes: 12, no: 0, maybe: 0, no_answer: 0 }, myStatus: 'yes' },
 ]
 
 export const eventDetail = {
   id: 'e1',
-  title: 'Kegelabend Mai',
+  title: 'Kegelabend Juni',
   type: 'recurring',
-  date: '2026-05-23T19:30',
+  date: '2026-06-27T19:30',
   lane: 'Bahn 3+4',
   deadlineH: 48,
+  rsvpMode: 'opt_in',
+  noteRequired: true, // Notiz bei Absage & Vielleicht verpflichtend
   description: 'Regulärer Kegelabend. Wer kommt, sagt bitte bis Donnerstag zu — danach gibt es eine Verspätungsstrafe für kurzfristige Absagen.',
   responses: [
-    { name: 'Hans Meier', status: 'yes' },
+    { name: 'Hans Meier', status: 'yes', guests: ['Uwe (Gast)'] },
     { name: 'Karin Voss', status: 'yes' },
     { name: 'Martin Haas', status: 'yes' },
-    { name: 'Petra Lang', status: 'yes', note: 'Komme später, ca. 20 Uhr' },
+    { name: 'Petra Lang', status: 'maybe', note: 'Versuche zu kommen, ggf. später' },
     { name: 'Tobias Brandt', status: 'yes' },
     { name: 'Anna Schulz', status: 'yes' },
     { name: 'Maria Wolf', status: 'yes' },
     { name: 'Sven Decker', status: 'yes' },
-    { name: 'Noah Roosen', status: 'pending' },
-    { name: 'Lisa Köhler', status: 'pending' },
+    { name: 'Noah Roosen', status: 'no_answer' },
+    { name: 'Lisa Köhler', status: 'no_answer' },
     { name: 'Jan Fischer', status: 'no', note: 'Im Urlaub' },
-    { name: 'Ralf Berg', status: 'pending' },
+    { name: 'Ralf Berg', status: 'yes', guests: ['Tom (Gast)'] },
   ],
 }
 

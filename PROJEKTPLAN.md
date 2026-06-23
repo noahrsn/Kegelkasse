@@ -75,19 +75,19 @@ Die **mobile Nutzung hat absolute Priorität.** Die App wird primär von Mitglie
 |---|---|---|---|
 | 1 | Login | `/login` | E-Mail + Passwort, "Registrieren"-Link |
 | 2 | Registrierung | `/register` | Vorname, Nachname, E-Mail, Passwort |
-| 3 | Dashboard | `/dashboard` | Bento-Grid: Schulden, nächster Termin, Kasse, Aktivität, Mitglieder |
-| 4 | Kegelabende — Liste | `/sessions` | Vergangene Abende, Status-Badges, "Neuen starten"-Button |
-| 5 | Kegelabend starten | `/sessions/new` | Teilnehmer konfigurieren: Anwesend / Abwesend / Gäste |
-| 6 | Laufende Erfassung | `/sessions/:id` | Teilnehmerliste, Strafe per Tap/Klick, Bottom-Sheet/Modal, Nachzügler, Abschluss |
+| 3 | Dashboard | `/dashboard` | Bento-Grid: Schulden, nächster Termin, Kasse, Aktivität, Mitglieder — **jede Kachel verlinkt auf den passenden Bereich** (Schulden→Mitglieder, Termin→Termine, Kasse→Kassenbuch, …) |
+| 4 | Kegelabende — Liste | `/sessions` | Vergangene Abende, Status-Badges; **oben: nächsten Termin direkt starten** (übernimmt Anwesenheit + Gäste) |
+| 5 | Kegelabend starten | `/sessions/new` | Teilnehmer konfigurieren: Anwesend / Abwesend / Gäste (vorbefüllt bei Start aus Termin) |
+| 6 | Laufende Erfassung | `/sessions/:id` | Teilnehmerliste, **Modus Schnell (Standard, 1-Klick) / Detailliert (Stepper)**, Bottom-Sheet, manuelle Beträge, Nachzügler, Abschluss |
 | 7 | Einreichung prüfen | `/sessions/:id/review` | Kassenwart-Ansicht: Übersicht, Genehmigen / Ablehnen |
 | 8 | Kassenbuch | `/treasury` | Transaktionsliste, Kassenstand, Statusanzeige |
 | 9 | CSV-Import | `/treasury/import` | Upload-Screen, Match-Vorschau, Zuordnung bestätigen |
 | 10 | Manuelle Buchung | `/treasury/new` | Formular: Datum, Betrag, Kategorie, Beschreibung |
-| 11 | Strafenkatalog | `/penalties` | Alle Strafen, Edit-Modus, Neue Strafe, Deaktivieren |
+| 11 | Strafenkatalog | `/penalties` | Alle Strafen, Edit-Modus, Neue Strafe, Deaktivieren; **fester ODER manueller Betrag** (z. B. „Glas umgeworfen") |
 | 12 | Mitgliederliste | `/members` | Karten mit Schuldenstand, Farbmarkierung, Schulden abhaken |
 | 13 | Terminkalender | `/calendar` | Listenansicht, kommende Events, RSVP-Status |
-| 14 | Termin-Detail & RSVP | `/calendar/:id` | Event-Info, Zu-/Absagen, Notiz, Teilnehmerliste |
-| 15 | Termin anlegen | `/calendar/new` | Einzeltermin / Wiederkehrend / Mehrtägig |
+| 14 | Termin-Detail & RSVP | `/calendar/:id` | Event-Info; **Zusage / Vielleicht / Absage**, Status „Keine Antwort"; Pflicht-Notiz (konfigurierbar); **Gäste pro Person** mitbringen; Teilnehmerliste |
+| 15 | Termin anlegen | `/calendar/new` | Einzel / Wiederkehrend / Mehrtägig; **flexibler Turnus** (täglich…jährlich) + Muster (Datum / Wochentag / n-ter Wochentag); Opt-in/Opt-out; Pflicht-Notiz-Schalter; Absagefrist als **Freitext (Stunden)** |
 | 16 | Einstellungs-Hub | `/settings` | Alle Tabs: Allgemein, Finanzen, Strafenkatalog, Regeltermine, Regelwerk, Mitglieder, Einladung |
 | 17 | Setup-Wizard | `/setup/:step` | Alle 6 Schritte klickbar durchlaufen |
 | 18 | Statistiken | `/stats` | Awards, Top-Listen, Monatsdiagramm |
@@ -300,14 +300,17 @@ CREATE TABLE notification_settings (
 **Tabelle: `penalties_catalog`**
 ```sql
 CREATE TABLE penalties_catalog (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  group_id    UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
-  name        TEXT NOT NULL,
-  amount      NUMERIC(10,2) NOT NULL,
-  icon        TEXT DEFAULT '🎳',
-  active      BOOLEAN DEFAULT TRUE
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  group_id      UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+  name          TEXT NOT NULL,
+  amount        NUMERIC(10,2),                 -- NULL wenn manueller Betrag
+  manual_amount BOOLEAN NOT NULL DEFAULT FALSE,-- Betrag erst bei Erfassung eingeben
+  icon          TEXT DEFAULT '🎳',
+  active         BOOLEAN DEFAULT TRUE
 );
 ```
+
+> **`manual_amount = TRUE`:** Strafe ohne festen Betrag (z. B. „Glas umgeworfen") — der Betrag wird am Kegelabend pro Vorfall einzeln eingegeben und auf `session_penalties.amount` gespeichert. `amount` bleibt dann NULL.
 
 **Tabelle: `events`** — Kegelkalender
 ```sql
@@ -319,12 +322,15 @@ CREATE TABLE events (
   type                  TEXT NOT NULL DEFAULT 'single',
   start_date            TIMESTAMPTZ NOT NULL,
   end_date              TIMESTAMPTZ,
-  recurrence_pattern    TEXT,
-  recurrence_weekday    INTEGER,
-  recurrence_nth        INTEGER,
+  recurrence_interval   TEXT,                 -- Turnus: daily|weekly|biweekly|monthly|quarterly|halfyearly|yearly
+  recurrence_mode       TEXT,                 -- same_date|weekday|nth_weekday
+  recurrence_monthday   INTEGER,              -- bei same_date: Tag im Monat
+  recurrence_weekday    INTEGER,              -- bei weekday / nth_weekday: 0=So … 6=Sa
+  recurrence_nth        INTEGER,              -- bei nth_weekday: 1–4, -1=letzter
   recurrence_until      TIMESTAMPTZ,
-  rsvp_deadline_hours   INTEGER DEFAULT 48,
+  rsvp_deadline_hours   INTEGER DEFAULT 48,   -- Freitext-Stundenangabe im UI
   rsvp_mode             TEXT DEFAULT 'opt_in',
+  rsvp_note_required    BOOLEAN DEFAULT FALSE,-- Notiz bei Absage & Vielleicht Pflicht
   created_by            UUID NOT NULL REFERENCES users(id),
   linked_session_id     UUID,
   created_at            TIMESTAMPTZ DEFAULT now()
@@ -332,7 +338,8 @@ CREATE TABLE events (
 ```
 
 > **`type`-Werte:** `single` · `recurring` · `multi_day`  
-> **`rsvp_mode`-Werte:** `opt_in` (Standard, initiales Status = pending) · `opt_out` (initiales Status = attending)
+> **`rsvp_mode`-Werte:** `opt_in` (Standard, initialer Status = `no_answer`) · `opt_out` (initialer Status = `yes`)  
+> **`recurrence_*`:** Turnus (`recurrence_interval`) plus Muster (`recurrence_mode`): `same_date` nutzt `recurrence_monthday`, `weekday`/`nth_weekday` nutzen `recurrence_weekday` (+ `recurrence_nth`).
 >
 > **Bekannte Einschränkung:** Das Absagen einer einzelnen Instanz aus einer wiederkehrenden Serie ist nicht vorgesehen — Änderungen betreffen immer die gesamte Serie.
 
@@ -342,13 +349,28 @@ CREATE TABLE rsvp_entries (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   event_id        UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
   user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  status          TEXT NOT NULL DEFAULT 'pending',
+  status          TEXT NOT NULL DEFAULT 'no_answer',
   note            TEXT,
   responded_at    TIMESTAMPTZ,
   late_response   BOOLEAN DEFAULT FALSE,
   UNIQUE (event_id, user_id)
 );
 ```
+
+> **`status`-Werte:** `yes` · `maybe` · `no` · `no_answer`. Bei `maybe` und `no` kann `note` per `events.rsvp_note_required` zur Pflicht gemacht werden.
+
+**Tabelle: `event_guests`** — Gäste, die ein Mitglied zu einem Termin mitbringt
+```sql
+CREATE TABLE event_guests (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id    UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  invited_by  UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  guest_name  TEXT NOT NULL,
+  created_at  TIMESTAMPTZ DEFAULT now()
+);
+```
+
+> Beim Start eines Kegelabends aus einem Termin werden `event_guests` als `session_participants` mit `is_guest = TRUE` übernommen.
 
 **Tabelle: `sessions`** — Kegeltermine
 ```sql
@@ -664,16 +686,22 @@ Nicht berechtigte Sektionen werden ausgeblendet, nicht nur gesperrt.
 
 ### Features
 
-**Kegelabend starten** — drei Wege:
-- Über den Menüpunkt → Liste anstehender Events → auswählen
+**Kegelabend starten** — mehrere Wege:
+- Über den Menüpunkt Kegelabende → **nächster Termin wird oben angezeigt** → „Kegelabend starten"
 - Direkt aus der Kalender-Event-Detailansicht
 - Dashboard-Button (wenn heute ein Event stattfindet)
+- Leeren Kegelabend ohne Termin starten
+
+**Übernahme aus dem Termin:** Beim Start aus einem Termin werden die **Zusagen als anwesend** und alle **mitgebrachten Gäste** automatisch übernommen. Die Konfigurations-Übersicht erscheint trotzdem, sodass vor dem Start noch angepasst werden kann.
 
 **Konfiguration vor dem Start:** Anwesende / Abwesende Mitglieder auswählen, Gäste hinzufügen.
 
 **Laufende Erfassung:**
 - Einheitliche Liste aller anwesenden Mitglieder und Gäste
-- Tap/Klick auf Person → Strafenauswahl (Bottom-Sheet/Modal) → sofort gespeichert (Draft)
+- **Zwei Erfassungsmodi (umschaltbar, Schnell ist Standard):**
+  - **Schnell:** Tap auf Person → Bottom-Sheet mit Strafen-Raster → ein Tap pro Strafe rechnet sie sofort drauf (minimale Klicks); zuletzt erfasste Strafen als Undo-Chips
+  - **Detailliert:** Tap auf Person → Strafen mit +/−-Stepper exakt einstellen
+- **Manuelle Beträge:** Strafen ohne festen Betrag (z. B. „Glas umgeworfen") fragen beim Antippen den Betrag ab
 - **Nachzügler:** Button "Nachzügler hinzufügen" → Liste der abwesenden Mitglieder → Auswahl → automatische Durchschnittsstrafe wird zugewiesen
 - **Abschluss:** "Einreichen"-Button → Status: `submitted`
 - **Genehmigung:** Kassenwart/Admin prüft → gibt frei → Status: `approved` → Schulden gebucht
@@ -695,16 +723,20 @@ Nicht berechtigte Sektionen werden ausgeblendet, nicht nur gesperrt.
 ### Features
 
 **Terminerstellung (Präsident & Admin):**
-- **Einzeltermin** · **Wiederkehrender Termin** (z.B. "Jeden 4. Samstag") · **Mehrtägiges Event**
+- **Einzeltermin** · **Mehrtägiges Event** · **Wiederkehrender Termin** mit flexiblem Muster:
+  - **Turnus:** täglich · wöchentlich · alle 2 Wochen · monatlich · vierteljährlich · halbjährlich · jährlich
+  - **Muster (je nach Turnus sinnvoll):** gleiches Datum · fester Wochentag · n-ter Wochentag im Monat (z. B. „4. Samstag", „letzter Freitag")
 
 **RSVP-System:**
-- Opt-in (Standard): Mitglieder müssen aktiv zusagen
-- Opt-out: Automatisch zugesagt, nur aktiv absagen nötig
-- Optionale Notiz zur Rückmeldung
-- Echtzeitanzeige: Anzahl Zu-/Absagen / Ausstehend
+- **Opt-in:** Mitglieder müssen aktiv zusagen (Startstatus „Keine Antwort")
+- **Opt-out:** Automatisch zugesagt, nur aktiv absagen nötig
+- **Vier Status:** `yes` (Zusage) · `maybe` (Vielleicht) · `no` (Absage) · `no_answer` (Keine Antwort, ersetzt das frühere „Offen/Pending")
+- **Notiz:** bei Absage **und** Vielleicht — Pflicht oder optional, **konfigurierbar pro Termin**
+- **Gäste pro Person:** Jedes Mitglied kann eigene Gastkegler zum Termin hinzufügen → werden beim Start des Kegelabends übernommen
+- Echtzeitanzeige: Zusagen / Vielleicht / Absagen / Keine Antwort
 
 **Absagefristen:**
-- Konfigurierbare RSVP-Deadline (Stunden vor dem Termin)
+- Konfigurierbare RSVP-Deadline als **Freitext-Stundenangabe** (frei eingeben, kein festes Dropdown)
 - Verspätete Absage → Log-Eintrag + optionale E-Mail + manuelle/automatische Strafe
 
 **Kalenderansicht:** Listenansicht, vergangene Events mit Session-Link.

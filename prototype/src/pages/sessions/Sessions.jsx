@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { Card, Badge, Button, PageTitle, Avatar } from '../../components/ui'
+import { Card, Badge, Button, PageTitle, Avatar, AvatarStack } from '../../components/ui'
 import { eur, pal } from '../../design/calm'
-import { sessions } from '../../mock/data'
+import { sessions, events, eventDetail, members } from '../../mock/data'
 
 const STATUS = {
   draft: { label: 'Entwurf', tone: 'neutral' },
@@ -15,13 +15,62 @@ function fmtDate(d) {
 
 export default function Sessions() {
   const navigate = useNavigate()
+  const next = events.find((e) => !e.past)
+
+  const startFromEvent = () => {
+    const presentIds = eventDetail.responses
+      .filter((r) => r.status === 'yes')
+      .map((r) => members.find((m) => m.name === r.name)?.id)
+      .filter(Boolean)
+    const guests = eventDetail.responses.flatMap((r) => r.guests || [])
+    navigate('/sessions/new', {
+      state: { fromEvent: true, eventTitle: eventDetail.title, presentIds, guests },
+    })
+  }
+
+  const yesNames = eventDetail.responses.filter((r) => r.status === 'yes').map((r) => r.name)
+  const guestCount = eventDetail.responses.reduce((a, r) => a + (r.guests?.length || 0), 0)
+
   return (
     <div className="space-y-5">
       <PageTitle
         kicker="Kegelabende"
         title="Vergangene Abende"
-        action={<Button onClick={() => navigate('/sessions/new')}>+ Neuen starten</Button>}
+        action={<Button onClick={() => navigate('/sessions/new')}>+ Leeren starten</Button>}
       />
+
+      {/* Nächsten Termin direkt starten */}
+      {next && (
+        <Card tone="navy" className="space-y-4">
+          <div className="flex items-center gap-3">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white/10 text-xl">
+              🎳
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="text-[11px] uppercase tracking-wide text-cream">Nächster Termin</div>
+              <div className="truncate text-[15px] font-semibold">{next.title}</div>
+              <div className="text-[12px] text-white/70">Sa, 27. Juni · 19:30 Uhr · {next.lane}</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <AvatarStack names={yesNames} ringColor={pal.navy} max={5} />
+            <span className="text-[12px] text-white/75">
+              {yesNames.length} zugesagt{guestCount > 0 ? ` · ${guestCount} Gäste` : ''}
+            </span>
+          </div>
+          <button
+            onClick={startFromEvent}
+            className="w-full rounded-full py-3 text-[14px] font-semibold"
+            style={{ background: pal.cream, color: pal.navy }}
+          >
+            Kegelabend starten · Anwesenheit übernehmen
+          </button>
+          <p className="text-[11px] text-white/60">
+            Zusagen und mitgebrachte Gäste werden übernommen — vor dem Start kannst du alles noch
+            anpassen.
+          </p>
+        </Card>
+      )}
 
       {/* Offene Einreichung hervorheben */}
       {sessions.some((s) => s.status === 'submitted') && (

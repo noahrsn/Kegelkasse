@@ -30,8 +30,13 @@ export default function Dashboard() {
 
       {/* Bento-Grid */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {/* Schulden */}
-        <Card tone="terra" className="flex flex-col animate-rise" style={{ animationDelay: '40ms' }}>
+        {/* Schulden → Mitglieder */}
+        <Card
+          tone="terra"
+          onClick={() => navigate('/members')}
+          className="flex cursor-pointer flex-col animate-rise transition hover:brightness-[0.99]"
+          style={{ animationDelay: '40ms' }}
+        >
           <div className="flex items-center justify-between">
             <div className="text-[12px] font-semibold tracking-wide text-terra">Meine Schulden</div>
             <Badge tone="terra" className="bg-white/70">
@@ -48,21 +53,33 @@ export default function Dashboard() {
               <div className="text-[10px] font-semibold uppercase tracking-wide text-terra">IBAN</div>
               <div className="truncate font-mono text-[11.5px] text-ink">{club.iban}</div>
             </div>
-            <Button variant="terra" size="sm" onClick={() => navigate('/profile')}>
+            <Button
+              variant="terra"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation()
+                navigate('/profile')
+              }}
+            >
               Begleichen
             </Button>
           </div>
         </Card>
 
-        {/* Nächster Abend */}
-        <Card tone="navy" className="flex flex-col animate-rise" style={{ animationDelay: '80ms' }}>
+        {/* Nächster Abend → Termine */}
+        <Card
+          tone="navy"
+          onClick={() => navigate('/calendar')}
+          className="flex cursor-pointer flex-col animate-rise transition hover:brightness-[1.03]"
+          style={{ animationDelay: '80ms' }}
+        >
           <div className="flex items-center justify-between">
             <div className="text-[12px] font-semibold text-cream">Nächster Abend</div>
-            <span className="text-[11px] text-white/70">in 9 Tagen</span>
+            <span className="text-[11px] text-white/70">in 4 Tagen</span>
           </div>
           <div className="mt-4 flex items-end gap-3.5">
             <div className="font-display text-7xl font-medium leading-[0.8] tracking-tight" style={{ color: pal.cream }}>
-              23
+              27
             </div>
             <div className="pb-1.5">
               <div className="text-sm font-semibold">Sa, Juni</div>
@@ -72,18 +89,24 @@ export default function Dashboard() {
           <div className="flex-1" />
           <div className="mt-4 flex items-center gap-2.5">
             <AvatarStack names={members.slice(0, 4).map((m) => m.name)} ringColor={pal.navy} />
-            <div className="text-[11px] text-white/75">9 zugesagt · 3 offen</div>
+            <div className="text-[11px] text-white/75">8 zugesagt · 2 keine Antwort</div>
           </div>
           <div className="mt-3.5 flex gap-2">
             <button
-              onClick={() => navigate('/calendar/e1')}
+              onClick={(e) => {
+                e.stopPropagation()
+                navigate('/calendar/e1')
+              }}
               className="flex-1 rounded-full py-2.5 text-[12px] font-semibold"
               style={{ background: pal.cream, color: pal.navy }}
             >
               Zusagen
             </button>
             <button
-              onClick={() => navigate('/calendar/e1')}
+              onClick={(e) => {
+                e.stopPropagation()
+                navigate('/calendar/e1')
+              }}
               className="rounded-full border border-white/25 bg-white/10 px-4 py-2.5 text-[12px] font-medium text-white"
             >
               Absagen
@@ -91,8 +114,12 @@ export default function Dashboard() {
           </div>
         </Card>
 
-        {/* Vereinskasse */}
-        <Card className="flex flex-col animate-rise" style={{ animationDelay: '120ms' }}>
+        {/* Vereinskasse → Kassenbuch */}
+        <Card
+          onClick={() => navigate('/treasury')}
+          className="flex cursor-pointer flex-col animate-rise transition hover:border-ink/20"
+          style={{ animationDelay: '120ms' }}
+        >
           <div className="flex items-center justify-between">
             <div className="text-[12px] font-semibold text-ink-soft">Vereinskasse</div>
             <Badge tone="sage">▲ +6,2 %</Badge>
@@ -156,13 +183,16 @@ export default function Dashboard() {
           </div>
         </Card>
 
-        {/* Mitglieder + Top Pudler */}
-        <Card tone="cream" className="flex flex-col animate-rise" style={{ animationDelay: '200ms' }}>
+        {/* Mitglieder + Top Pudler → Mitglieder */}
+        <Card
+          tone="cream"
+          onClick={() => navigate('/members')}
+          className="flex cursor-pointer flex-col animate-rise transition hover:brightness-[0.99]"
+          style={{ animationDelay: '200ms' }}
+        >
           <div className="flex items-center justify-between">
             <div className="text-[12px] font-semibold text-ink">Mitglieder</div>
-            <Link to="/members" className="text-[11px] font-semibold text-amber">
-              12 aktiv →
-            </Link>
+            <span className="text-[11px] font-semibold text-amber">12 aktiv →</span>
           </div>
           <div className="mt-3.5 flex flex-wrap gap-1.5">
             {members.slice(0, 7).map((m) => (
@@ -171,13 +201,21 @@ export default function Dashboard() {
                 <span className="text-[11px] font-medium">{m.name.split(' ')[0]}</span>
               </div>
             ))}
-            <Link to="/members" className="rounded-full bg-ink px-2.5 py-1.5 text-[11px] font-semibold text-bg">
+            <span className="rounded-full bg-ink px-2.5 py-1.5 text-[11px] font-semibold text-bg">
               +5 weitere
-            </Link>
+            </span>
           </div>
           <div className="flex-1" />
           <div className="mt-4 border-t border-black/10 pt-4">
-            <div className="mb-2 text-[11px] font-semibold text-ink-soft">Top Pudler · Mai</div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                navigate('/stats')
+              }}
+              className="mb-2 text-[11px] font-semibold text-ink-soft hover:text-ink"
+            >
+              Top Pudler · Mai →
+            </button>
             {topPudler.slice(0, 3).map(([n, e, p], i) => (
               <div key={i} className="mt-1.5 flex items-center gap-2.5">
                 <span className="w-16 text-[11px] font-medium">{n.split(' ')[0]} {n.split(' ')[1]?.[0]}.</span>
