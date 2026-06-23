@@ -4,15 +4,17 @@
 
 Webapp für Kegelclubs zur Verwaltung von Strafen, Mitgliedern, Beiträgen, Terminen und Vereinsleben.
 
-**Stack:** Python (FastAPI) · Supabase (PostgreSQL) · Jinja2 / HTMX / Alpine.js · Tailwind CSS (PostCSS)
+**Stack:** Supabase (PostgreSQL + Auth + Edge Functions) · React + Vite · Tailwind CSS · Resend (E-Mail)
 
-**Entwicklung:** Lokale Entwicklung via localhost. Frontend-Prototyp als statische App auf **Render** gehostet (kostenlos). Backend ab Phase 3 ebenfalls auf Render (Free Tier). Kein Azure.
+**Entwicklung:** Lokale Entwicklung via localhost. Frontend als statische App auf **Render** (Free Tier). Backend und Datenbank auf **Supabase Free Plan** (Edge Functions + Auth + PostgreSQL). Kein Azure, kein separater Backend-Server.
 
 ---
 
 ## Design-Konzept
 
 Das UI/UX-Design und das Frontend werden vollständig, iterativ und direkt im Code mit **Claude Code** entwickelt. Das Design basiert auf dem **Calm Bento**-Design-System (`design_system/calm.jsx`): warmes Off-White, große gerundete Karten, zurückhaltende Farbblöcke (Sage / Terracotta / Navy).
+
+> **Hinweis Frontend-Technologie:** HTMX + Jinja2/Alpine.js entfällt, da kein traditioneller Python-Server mehr existiert. Das Frontend ist eine React+Vite-SPA (identisch mit dem Prototyp aus Phase 1). Der Prototyp ist also nicht nur Wegwerfcode — er wird direkt zur Produktions-App weiterentwickelt.
 
 ### Menü- & Navigationsstruktur
 
@@ -46,9 +48,11 @@ Das UI/UX-Design und das Frontend werden vollständig, iterativ und direkt im Co
 
 **Ziel:** Vollständig klickbarer Prototyp aller Screens mit Mock-Daten — ohne Backend-Logik. Dient zur vollständigen UX-Optimierung und Feinabstimmung bevor die eigentliche Implementierung beginnt.
 
+> Der Prototyp ist kein Wegwerfcode — er wird direkt zur Produktions-App weiterentwickelt. Phase 3+ ersetzt die Mock-Daten durch echte Supabase-Aufrufe, ohne die Komponenten grundlegend umzubauen.
+
 ### Technologie
 
-- **React + Vite** als eigenständige App in `/prototype/` — kein FastAPI nötig
+- **React + Vite** als eigenständige App in `/prototype/` — kein Backend nötig
 - **Design-System:** Calm Bento aus `design_system/calm.jsx` — Farbpalette, Typographie, Card-Komponenten werden direkt übernommen
 - **Mock-Daten:** Hardcoded in `/prototype/src/mock/data.js`
 - **Navigation:** React Router — alle URL-Übergänge und Navigationspunkte sind klickbar
@@ -141,69 +145,78 @@ Der Prototyp kann ohne Backend als kostenlose statische App auf Render gehostet 
 
 ## Phase 2 — Projektstruktur & Supabase-Schema
 
-**Ziel:** FastAPI-Grundgerüst aufsetzen, Supabase lokal einrichten, PostgreSQL-Schema anlegen.
+**Ziel:** Supabase-Projekt einrichten, PostgreSQL-Schema anlegen, Edge-Function-Grundgerüst aufsetzen.
 
 ### 2.1 Projektstruktur
 
 ```
 kegelkasse/
-├── app/
-│   ├── main.py
-│   ├── config.py                # Umgebungsvariablen via python-dotenv
-│   ├── database/
-│   │   ├── supabase.py          # Supabase-Client-Wrapper
-│   │   └── models.py            # Pydantic-Modelle
-│   ├── routers/
-│   │   ├── auth.py
-│   │   ├── members.py
-│   │   ├── groups.py
-│   │   ├── penalties.py
-│   │   ├── sessions.py
-│   │   ├── calendar.py
-│   │   ├── treasury.py
-│   │   ├── awards.py
-│   │   ├── rulebook.py
-│   │   └── notifications.py
-│   ├── services/
-│   │   ├── auth_service.py
-│   │   ├── email_service.py
-│   │   ├── penalty_service.py
-│   │   ├── calendar_service.py
-│   │   ├── treasury_service.py
-│   │   ├── csv_import_service.py
-│   │   ├── awards_service.py
-│   │   └── scheduler_service.py
-│   ├── templates/
-│   └── static/
-│       ├── css/
-│       ├── js/
-│       └── icons/
 ├── supabase/
-│   └── migrations/
-│       └── 001_initial_schema.sql
-├── prototype/                   # Phase 1 — klickbarer Prototyp
-├── tests/
-├── requirements.txt
+│   ├── config.toml              # Supabase CLI Konfiguration
+│   ├── migrations/
+│   │   └── 001_initial_schema.sql
+│   └── functions/               # Supabase Edge Functions (Deno/TypeScript)
+│       ├── _shared/
+│       │   ├── supabase.ts      # Supabase-Client für Edge Functions
+│       │   └── resend.ts        # Resend E-Mail-Helper
+│       ├── session-approve/     # Session genehmigen + Schulden buchen
+│       ├── csv-import/          # CSV-Import Sparkasse-Format
+│       ├── awards-calculate/    # Award-Berechnung nach Session-Genehmigung
+│       ├── monthly-fee/         # Monatsbeitrag buchen (via pg_cron)
+│       ├── debt-reminder/       # Wöchentlicher Schulden-Reminder (via pg_cron)
+│       └── send-email/          # Zentraler E-Mail-Versand via Resend
+├── src/                         # React+Vite Frontend (aus Phase 1 weiterentwickelt)
+│   ├── main.jsx
+│   ├── App.jsx
+│   ├── design/
+│   │   └── calm.js
+│   ├── components/
+│   ├── pages/
+│   ├── hooks/
+│   │   └── useSupabase.js       # Supabase-Client-Hook
+│   └── lib/
+│       └── supabase.js          # Supabase JS Client Initialisierung
+├── index.html
+├── vite.config.js
+├── package.json
 └── .env.example
 ```
 
+> **Kein Python-Backend mehr.** Alle Geschäftslogik liegt entweder direkt im React-Frontend (via Supabase JS Client + Row Level Security) oder in Supabase Edge Functions (Deno/TypeScript) für komplexe Operationen, die nicht sicher im Client laufen können.
+
 ### 2.2 Supabase PostgreSQL-Schema
 
-**Tabelle: `users`**
+**Tabelle: `profiles`** *(ergänzt `auth.users` von Supabase Auth)*
 ```sql
-CREATE TABLE users (
-  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email               TEXT UNIQUE NOT NULL,
-  first_name          TEXT NOT NULL,
-  last_name           TEXT NOT NULL,
-  password_hash       TEXT NOT NULL,
-  email_verified      BOOLEAN DEFAULT FALSE,
-  verification_token  TEXT,
-  created_at          TIMESTAMPTZ DEFAULT now()
+CREATE TABLE profiles (
+  id          UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  first_name  TEXT NOT NULL,
+  last_name   TEXT NOT NULL,
+  created_at  TIMESTAMPTZ DEFAULT now()
 );
+
+-- Trigger: Profil automatisch anlegen wenn User sich registriert
+CREATE OR REPLACE FUNCTION handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO profiles (id, first_name, last_name)
+  VALUES (
+    NEW.id,
+    NEW.raw_user_meta_data->>'first_name',
+    NEW.raw_user_meta_data->>'last_name'
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION handle_new_user();
 ```
 
-> `first_name` und `last_name` sind Pflichtfelder bei der Registrierung. Der vollständige Name wird im CSV-Import als sekundärer Matching-Schlüssel verwendet (case-insensitiv, normalisiert).
+> `auth.users` (von Supabase verwaltet) enthält E-Mail, Passwort-Hash, E-Mail-Verifizierungsstatus und Auth-Token. `profiles` enthält nur die app-spezifischen Zusatzdaten.  
+> `first_name` und `last_name` werden bei der Registrierung als `raw_user_meta_data` mitgegeben und per Trigger in `profiles` übertragen. Der vollständige Name wird im CSV-Import als sekundärer Matching-Schlüssel verwendet (case-insensitiv, normalisiert).  
+> Alle anderen Tabellen referenzieren `auth.users(id)` über die `profiles`-UUID.
 
 **Tabelle: `groups`**
 ```sql
@@ -533,29 +546,33 @@ npm install -g supabase
 supabase start
 # → PostgreSQL auf localhost:54322
 # → Supabase Studio auf http://localhost:54323
+# → API auf http://localhost:54321
 
 # Schema anlegen
 supabase db reset   # führt alle migrations/ aus
 
-# FastAPI starten
-pip install -r requirements.txt
-python app/main.py
-# → http://localhost:8000
+# Edge Functions lokal testen
+supabase functions serve
+
+# Frontend starten
+npm install
+npm run dev
+# → http://localhost:5173
 ```
 
-**`.env.example`:**
+**`.env.example`** (für lokale Entwicklung — Werte aus `supabase start` Output):
 ```
-SUPABASE_URL=http://localhost:54321
-SUPABASE_ANON_KEY=...
+VITE_SUPABASE_URL=http://localhost:54321
+VITE_SUPABASE_ANON_KEY=...
 SUPABASE_SERVICE_KEY=...
-DATABASE_URL=postgresql://postgres:postgres@localhost:54322/postgres
-JWT_SECRET=...
-SENDGRID_API_KEY=
-SENDGRID_FROM_EMAIL=
+RESEND_API_KEY=
+RESEND_FROM_EMAIL=noreply@kegelkasse.de
 ENVIRONMENT=development
 ```
 
-> Mit `ENVIRONMENT=development` werden E-Mails nur in der Konsole geloggt.
+> Mit `ENVIRONMENT=development` werden E-Mails nur in der Konsole geloggt (kein echter Resend-Aufruf).  
+> `VITE_`-Prefix macht Variablen im React-Frontend via `import.meta.env.VITE_*` verfügbar.  
+> `SUPABASE_SERVICE_KEY` (ohne VITE-Prefix) bleibt serverseitig in Edge Functions — nie im Frontend exponieren.
 
 ---
 
@@ -564,10 +581,10 @@ ENVIRONMENT=development
 **Ziel:** Registrierung, Login, E-Mail-Verifizierung, Gruppenanlage mit Setup-Wizard, Einladungslink, Rollenverwaltung.
 
 ### Features
-- Registrierung mit E-Mail, **Vorname, Nachname** + Passwort (`bcrypt` via `passlib`) — Pflichtfelder
-- E-Mail-Verifizierung per Token-Link (Ablauf: 24 h)
-- Login per E-Mail/Passwort → JWT-Session-Cookie (httpOnly, SameSite=Strict)
-- Passwort-Reset-Flow (Token-Link per E-Mail)
+- Registrierung mit E-Mail, **Vorname, Nachname** + Passwort — vollständig über **Supabase Auth** (`supabase.auth.signUp()`)
+- E-Mail-Verifizierung: Supabase Auth sendet Verifizierungslink via **Resend** (SMTP-Integration in Supabase Dashboard konfiguriert)
+- Login per E-Mail/Passwort → Supabase Session (JWT automatisch verwaltet via `@supabase/supabase-js`)
+- Passwort-Reset-Flow: Supabase Auth sendet Reset-Link via Resend
 - Gruppe erstellen → Ersteller wird automatisch Admin → **Setup-Wizard startet automatisch**
 - Eindeutiger Einladungslink (`/join/{invite_token}`) — Token reset-fähig durch Admin/Präsident
 
@@ -798,9 +815,9 @@ Nicht berechtigte Sektionen werden ausgeblendet, nicht nur gesperrt.
 | `new_poll` · `poll_closing_soon` · `poll_closed` | Alle / noch nicht Abgestimmt |
 
 ### Implementierung
-- SendGrid (Free Tier)
-- Jinja2-Templates für E-Mails (HTML + Plain-Text-Fallback)
-- APScheduler für geplante E-Mails
+- **Resend** für den transaktionalen E-Mail-Versand (kostenlos bis 3.000 Mails/Monat)
+- E-Mail-Templates als HTML-Strings in der Edge Function `send-email/` (kein Jinja2)
+- Geplante Benachrichtigungen (`debt_reminder`, `monthly_summary`) via **pg_cron** — cron-Job in Supabase ruft die Edge Function auf
 - Toggles pro Benachrichtigungstyp und Gruppe in den Kontoeinstellungen
 
 ---
@@ -872,7 +889,7 @@ Phase 10 →  Hardening, Tests, Sicherheit
 | **Push-Benachrichtigungen** | Web Push via `pywebpush` |
 | **Kommentarfunktion** | Kurze Kommentare unter Sessions/Events |
 | **Multi-Bank CSV-Import** | DKB- und ING-Format zusätzlich |
-| **Cloud-Deployment** | Supabase Cloud (Free Tier) + Railway / Render für FastAPI |
+| **Supabase Pro** | Upgrade auf Supabase Pro für mehr Edge Function Invocations und DB-Größe |
 
 ---
 
@@ -880,17 +897,15 @@ Phase 10 →  Hardening, Tests, Sicherheit
 
 | Bereich | Wahl | Begründung |
 |---|---|---|
-| Backend | FastAPI | Schnell, Pydantic-nativ, async-fähig |
-| Templating | Jinja2 + HTMX | Serverseitiges Rendering, reaktiv ohne SPA-Overhead |
-| Interaktivität | Alpine.js | Leichtgewichtig, keine Build-Pipeline nötig |
+| Frontend | React + Vite | Konsistent mit Phase-1-Prototyp; SPA passt zu statischem Hosting |
 | CSS | Tailwind CSS (PostCSS-Build) | Utility-first, kein generisches Bootstrap-Look |
-| Auth | passlib[bcrypt] + python-jose (JWT) | Battle-tested |
-| DB | Supabase (PostgreSQL) | Managed Postgres, Studio-UI, local dev via CLI |
-| DB-Client | supabase-py oder asyncpg | Direkter PostgreSQL-Zugriff, kein ORM-Overhead |
-| E-Mail | SendGrid (Free Tier) | 100 Mails/Tag kostenlos |
-| Scheduling | APScheduler (in-process) | Direkt in FastAPI, kein separater Dienst |
-| Markdown | python-markdown oder mistune | Vereinsregelwerk-Rendering |
-| CSV-Parsing | Python stdlib `csv` | Sparkasse-CSV-Import, kein Pandas-Overhead |
-| Prototyp | React + Vite | JSX-kompatibel mit Design-System (calm.jsx) |
+| Auth | Supabase Auth | Eingebaut — E-Mail-Verifizierung, JWT, Passwort-Reset ohne eigenen Server |
+| DB | Supabase (PostgreSQL) | Managed Postgres, Studio-UI, RLS, local dev via CLI |
+| DB-Client (Frontend) | @supabase/supabase-js | Offizieller Client, kompatibel mit Supabase Auth + RLS |
+| Backend-Logik | Supabase Edge Functions (Deno/TS) | Für Operationen, die Service-Role-Key brauchen (CSV-Import, Awards, Schuldenbuchen) |
+| E-Mail | Resend | Einfache API, 3.000 Mails/Monat kostenlos; Supabase Auth nutzt Resend per SMTP-Config |
+| Scheduling | pg_cron (Supabase Extension) | Cron-Jobs direkt in PostgreSQL, triggern Edge Functions — kein separater Dienst |
+| Markdown | react-markdown | Vereinsregelwerk-Rendering im Browser |
+| CSV-Parsing | Papa Parse (JS) | Sparkasse-CSV-Import, läuft in Edge Function oder Client |
 | Hosting (Frontend) | Render Static Web Service | Kostenlos, Git-Integration, auto-deploy bei Push |
-| Hosting (Backend) | Render Web Service (Free Tier) | Ab Phase 3, FastAPI via Uvicorn |
+| Hosting (Backend + DB) | Supabase Free Plan | Edge Functions + Auth + PostgreSQL + Storage in einem |
