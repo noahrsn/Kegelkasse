@@ -1,0 +1,136 @@
+@import 'tailwindcss';
+
+/* ── Calm Bento Design Tokens ─────────────────────────────────────────── */
+@theme {
+  --color-bg: #f3f0eb;
+  --color-ink: #1c1a17;
+  --color-ink-soft: #5c574e;
+  --color-ink-dim: #9a948a;
+  --color-card: #fbfaf6;
+  --color-card-edge: #e5e1d8;
+
+  --color-sage: #5e7a5a;
+  --color-sage-bg: #e2ead8;
+  --color-terra: #b56546;
+  --color-terra-bg: #f5dccd;
+  --color-navy: #2b3a55;
+  --color-navy-bg: #d8dde7;
+  --color-cream: #efe4d0;
+  --color-amber: #b07e2a;
+  --color-amber-bg: #f7eacf;
+
+  --font-sans: 'Geist', system-ui, sans-serif;
+  --font-display: 'Fraunces', 'Geist', serif;
+  --font-mono: 'Geist Mono', ui-monospace, monospace;
+
+  --radius-card: 24px;
+  --radius-soft: 16px;
+}
+
+/* ── Base ─────────────────────────────────────────────────────────────── */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+input,
+textarea,
+select {
+  font-family: inherit;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Subtle scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #d8d3c8;
+  border-radius: 100px;
+  border: 3px solid var(--color-bg);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ── Animations ───────────────────────────────────────────────────────── */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-rise {
+  animation: rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.animate-fade {
+  animation: fade 0.3s ease both;
+}
+.animate-sheet {
+  animation: sheet-up 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.animate-pop {
+  animation: pop 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-rise,
+  .animate-fade,
+  .animate-sheet,
+  .animate-pop {
+    animation: none;
+  }
+}
