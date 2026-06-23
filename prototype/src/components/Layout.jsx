@@ -23,6 +23,7 @@ const primary = [
 const more = [
   { to: '/members', label: 'Mitglieder', icon: UsersIcon },
   { to: '/penalties', label: 'Strafenkatalog', icon: ListIcon },
+  { to: '/rulebook', label: 'Regelwerk', icon: BookIcon },
   { to: '/polls', label: 'Abstimmungen', icon: PollIcon },
   { to: '/stats', label: 'Statistiken', icon: TrophyIcon },
   { to: '/settings', label: 'Club-Einstellungen', icon: GearIcon },
@@ -421,6 +422,14 @@ function ListIcon(p) {
   return (
     <I {...p}>
       <path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01" />
+    </I>
+  )
+}
+function BookIcon(p) {
+  return (
+    <I {...p}>
+      <path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2V5Z" />
+      <path d="M4 19a2 2 0 0 0 2 2h13M8 7h7M8 11h7" />
     </I>
   )
 }

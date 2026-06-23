@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Card, Button, PageTitle, Field, Input, Select, Tabs, Avatar, Empty } from '../components/ui'
 import { ROLE_LABEL, cx } from '../design/calm'
 import { club as mockClub, members as mockMembers, penalties as mockPenalties } from '../mock/data'
@@ -11,6 +11,7 @@ import {
   updateMemberRole,
   listPenalties,
   resetInvite,
+  saveRulebook,
 } from '../lib/api.js'
 import { InviteBox } from './Members'
 
@@ -43,7 +44,11 @@ export default function Settings() {
     [mockMode, role],
   )
 
-  const [tab, setTab] = useState(tabs[0]?.key)
+  const [searchParams] = useSearchParams()
+  const wantTab = searchParams.get('tab')
+  const [tab, setTab] = useState(
+    tabs.some((t) => t.key === wantTab) ? wantTab : tabs[0]?.key,
+  )
   useEffect(() => {
     if (!tabs.some((t) => t.key === tab)) setTab(tabs[0]?.key)
   }, [tabs, tab])
@@ -97,7 +102,18 @@ export default function Settings() {
         {tab === 'finance' && <Finance group={group} onSave={save} mockMode={mockMode} />}
         {tab === 'penalties' && <PenaltiesTab mockMode={mockMode} groupId={activeGroupId} />}
         {tab === 'events' && <EventsTab />}
-        {tab === 'rulebook' && <Rulebook group={group} onSave={save} mockMode={mockMode} />}
+        {tab === 'rulebook' && (
+          <Rulebook
+            group={group}
+            mockMode={mockMode}
+            onSave={async (patch) => {
+              if (mockMode) return
+              await saveRulebook(activeGroupId, patch.rulebook_content)
+              const g = await getGroup(activeGroupId)
+              setGroup(g)
+            }}
+          />
+        )}
         {tab === 'members' && <MembersTab mockMode={mockMode} groupId={activeGroupId} canEdit={mockMode || role === 'admin'} />}
         {tab === 'invite' && (
           <Card>
@@ -297,12 +313,19 @@ function Rulebook({ group, onSave }) {
   return (
     <div className="space-y-4">
       <Card>
-        <div className="mb-2 text-[12px] font-semibold text-ink-soft">Vereinsregelwerk (Markdown)</div>
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-[12px] font-semibold text-ink-soft">Vereinsregelwerk (Markdown)</span>
+          <Link to="/rulebook" className="text-[12px] font-semibold text-sage">Leseansicht →</Link>
+        </div>
         <textarea
           className="h-64 w-full resize-none rounded-2xl border border-card-edge bg-card p-4 font-mono text-[13px] outline-none focus:border-ink"
           value={ed.val.rulebook_content}
           onChange={ed.field('rulebook_content')}
+          placeholder="# Vereinsregelwerk&#10;&#10;## §1 …"
         />
+        <p className="mt-2 text-[11px] text-ink-dim">
+          Markdown: <code># Überschrift</code>, <code>**fett**</code>, <code>- Liste</code>.
+        </p>
       </Card>
       <SaveBar onDiscard={ed.discard} onSave={() => ed.save()} saving={ed.saving} saved={ed.saved} />
     </div>

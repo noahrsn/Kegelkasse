@@ -20,6 +20,7 @@ import Treasury from './pages/treasury/Treasury'
 import TreasuryImport from './pages/treasury/TreasuryImport'
 import TreasuryNew from './pages/treasury/TreasuryNew'
 import Penalties from './pages/Penalties'
+import Rulebook from './pages/Rulebook'
 import Members from './pages/Members'
 import Calendar from './pages/calendar/Calendar'
 import CalendarEvent from './pages/calendar/CalendarEvent'
@@ -71,6 +72,7 @@ export default function App() {
       <Route path="/treasury/import" element={<Protected><TreasuryImport /></Protected>} />
       <Route path="/treasury/new" element={<Protected><TreasuryNew /></Protected>} />
       <Route path="/penalties" element={<Protected><Penalties /></Protected>} />
+      <Route path="/rulebook" element={<Protected><Rulebook /></Protected>} />
       <Route path="/members" element={<Protected><Members /></Protected>} />
       <Route path="/calendar" element={<Protected><Calendar /></Protected>} />
       <Route path="/calendar/new" element={<Protected><CalendarNew /></Protected>} />

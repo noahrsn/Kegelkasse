@@ -1,20 +1,54 @@
-import { useState } from 'react'
-import { Card, Button, Badge, PageTitle, Field, Input } from '../components/ui'
+import { useEffect, useState } from 'react'
+import { Card, Button, Badge, PageTitle, Field, Input, Empty } from '../components/ui'
 import { Sheet } from '../components/Modal'
 import { cx, eur } from '../design/calm'
 import { penalties as seed } from '../mock/data'
+import { useAuth } from '../context/AuthContext.jsx'
+import { listPenalties, insertPenalty, updatePenalty } from '../lib/api.js'
 
 const ICONS = ['🎳', '🌊', '🎯', '⏰', '📱', '↔️', '🤬', '👟', '🍺', '🎂', '🥃', '💸']
+
+const EDIT_ROLES = ['admin', 'kassenwart']
 
 function priceLabel(p) {
   return p.manual ? 'Betrag manuell' : `${eur(p.amount)} €`
 }
 
+/* DB-Zeile <-> UI-Form. Die DB nutzt manual_amount, die UI manual. */
+function fromDb(p) {
+  return {
+    id: p.id,
+    name: p.name,
+    amount: p.amount == null ? null : Number(p.amount),
+    icon: p.icon,
+    active: p.active,
+    manual: p.manual_amount,
+  }
+}
+function toDb(draft) {
+  return {
+    name: draft.name.trim(),
+    icon: draft.icon,
+    manual_amount: draft.manual,
+    amount: draft.manual ? null : parseFloat(draft.amount) || 0,
+  }
+}
+
 export default function Penalties() {
-  const [list, setList] = useState(seed)
+  const { mockMode, activeGroupId, role } = useAuth()
+  const canEdit = mockMode || EDIT_ROLES.includes(role)
+
+  const [list, setList] = useState(mockMode ? seed : null)
   const [edit, setEdit] = useState(false)
   const [sheet, setSheet] = useState(null) // null | 'new' | penalty
   const [draft, setDraft] = useState({ name: '', amount: '', icon: '🎳', manual: false })
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (mockMode || !activeGroupId) return
+    setList(null)
+    listPenalties(activeGroupId).then((rows) => setList(rows.map(fromDb)))
+  }, [mockMode, activeGroupId])
 
   const openNew = () => {
     setDraft({ name: '', amount: '', icon: '🎳', manual: false })
@@ -24,23 +58,47 @@ export default function Penalties() {
     setDraft({ ...p, amount: p.amount == null ? '' : String(p.amount) })
     setSheet(p)
   }
-  const valid = draft.name && (draft.manual || draft.amount)
-  const save = () => {
-    const payload = {
-      name: draft.name,
-      icon: draft.icon,
-      manual: draft.manual,
-      amount: draft.manual ? null : parseFloat(draft.amount) || 0,
+  const valid = draft.name.trim() && (draft.manual || draft.amount)
+
+  const save = async () => {
+    if (!valid || saving) return
+    setSaving(true)
+    try {
+      if (mockMode) {
+        const db = toDb(draft)
+        const payload = { name: db.name, icon: db.icon, manual: db.manual_amount, amount: db.amount }
+        if (sheet === 'new') {
+          setList((l) => [...l, { ...payload, id: 'p' + Date.now(), active: true }])
+        } else {
+          setList((l) => l.map((p) => (p.id === sheet.id ? { ...p, ...payload } : p)))
+        }
+      } else if (sheet === 'new') {
+        const row = fromDb(await insertPenalty(activeGroupId, { ...toDb(draft), active: true }))
+        setList((l) => [...(l || []), row])
+      } else {
+        const row = fromDb(await updatePenalty(sheet.id, toDb(draft)))
+        setList((l) => l.map((p) => (p.id === sheet.id ? row : p)))
+      }
+      setSheet(null)
+    } catch (err) {
+      alert('Speichern fehlgeschlagen: ' + (err?.message || err))
+    } finally {
+      setSaving(false)
     }
-    if (sheet === 'new') {
-      setList((l) => [...l, { ...payload, id: 'p' + Date.now(), active: true }])
-    } else {
-      setList((l) => l.map((p) => (p.id === sheet.id ? { ...p, ...payload } : p)))
-    }
-    setSheet(null)
   }
-  const toggleActive = (id) =>
-    setList((l) => l.map((p) => (p.id === id ? { ...p, active: !p.active } : p)))
+
+  const toggleActive = async (p) => {
+    const next = !p.active
+    setList((l) => l.map((x) => (x.id === p.id ? { ...x, active: next } : x)))
+    if (mockMode) return
+    try {
+      await updatePenalty(p.id, { active: next })
+    } catch (err) {
+      // Rückgängig bei Fehler.
+      setList((l) => l.map((x) => (x.id === p.id ? { ...x, active: p.active } : x)))
+      alert('Konnte Status nicht ändern: ' + (err?.message || err))
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -48,65 +106,81 @@ export default function Penalties() {
         kicker="Strafenkatalog"
         title="Strafen"
         action={
-          <div className="flex gap-2">
-            <Button variant="soft" onClick={() => setEdit((v) => !v)}>
-              {edit ? 'Fertig' : 'Bearbeiten'}
-            </Button>
-            <Button onClick={openNew}>+ Strafe</Button>
-          </div>
+          canEdit ? (
+            <div className="flex gap-2">
+              <Button variant="soft" onClick={() => setEdit((v) => !v)}>
+                {edit ? 'Fertig' : 'Bearbeiten'}
+              </Button>
+              <Button onClick={openNew}>+ Strafe</Button>
+            </div>
+          ) : null
         }
       />
 
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        {list.map((p) => (
-          <Card key={p.id} className={cx('flex items-center gap-3', !p.active && 'opacity-55')}>
-            <span className="grid h-12 w-12 place-items-center rounded-2xl bg-bg text-2xl">{p.icon}</span>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold">{p.name}</span>
-                {p.manual && <Badge tone="amber">manuell</Badge>}
-                {!p.active && <Badge tone="neutral">inaktiv</Badge>}
+      {list == null ? (
+        <Card><div className="py-8 text-center text-sm text-ink-dim">Lädt…</div></Card>
+      ) : list.length === 0 ? (
+        <Card>
+          <Empty
+            icon="🎳"
+            title="Noch keine Strafen"
+            hint={canEdit ? 'Lege die erste Strafe für deinen Club an.' : 'Der Katalog ist noch leer.'}
+          />
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {list.map((p) => (
+            <Card key={p.id} className={cx('flex items-center gap-3', !p.active && 'opacity-55')}>
+              <span className="grid h-12 w-12 place-items-center rounded-2xl bg-bg text-2xl">{p.icon}</span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold">{p.name}</span>
+                  {p.manual && <Badge tone="amber">manuell</Badge>}
+                  {!p.active && <Badge tone="neutral">inaktiv</Badge>}
+                </div>
+                <div className="font-mono text-[13px] text-ink-soft">{priceLabel(p)}</div>
               </div>
-              <div className="font-mono text-[13px] text-ink-soft">{priceLabel(p)}</div>
-            </div>
-            {edit ? (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => openEdit(p)}
-                  className="rounded-full bg-bg px-3 py-1.5 text-[12px] font-semibold text-ink-soft"
-                >
-                  Bearbeiten
-                </button>
-                <button
-                  onClick={() => toggleActive(p.id)}
-                  className={cx(
-                    'rounded-full px-3 py-1.5 text-[12px] font-semibold',
-                    p.active ? 'bg-terra-bg text-terra' : 'bg-sage-bg text-sage',
-                  )}
-                >
-                  {p.active ? 'Deaktivieren' : 'Aktivieren'}
-                </button>
-              </div>
-            ) : p.manual ? (
-              <span className="text-[12px] font-semibold text-amber">€ ?</span>
-            ) : (
-              <span className="font-mono text-lg font-semibold tnum">{eur(p.amount)}</span>
-            )}
-          </Card>
-        ))}
-      </div>
+              {edit && canEdit ? (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => openEdit(p)}
+                    className="rounded-full bg-bg px-3 py-1.5 text-[12px] font-semibold text-ink-soft"
+                  >
+                    Bearbeiten
+                  </button>
+                  <button
+                    onClick={() => toggleActive(p)}
+                    className={cx(
+                      'rounded-full px-3 py-1.5 text-[12px] font-semibold',
+                      p.active ? 'bg-terra-bg text-terra' : 'bg-sage-bg text-sage',
+                    )}
+                  >
+                    {p.active ? 'Deaktivieren' : 'Aktivieren'}
+                  </button>
+                </div>
+              ) : p.manual ? (
+                <span className="text-[12px] font-semibold text-amber">€ ?</span>
+              ) : (
+                <span className="font-mono text-lg font-semibold tnum">{eur(p.amount)}</span>
+              )}
+            </Card>
+          ))}
+        </div>
+      )}
 
-      <p className="text-center text-[12px] text-ink-dim">
-        Strafen werden nie gelöscht, nur deaktiviert — für einen lückenlosen Verlauf.
-      </p>
+      {canEdit && (
+        <p className="text-center text-[12px] text-ink-dim">
+          Strafen werden nie gelöscht, nur deaktiviert — für einen lückenlosen Verlauf.
+        </p>
+      )}
 
       <Sheet
         open={sheet != null}
         onClose={() => setSheet(null)}
         title={sheet === 'new' ? 'Neue Strafe' : 'Strafe bearbeiten'}
         footer={
-          <Button className="w-full" onClick={save} disabled={!valid}>
-            Speichern
+          <Button className="w-full" onClick={save} disabled={!valid || saving}>
+            {saving ? 'Speichert…' : 'Speichern'}
           </Button>
         }
       >

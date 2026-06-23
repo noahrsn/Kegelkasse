@@ -42,6 +42,55 @@ export async function insertPenalties(groupId, rows) {
   if (error) throw error
 }
 
+/* Einzelne Strafe anlegen und mit DB-Werten (inkl. id) zurückgeben. */
+export async function insertPenalty(groupId, row) {
+  const { data, error } = await supabase
+    .from('penalties_catalog')
+    .insert({ ...row, group_id: groupId })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+/* Strafe bearbeiten / (de)aktivieren — nie löschen (Audit-Trail). */
+export async function updatePenalty(id, patch) {
+  const { data, error } = await supabase
+    .from('penalties_catalog')
+    .update(patch)
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+/* Vereinsregelwerk speichern (RPC stempelt Editor + Zeitpunkt; nur admin/präsident). */
+export async function saveRulebook(groupId, content) {
+  const { data, error } = await supabase.rpc('set_rulebook', {
+    p_group_id: groupId,
+    p_content: content,
+  })
+  if (error) throw error
+  return data // last_edited_at
+}
+
+/* Regelwerk + Editor-Name für die Leseansicht laden. */
+export async function getRulebook(groupId) {
+  const { data, error } = await supabase
+    .from('groups')
+    .select('rulebook_content, rulebook_last_edited_at, editor:rulebook_last_edited_by(first_name, last_name)')
+    .eq('id', groupId)
+    .maybeSingle()
+  if (error) throw error
+  if (!data) return null
+  return {
+    content: data.rulebook_content || '',
+    editedAt: data.rulebook_last_edited_at,
+    editedBy: data.editor ? `${data.editor.first_name} ${data.editor.last_name}`.trim() : null,
+  }
+}
+
 export async function insertEvent(groupId, createdBy, row) {
   const { error } = await supabase
     .from('events')
