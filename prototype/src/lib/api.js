@@ -101,13 +101,14 @@ export async function insertEvent(groupId, createdBy, row) {
 export async function listMembers(groupId) {
   const { data, error } = await supabase
     .from('group_members')
-    .select('id, role, user_id, profiles(first_name, last_name)')
+    .select('id, role, user_id, iban, profiles(first_name, last_name)')
     .eq('group_id', groupId)
   if (error) throw error
   return (data ?? []).map((m) => ({
     id: m.id,
     userId: m.user_id,
     role: m.role,
+    iban: m.iban || '',
     name: m.profiles ? `${m.profiles.first_name} ${m.profiles.last_name}`.trim() : '—',
   }))
 }
@@ -346,4 +347,185 @@ export function recurrenceFromPreset(preset) {
     default:
       return { recurrence_interval: 'monthly', recurrence_mode: 'nth_weekday', recurrence_weekday: 6, recurrence_nth: 4 }
   }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Phase 7 (Schritt 1) — Schulden, Kassenbuch & Aktivitätslog
+ * ────────────────────────────────────────────────────────────────────────── */
+
+/* Offene Schulden je Mitglied (View member_debts; RLS: Kassenwart/Admin alle,
+   Mitglied nur die eigene Zeile). */
+export async function listMemberDebts(groupId) {
+  const { data, error } = await supabase
+    .from('member_debts')
+    .select('*')
+    .eq('group_id', groupId)
+  if (error) throw error
+  return (data ?? []).map((m) => ({
+    userId: m.user_id,
+    name: m.name,
+    open: Number(m.open_amount) || 0,
+    openCount: Number(m.open_count) || 0,
+    penalties: Number(m.open_penalties) || 0,
+    fees: Number(m.open_fees) || 0,
+    nextDue: m.next_due,
+  }))
+}
+
+/* Offene Einzelposten eines Mitglieds (Detail-Sheet / Profil). */
+export async function listOpenDebts(groupId, userId) {
+  const { data, error } = await supabase
+    .from('debts')
+    .select('id, type, amount, description, due_date, created_at')
+    .eq('group_id', groupId)
+    .eq('user_id', userId)
+    .eq('paid', false)
+    .eq('cancelled', false)
+    .order('created_at', { ascending: true })
+  if (error) throw error
+  return (data ?? []).map((d) => ({
+    id: d.id,
+    type: d.type,
+    amount: Number(d.amount) || 0,
+    description: d.description,
+    dueDate: d.due_date,
+  }))
+}
+
+/* Kassenstand + Kennzahlen (RPC, für alle Mitglieder lesbar). */
+export async function getTreasury(groupId) {
+  const { data, error } = await supabase.rpc('treasury_summary', { p_group_id: groupId })
+  if (error) throw error
+  return data // jsonb: balance, opening_balance, opening_date, income_*, expense_*, last_csv_import
+}
+
+/* Kassenbuch-Liste (View transactions_view; nur Kassenwart/Admin). */
+export async function listTransactions(groupId) {
+  const { data, error } = await supabase
+    .from('transactions_view')
+    .select('*')
+    .eq('group_id', groupId)
+    .order('date', { ascending: false })
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return (data ?? []).map((t) => ({
+    id: t.id,
+    date: t.date,
+    type: t.type,
+    category: t.category,
+    amount: Number(t.amount) || 0,
+    description: t.description,
+    member: t.member_name || null,
+    source: t.source,
+  }))
+}
+
+/* Offene Schulden eines Mitglieds als bezahlt buchen (RPC). Rückgabe: Summe. */
+export async function markMemberPaid(groupId, userId) {
+  const { data, error } = await supabase.rpc('mark_member_paid', {
+    p_group_id: groupId,
+    p_user_id: userId,
+  })
+  if (error) throw error
+  return Number(data) || 0
+}
+
+/* Strafe außerhalb eines Kegelabends buchen (RPC). Rückgabe: debt id. */
+export async function bookManualPenalty(groupId, userId, amount, description) {
+  const { data, error } = await supabase.rpc('book_manual_penalty', {
+    p_group_id: groupId,
+    p_user_id: userId,
+    p_amount: amount,
+    p_description: description || null,
+  })
+  if (error) throw error
+  return data
+}
+
+/* Manuelle Kassenbuchung (RPC). amount: Einnahme positiv, Ausgabe negativ. */
+export async function bookTransaction(groupId, { date, category, amount, description }) {
+  const { data, error } = await supabase.rpc('book_transaction', {
+    p_group_id: groupId,
+    p_date: date,
+    p_category: category,
+    p_amount: amount,
+    p_description: description || null,
+  })
+  if (error) throw error
+  return data
+}
+
+/* Einzelnen Schuldposten stornieren (RPC). */
+export async function cancelDebt(debtId, reason) {
+  const { error } = await supabase.rpc('cancel_debt', { p_debt_id: debtId, p_reason: reason || null })
+  if (error) throw error
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Phase 7 (Schritt 2) — CSV-Import, Zahlungsabgleich & Gamification
+ * ────────────────────────────────────────────────────────────────────────── */
+
+/* Kontoauszug-Zeilen buchen + Zahlungen abgleichen (RPC). Rückgabe {inserted, skipped}.
+   rows: [{ date, amount, description, csv_row_hash, matched_user_id }] */
+export async function importTransactions(groupId, rows) {
+  const { data, error } = await supabase.rpc('import_transactions', {
+    p_group_id: groupId,
+    p_rows: rows,
+  })
+  if (error) throw error
+  return data || { inserted: 0, skipped: 0 }
+}
+
+/* Aktuelle Auszeichnungen (RPC, live berechnet). */
+export async function getAwards(groupId) {
+  const { data, error } = await supabase.rpc('group_awards', { p_group_id: groupId })
+  if (error) throw error
+  return data || []
+}
+
+/* Strafensumme je Monat (RPC) für das Diagramm. */
+export async function getMonthlyStats(groupId) {
+  const { data, error } = await supabase.rpc('stats_monthly', { p_group_id: groupId })
+  if (error) throw error
+  return data || []
+}
+
+/* Mitglieder-Statistik über genehmigte Kegelabende (View). */
+export async function listSessionStats(groupId) {
+  const { data, error } = await supabase
+    .from('member_session_stats')
+    .select('*')
+    .eq('group_id', groupId)
+  if (error) throw error
+  return (data ?? []).map((s) => ({
+    userId: s.user_id,
+    name: s.name,
+    totalSessions: Number(s.total_sessions) || 0,
+    attended: Number(s.attended) || 0,
+    penaltyTotal: Number(s.penalty_total) || 0,
+    rinnen: Number(s.rinnen_count) || 0,
+    late: Number(s.late_count) || 0,
+    paymentTotal: Number(s.payment_total) || 0,
+    attendance: Number(s.total_sessions) > 0 ? Number(s.attended) / Number(s.total_sessions) : 0,
+  }))
+}
+
+/* Aktivitätslog (View activity_log; Sichtbarkeit via RLS). */
+export async function listActivity(groupId, limit = 40) {
+  const { data, error } = await supabase
+    .from('activity_log')
+    .select('*')
+    .eq('group_id', groupId)
+    .order('timestamp', { ascending: false })
+    .limit(limit)
+  if (error) throw error
+  return (data ?? []).map((l) => ({
+    id: l.id,
+    actorName: l.actor_name,
+    action: l.action,
+    targetName: l.target_name,
+    details: l.details,
+    visibleTo: l.visible_to,
+    timestamp: l.timestamp,
+  }))
 }

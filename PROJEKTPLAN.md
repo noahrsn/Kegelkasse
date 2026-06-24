@@ -758,9 +758,31 @@ Nicht berechtigte Sektionen werden ausgeblendet, nicht nur gesperrt.
 
 ---
 
-## Phase 7 — Schulden, Dashboard & Gamification
+## Phase 7 — Schulden, Dashboard & Gamification ✅
 
 **Ziel:** Klare Übersicht für alle Rollen, Motivationssystem durch Awards und Statistiken.
+
+> **Status — vollständig umgesetzt ✅ (in zwei Schritten gebaut).**
+>
+> **Schritt 1** — Migration `007_phase7_debts_treasury_log.sql`: RLS-SELECT für
+> `transactions`/`logs`/`debt_transaction_links`; Views `member_debts`, `transactions_view`,
+> `activity_log` (security_invoker); RPC `treasury_summary()` (Kassenstand für alle Mitglieder);
+> SECURITY-DEFINER-RPCs `mark_member_paid`, `book_manual_penalty`, `book_transaction`,
+> `cancel_debt` (Storno, aus Phase 5 nachgezogen). Frontend: Dashboard, Mitglieder (Schulden,
+> als-bezahlt, Storno, manuelle Strafe), Kassenbuch (Saldo, Transaktionen, manuelle Buchung,
+> Staleness), Profil (eigene Schulden), neue Seite `/log` (Aktivitätslog) + Navigation.
+>
+> **Schritt 2** — Migration `008_phase7_csv_awards.sql`: RPC `import_transactions()`
+> (Sparkasse-CSV buchen, Dedup via `csv_row_hash`, Zahlungsabgleich älteste Schuld zuerst,
+> Verspätungsstrafe bei Zahlung nach Fälligkeit); View `member_session_stats`; RPCs
+> `group_awards()` (5 Auszeichnungen live) + `stats_monthly()`. Frontend: CSV-Parser
+> `lib/csv.js` (ISO-8859-1, sha256 via Web Crypto, keine Dependency), `TreasuryImport`
+> (Upload→Matching→Import), `Stats`, `StatsAlltime`, „Meine Titel" im Profil, Anwesenheit in
+> der Mitgliederliste. Mock-Modus bleibt überall erhalten.
+>
+> **Hinweis:** Eisenmann (längste Anwesenheitsserie) ist als „meiste Anwesenheiten" approximiert.
+> Awards werden live berechnet statt in `awards` persistiert (Persistenz/pg_cron-Trigger →
+> spätere Phase). E-Mail-Benachrichtigungen zu Zahlungen/Strafen → Phase 9.
 
 ### Mitglied-Ansicht
 - Gesamtschulden prominent (große Zahl), aufgeteilt nach Typ

@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, Button, Badge, PageTitle, Avatar, Tabs } from '../../components/ui'
+import { Card, Button, Badge, PageTitle, Avatar, Tabs, Empty } from '../../components/ui'
 import { eur, pal, cx } from '../../design/calm'
-import { club, transactions } from '../../mock/data'
+import { useAuth } from '../../context/AuthContext.jsx'
+import { getTreasury, listTransactions } from '../../lib/api.js'
+import { club, transactions as mockTx } from '../../mock/data'
 
 const CAT = {
   member_payment: { label: 'Mitgliedszahlung', tone: 'sage' },
@@ -12,13 +14,60 @@ const CAT = {
   other_expense: { label: 'Sonst. Ausgabe', tone: 'terra' },
 }
 
+function sameMonth(dateStr) {
+  if (!dateStr) return false
+  const d = new Date(dateStr)
+  const now = new Date()
+  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
+}
+
 export default function Treasury() {
   const navigate = useNavigate()
+  const { mockMode, activeGroupId } = useAuth()
   const [filter, setFilter] = useState('all')
 
-  const list = transactions.filter((t) =>
-    filter === 'all' ? true : filter === 'in' ? t.amount > 0 : t.amount < 0,
+  const [summary, setSummary] = useState(
+    mockMode
+      ? {
+          balance: club.treasuryBalance,
+          opening_balance: club.openingBalance,
+          opening_date: club.openingBalanceDate,
+          income_30d: 312.4,
+          expense_30d: -84.2,
+          last_csv_import: null,
+        }
+      : null,
   )
+  const [list, setList] = useState(
+    mockMode
+      ? mockTx.map((t) => ({
+          id: t.id,
+          date: t.date,
+          category: t.category,
+          amount: t.amount,
+          description: t.desc,
+          member: t.member,
+          source: t.source,
+        }))
+      : null,
+  )
+
+  useEffect(() => {
+    if (mockMode || !activeGroupId) return
+    setSummary(null)
+    setList(null)
+    getTreasury(activeGroupId).then(setSummary).catch((e) => console.error(e))
+    listTransactions(activeGroupId)
+      .then(setList)
+      .catch((e) => {
+        console.error(e)
+        setList([])
+      })
+  }, [mockMode, activeGroupId])
+
+  const data = list || []
+  const shown = data.filter((t) => (filter === 'all' ? true : filter === 'in' ? t.amount > 0 : t.amount < 0))
+  const stale = !sameMonth(summary?.last_csv_import)
 
   return (
     <div className="space-y-5">
@@ -41,44 +90,49 @@ export default function Treasury() {
           <div>
             <div className="text-[12px] font-semibold text-ink-soft">Aktueller Kassenstand</div>
             <div className="mt-1 font-display text-5xl font-medium tracking-tight tnum sm:text-6xl">
-              {eur(club.treasuryBalance)} <span className="text-3xl font-normal text-ink-dim">€</span>
+              {eur(summary?.balance ?? 0)} <span className="text-3xl font-normal text-ink-dim">€</span>
             </div>
-            <div className="mt-1 text-[12px] text-ink-dim">
-              Eröffnungssaldo {eur(club.openingBalance)} € · seit 01.01.2026
-            </div>
+            {summary && (
+              <div className="mt-1 text-[12px] text-ink-dim">
+                Eröffnungssaldo {eur(summary.opening_balance)} €
+                {summary.opening_date
+                  ? ` · seit ${new Date(summary.opening_date).toLocaleDateString('de-DE')}`
+                  : ''}
+              </div>
+            )}
           </div>
           <div className="flex gap-3">
             <div className="rounded-2xl bg-sage-bg px-4 py-3">
-              <div className="text-[10px] uppercase text-sage">Einnahmen</div>
-              <div className="font-mono text-lg font-semibold text-sage">+ 312,40 €</div>
+              <div className="text-[10px] uppercase text-sage">Ein · 30 Tage</div>
+              <div className="font-mono text-lg font-semibold text-sage">+ {eur(summary?.income_30d ?? 0)} €</div>
             </div>
             <div className="rounded-2xl bg-terra-bg px-4 py-3">
-              <div className="text-[10px] uppercase text-terra">Ausgaben</div>
-              <div className="font-mono text-lg font-semibold text-terra">− 84,20 €</div>
+              <div className="text-[10px] uppercase text-terra">Aus · 30 Tage</div>
+              <div className="font-mono text-lg font-semibold text-terra">
+                − {eur(Math.abs(summary?.expense_30d ?? 0))} €
+              </div>
             </div>
           </div>
-        </div>
-
-        {/* Verlaufsbalken nach Kategorie */}
-        <div className="mt-5 flex h-3 overflow-hidden rounded-full">
-          <div style={{ width: '46%', background: pal.sage }} />
-          <div style={{ width: '22%', background: pal.amber }} />
-          <div style={{ width: '20%', background: pal.terra }} />
-          <div style={{ width: '12%', background: pal.navy }} />
         </div>
       </Card>
 
       {/* Staleness-Hinweis */}
-      <Card tone="amber" className="flex items-center gap-3 py-3">
-        <span className="text-lg">📥</span>
-        <div className="flex-1 text-[12px] text-ink-soft">
-          <strong className="text-ink">Kein CSV-Import im Juni.</strong> Der Kassenstand könnte
-          veraltet sein.
-        </div>
-        <Button variant="soft" size="sm" onClick={() => navigate('/treasury/import')}>
-          Importieren
-        </Button>
-      </Card>
+      {stale && (
+        <Card tone="amber" className="flex items-center gap-3 py-3">
+          <span className="text-lg">📥</span>
+          <div className="flex-1 text-[12px] text-ink-soft">
+            <strong className="text-ink">
+              {summary?.last_csv_import
+                ? `Letzter CSV-Import: ${new Date(summary.last_csv_import).toLocaleDateString('de-DE')}.`
+                : 'Noch kein CSV-Import.'}
+            </strong>{' '}
+            Der Kassenstand könnte veraltet sein.
+          </div>
+          <Button variant="soft" size="sm" onClick={() => navigate('/treasury/import')}>
+            Importieren
+          </Button>
+        </Card>
+      )}
 
       {/* Transaktionen */}
       <div>
@@ -94,52 +148,53 @@ export default function Treasury() {
             onChange={setFilter}
           />
         </div>
-        <Card className="p-0">
-          {list.map((t, i) => {
-            const cat = CAT[t.category]
-            return (
-              <div
-                key={t.id}
-                className={cx(
-                  'flex items-center gap-3 p-4',
-                  i < list.length - 1 && 'border-b border-card-edge',
-                )}
-              >
-                <span
-                  className={cx(
-                    'grid h-10 w-10 place-items-center rounded-full text-base',
-                    t.amount > 0 ? 'bg-sage-bg text-sage' : 'bg-terra-bg text-terra',
-                  )}
+
+        {list == null ? (
+          <Card>
+            <div className="py-8 text-center text-sm text-ink-dim">Lädt…</div>
+          </Card>
+        ) : shown.length === 0 ? (
+          <Card>
+            <Empty icon="💶" title="Keine Buchungen" hint="Lege oben eine manuelle Buchung an oder importiere einen Kontoauszug." />
+          </Card>
+        ) : (
+          <Card className="p-0">
+            {shown.map((t, i) => {
+              const cat = CAT[t.category] ?? { label: t.category, tone: 'neutral' }
+              return (
+                <div
+                  key={t.id}
+                  className={cx('flex items-center gap-3 p-4', i < shown.length - 1 && 'border-b border-card-edge')}
                 >
-                  {t.amount > 0 ? '↓' : '↑'}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="truncate text-[14px] font-medium">{t.desc}</span>
+                  <span
+                    className={cx(
+                      'grid h-10 w-10 place-items-center rounded-full text-base',
+                      t.amount > 0 ? 'bg-sage-bg text-sage' : 'bg-terra-bg text-terra',
+                    )}
+                  >
+                    {t.amount > 0 ? '↓' : '↑'}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[14px] font-medium">{t.description || cat.label}</div>
+                    <div className="mt-0.5 flex items-center gap-2 text-[11px] text-ink-dim">
+                      <span>{new Date(t.date).toLocaleDateString('de-DE')}</span>
+                      <Badge tone={cat.tone}>{cat.label}</Badge>
+                      {t.source === 'csv' && <span className="text-ink-dim">CSV</span>}
+                    </div>
                   </div>
-                  <div className="mt-0.5 flex items-center gap-2 text-[11px] text-ink-dim">
-                    <span>{new Date(t.date).toLocaleDateString('de-DE')}</span>
-                    <Badge tone={cat.tone}>{cat.label}</Badge>
-                    {t.source === 'csv' && <span className="text-ink-dim">CSV</span>}
-                  </div>
+                  {t.member && (
+                    <div className="hidden sm:block">
+                      <Avatar name={t.member} size={26} />
+                    </div>
+                  )}
+                  <span className={cx('font-mono font-semibold tnum', t.amount > 0 ? 'text-sage' : 'text-terra')}>
+                    {t.amount > 0 ? '+' : '−'} {eur(Math.abs(t.amount))} €
+                  </span>
                 </div>
-                {t.member && (
-                  <div className="hidden sm:block">
-                    <Avatar name={t.member} size={26} />
-                  </div>
-                )}
-                <span
-                  className={cx(
-                    'font-mono font-semibold tnum',
-                    t.amount > 0 ? 'text-sage' : 'text-terra',
-                  )}
-                >
-                  {t.amount > 0 ? '+' : '−'} {eur(Math.abs(t.amount))} €
-                </span>
-              </div>
-            )
-          })}
-        </Card>
+              )
+            })}
+          </Card>
+        )}
       </div>
     </div>
   )

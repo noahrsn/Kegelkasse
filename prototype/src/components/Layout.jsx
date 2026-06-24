@@ -25,6 +25,7 @@ const more = [
   { to: '/penalties', label: 'Strafenkatalog', icon: ListIcon },
   { to: '/rulebook', label: 'Regelwerk', icon: BookIcon },
   { to: '/polls', label: 'Abstimmungen', icon: PollIcon },
+  { to: '/log', label: 'Aktivität', icon: BookIcon },
   { to: '/stats', label: 'Statistiken', icon: TrophyIcon },
   { to: '/settings', label: 'Club-Einstellungen', icon: GearIcon },
   { to: '/profile', label: 'Profil', icon: UserIcon },

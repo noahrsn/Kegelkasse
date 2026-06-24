@@ -1,28 +1,96 @@
-import { useState } from 'react'
-import { Card, Button, Badge, PageTitle, Avatar, Bar } from '../components/ui'
+import { useEffect, useState } from 'react'
+import { Card, Button, Badge, PageTitle, Avatar, Bar, Field, Input } from '../components/ui'
 import { Sheet } from '../components/Modal'
 import { cx, eur, pal, ROLE_LABEL } from '../design/calm'
+import { useAuth } from '../context/AuthContext.jsx'
+import {
+  listMembers,
+  listMemberDebts,
+  listOpenDebts,
+  listSessionStats,
+  markMemberPaid,
+  bookManualPenalty,
+  cancelDebt,
+} from '../lib/api.js'
 import { members as seed } from '../mock/data'
 
 const roleTone = { admin: 'navy', präsident: 'amber', kassenwart: 'sage', mitglied: 'neutral' }
+const debtColor = (d) => (d === 0 ? pal.sage : d > 15 ? pal.terra : pal.amber)
+
+const DEBT_TYPE = {
+  penalty: 'Strafe',
+  monthly_fee: 'Monatsbeitrag',
+  late_payment_fee: 'Verspätungsstrafe',
+  correction: 'Korrektur',
+  storno: 'Storno',
+}
+
+function fmtDate(d) {
+  return d ? new Date(d).toLocaleDateString('de-DE') : null
+}
 
 export default function Members() {
-  const [list, setList] = useState(seed)
+  const { mockMode, activeGroupId, role } = useAuth()
+  const canManage = role === 'admin' || role === 'kassenwart'
+
+  const [list, setList] = useState(
+    mockMode
+      ? seed.map((m) => ({
+          userId: m.id,
+          name: m.name,
+          role: m.role,
+          debt: m.debt,
+          attendance: m.attendance,
+          iban: m.iban,
+        }))
+      : null,
+  )
   const [sort, setSort] = useState('debt') // debt | name
   const [sel, setSel] = useState(null)
   const [inviteOpen, setInviteOpen] = useState(false)
 
-  const sorted = [...list].sort((a, b) =>
-    sort === 'debt' ? b.debt - a.debt : a.name.localeCompare(b.name),
-  )
-  const totalDebt = list.reduce((a, m) => a + m.debt, 0)
-
-  const markPaid = (id) => {
-    setList((l) => l.map((m) => (m.id === id ? { ...m, debt: 0 } : m)))
-    setSel(null)
+  const load = () => {
+    if (mockMode || !activeGroupId) return
+    Promise.all([
+      listMembers(activeGroupId),
+      listMemberDebts(activeGroupId),
+      listSessionStats(activeGroupId).catch(() => []),
+    ])
+      .then(([mem, debts, stats]) => {
+        const byUser = new Map(debts.map((d) => [d.userId, d]))
+        const statByUser = new Map(stats.map((s) => [s.userId, s]))
+        setList(
+          mem.map((m) => {
+            const d = byUser.get(m.userId)
+            const st = statByUser.get(m.userId)
+            return {
+              userId: m.userId,
+              name: m.name,
+              role: m.role,
+              iban: m.iban,
+              debt: d ? d.open : 0,
+              openCount: d ? d.openCount : 0,
+              penalties: d ? d.penalties : 0,
+              fees: d ? d.fees : 0,
+              nextDue: d ? d.nextDue : null,
+              attendance: st && st.totalSessions > 0 ? st.attendance : null,
+            }
+          }),
+        )
+      })
+      .catch((e) => {
+        console.error(e)
+        setList([])
+      })
   }
 
-  const debtColor = (d) => (d === 0 ? pal.sage : d > 15 ? pal.terra : pal.amber)
+  useEffect(load, [mockMode, activeGroupId])
+
+  const data = list || []
+  const sorted = [...data].sort((a, b) =>
+    sort === 'debt' ? b.debt - a.debt : a.name.localeCompare(b.name),
+  )
+  const totalDebt = data.reduce((a, m) => a + m.debt, 0)
 
   return (
     <div className="space-y-5">
@@ -35,7 +103,7 @@ export default function Members() {
       {/* Übersicht */}
       <div className="grid grid-cols-3 gap-3">
         <Card className="text-center">
-          <div className="font-display text-3xl font-medium tnum">{list.length}</div>
+          <div className="font-display text-3xl font-medium tnum">{data.length}</div>
           <div className="text-[11px] text-ink-dim">Mitglieder</div>
         </Card>
         <Card className="text-center">
@@ -44,7 +112,7 @@ export default function Members() {
         </Card>
         <Card className="text-center">
           <div className="font-display text-3xl font-medium tnum text-sage">
-            {list.filter((m) => m.debt === 0).length}
+            {data.filter((m) => m.debt === 0).length}
           </div>
           <div className="text-[11px] text-ink-dim">schuldenfrei</div>
         </Card>
@@ -60,89 +128,63 @@ export default function Members() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        {sorted.map((m) => (
-          <button key={m.id} onClick={() => setSel(m)} className="text-left">
-            <Card className="flex items-center gap-3 transition hover:border-ink/20">
-              <div className="relative">
-                <Avatar name={m.name} size={44} />
-                <span
-                  className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-card"
-                  style={{ background: debtColor(m.debt) }}
-                />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="truncate font-semibold">{m.name}</span>
-                  <Badge tone={roleTone[m.role]}>{ROLE_LABEL[m.role]}</Badge>
+      {list == null ? (
+        <Card>
+          <div className="py-8 text-center text-sm text-ink-dim">Lädt…</div>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {sorted.map((m) => (
+            <button key={m.userId} onClick={() => setSel(m)} className="text-left">
+              <Card className="flex items-center gap-3 transition hover:border-ink/20">
+                <div className="relative">
+                  <Avatar name={m.name} size={44} />
+                  <span
+                    className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-card"
+                    style={{ background: debtColor(m.debt) }}
+                  />
                 </div>
-                <div className="mt-1.5 flex items-center gap-2">
-                  <Bar value={m.attendance} color={pal.sage} />
-                  <span className="text-[11px] text-ink-dim">{Math.round(m.attendance * 100)}%</span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate font-semibold">{m.name}</span>
+                    <Badge tone={roleTone[m.role]}>{ROLE_LABEL[m.role]}</Badge>
+                  </div>
+                  {m.attendance != null ? (
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <Bar value={m.attendance} color={pal.sage} />
+                      <span className="text-[11px] text-ink-dim">{Math.round(m.attendance * 100)}%</span>
+                    </div>
+                  ) : (
+                    <div className="mt-1 text-[11px] text-ink-dim">
+                      {m.debt > 0
+                        ? `${m.openCount || 0} offen${m.nextDue ? ` · fällig ${fmtDate(m.nextDue)}` : ''}`
+                        : 'keine offenen Posten'}
+                    </div>
+                  )}
                 </div>
-              </div>
-              <div className="text-right">
-                <div
-                  className="font-mono text-base font-semibold tnum"
-                  style={{ color: debtColor(m.debt) }}
-                >
-                  {eur(m.debt)} €
+                <div className="text-right">
+                  <div className="font-mono text-base font-semibold tnum" style={{ color: debtColor(m.debt) }}>
+                    {eur(m.debt)} €
+                  </div>
+                  <div className="text-[10px] text-ink-dim">{m.debt === 0 ? 'bezahlt' : 'offen'}</div>
                 </div>
-                <div className="text-[10px] text-ink-dim">{m.debt === 0 ? 'bezahlt' : 'offen'}</div>
-              </div>
-            </Card>
-          </button>
-        ))}
-      </div>
-
-      {/* Mitglied-Detail (Kassenwart-Aktionen) */}
-      <Sheet
-        open={sel != null}
-        onClose={() => setSel(null)}
-        title={sel?.name}
-        subtitle={sel ? ROLE_LABEL[sel.role] : ''}
-        footer={
-          sel?.debt > 0 ? (
-            <Button variant="sage" className="w-full" onClick={() => markPaid(sel.id)}>
-              {eur(sel.debt)} € als bezahlt markieren
-            </Button>
-          ) : (
-            <Button variant="soft" className="w-full" onClick={() => setSel(null)}>
-              Schließen
-            </Button>
-          )
-        }
-      >
-        {sel && (
-          <div className="space-y-3">
-            <div className="flex items-center gap-3 rounded-2xl bg-bg p-4">
-              <Avatar name={sel.name} size={48} />
-              <div className="flex-1">
-                <div className="text-[12px] text-ink-dim">Offene Schulden</div>
-                <div
-                  className="font-display text-3xl font-medium tnum"
-                  style={{ color: debtColor(sel.debt) }}
-                >
-                  {eur(sel.debt)} €
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-[12px] text-ink-dim">Anwesenheit</div>
-                <div className="font-mono text-lg font-semibold text-sage">
-                  {Math.round(sel.attendance * 100)}%
-                </div>
-              </div>
-            </div>
-            <div className="rounded-2xl bg-bg p-4">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-dim">IBAN</div>
-              <div className="mt-1 font-mono text-[13px]">{sel.iban || '— nicht hinterlegt —'}</div>
-            </div>
-            <button className="w-full rounded-2xl border border-card-edge py-3 text-[13px] font-semibold text-ink-soft">
-              Strafe manuell buchen
+              </Card>
             </button>
-          </div>
-        )}
-      </Sheet>
+          ))}
+        </div>
+      )}
+
+      <MemberSheet
+        member={sel}
+        onClose={() => setSel(null)}
+        canManage={canManage}
+        mockMode={mockMode}
+        groupId={activeGroupId}
+        onChanged={() => {
+          load()
+          setSel(null)
+        }}
+      />
 
       {/* Einladen */}
       <Sheet
@@ -159,6 +201,217 @@ export default function Members() {
         <InviteBox />
       </Sheet>
     </div>
+  )
+}
+
+/* ── Mitglied-Detail mit Kassenwart-Aktionen ─────────────────────────────── */
+function MemberSheet({ member, onClose, canManage, mockMode, groupId, onChanged }) {
+  const [items, setItems] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [penaltyOpen, setPenaltyOpen] = useState(false)
+
+  useEffect(() => {
+    if (!member || mockMode) {
+      setItems(null)
+      return
+    }
+    setItems(null)
+    listOpenDebts(groupId, member.userId)
+      .then(setItems)
+      .catch((e) => {
+        console.error(e)
+        setItems([])
+      })
+  }, [member, mockMode, groupId])
+
+  if (!member) return <Sheet open={false} onClose={onClose} title="" />
+
+  const markPaid = async () => {
+    if (mockMode) return onChanged()
+    setBusy(true)
+    try {
+      await markMemberPaid(groupId, member.userId)
+      onChanged()
+    } catch (e) {
+      console.error(e)
+      alert(e.message || 'Fehlgeschlagen')
+      setBusy(false)
+    }
+  }
+
+  const storno = async (debtId) => {
+    if (mockMode) return
+    if (!window.confirm('Diesen Posten stornieren?')) return
+    setBusy(true)
+    try {
+      await cancelDebt(debtId, 'Storno durch Kassenwart')
+      onChanged()
+    } catch (e) {
+      console.error(e)
+      alert(e.message || 'Fehlgeschlagen')
+      setBusy(false)
+    }
+  }
+
+  return (
+    <>
+      <Sheet
+        open={member != null && !penaltyOpen}
+        onClose={onClose}
+        title={member.name}
+        subtitle={ROLE_LABEL[member.role]}
+        footer={
+          member.debt > 0 && canManage ? (
+            <Button variant="sage" className="w-full" disabled={busy} onClick={markPaid}>
+              {eur(member.debt)} € als bezahlt markieren
+            </Button>
+          ) : (
+            <Button variant="soft" className="w-full" onClick={onClose}>
+              Schließen
+            </Button>
+          )
+        }
+      >
+        <div className="space-y-3">
+          <div className="flex items-center gap-3 rounded-2xl bg-bg p-4">
+            <Avatar name={member.name} size={48} />
+            <div className="flex-1">
+              <div className="text-[12px] text-ink-dim">Offene Schulden</div>
+              <div className="font-display text-3xl font-medium tnum" style={{ color: debtColor(member.debt) }}>
+                {eur(member.debt)} €
+              </div>
+            </div>
+            {member.attendance != null && (
+              <div className="text-right">
+                <div className="text-[12px] text-ink-dim">Anwesenheit</div>
+                <div className="font-mono text-lg font-semibold text-sage">
+                  {Math.round(member.attendance * 100)}%
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Offene Posten (Echtmodus) */}
+          {!mockMode && (
+            <div className="rounded-2xl bg-bg p-3">
+              <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-dim">
+                Offene Posten
+              </div>
+              {items == null ? (
+                <div className="py-2 text-center text-[12px] text-ink-dim">Lädt…</div>
+              ) : items.length === 0 ? (
+                <div className="py-2 text-center text-[12px] text-ink-dim">Keine offenen Posten.</div>
+              ) : (
+                <div className="space-y-1.5">
+                  {items.map((d) => (
+                    <div key={d.id} className="flex items-center gap-2 rounded-xl bg-card px-3 py-2 text-[13px]">
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate">{d.description || DEBT_TYPE[d.type] || 'Posten'}</div>
+                        <div className="text-[11px] text-ink-dim">
+                          {DEBT_TYPE[d.type] || d.type}
+                          {d.dueDate ? ` · fällig ${fmtDate(d.dueDate)}` : ''}
+                        </div>
+                      </div>
+                      <span className="font-mono font-semibold tnum">{eur(d.amount)} €</span>
+                      {canManage && (
+                        <button
+                          onClick={() => storno(d.id)}
+                          disabled={busy}
+                          className="text-[12px] font-semibold text-terra hover:underline"
+                        >
+                          Storno
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="rounded-2xl bg-bg p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-dim">IBAN</div>
+            <div className="mt-1 font-mono text-[13px]">{member.iban || '— nicht hinterlegt —'}</div>
+          </div>
+
+          {canManage && (
+            <button
+              onClick={() => setPenaltyOpen(true)}
+              className="w-full rounded-2xl border border-card-edge py-3 text-[13px] font-semibold text-ink-soft"
+            >
+              Strafe manuell buchen
+            </button>
+          )}
+        </div>
+      </Sheet>
+
+      <ManualPenaltySheet
+        open={penaltyOpen}
+        member={member}
+        onClose={() => setPenaltyOpen(false)}
+        mockMode={mockMode}
+        groupId={groupId}
+        onBooked={() => {
+          setPenaltyOpen(false)
+          onChanged()
+        }}
+      />
+    </>
+  )
+}
+
+/* ── Manuelle Strafe buchen ──────────────────────────────────────────────── */
+function ManualPenaltySheet({ open, member, onClose, mockMode, groupId, onBooked }) {
+  const [amount, setAmount] = useState('')
+  const [desc, setDesc] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const save = async () => {
+    const val = Number(String(amount).replace(',', '.'))
+    if (!val || val <= 0) return
+    if (mockMode) return onBooked()
+    setBusy(true)
+    try {
+      await bookManualPenalty(groupId, member.userId, val, desc)
+      setAmount('')
+      setDesc('')
+      onBooked()
+    } catch (e) {
+      console.error(e)
+      alert(e.message || 'Fehlgeschlagen')
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title="Strafe manuell buchen"
+      subtitle={member ? `Für ${member.name}` : ''}
+      footer={
+        <Button className="w-full" disabled={busy || !amount} onClick={save}>
+          Strafe buchen
+        </Button>
+      }
+    >
+      <div className="space-y-4">
+        <Field label="Betrag (€)">
+          <Input
+            type="number"
+            step="0.01"
+            min="0"
+            inputMode="decimal"
+            placeholder="0,00"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+          />
+        </Field>
+        <Field label="Beschreibung" hint="z. B. Glas umgeworfen">
+          <Input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Grund der Strafe" />
+        </Field>
+      </div>
+    </Sheet>
   )
 }
 

@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Button, PageTitle, Field, Input, Textarea } from '../../components/ui'
 import { cx } from '../../design/calm'
+import { useAuth } from '../../context/AuthContext.jsx'
+import { bookTransaction } from '../../lib/api.js'
 
 const categories = [
   { key: 'member_payment', label: 'Mitgliedszahlung', type: 'in' },
@@ -11,22 +13,46 @@ const categories = [
   { key: 'other_expense', label: 'Sonst. Ausgabe', type: 'out' },
 ]
 
+const today = new Date().toISOString().slice(0, 10)
+
 export default function TreasuryNew() {
   const navigate = useNavigate()
+  const { mockMode, activeGroupId } = useAuth()
   const [type, setType] = useState('out')
   const [cat, setCat] = useState('event_expense')
+  const [amount, setAmount] = useState('')
+  const [date, setDate] = useState(today)
+  const [desc, setDesc] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
+
+  const submit = async (e) => {
+    e.preventDefault()
+    const val = Number(String(amount).replace(',', '.'))
+    if (!val || val <= 0) {
+      setError('Bitte einen Betrag größer 0 angeben.')
+      return
+    }
+    setError(null)
+    if (mockMode) return navigate('/treasury')
+    setBusy(true)
+    try {
+      // Ausgabe negativ, Einnahme positiv.
+      const signed = type === 'out' ? -Math.abs(val) : Math.abs(val)
+      await bookTransaction(activeGroupId, { date, category: cat, amount: signed, description: desc })
+      navigate('/treasury')
+    } catch (err) {
+      console.error(err)
+      setError(err.message || 'Buchung fehlgeschlagen.')
+      setBusy(false)
+    }
+  }
 
   return (
     <div className="space-y-5">
       <PageTitle kicker="Kassenbuch" title="Manuelle Buchung" />
 
-      <form
-        className="space-y-4"
-        onSubmit={(e) => {
-          e.preventDefault()
-          navigate('/treasury')
-        }}
-      >
+      <form className="space-y-4" onSubmit={submit}>
         {/* Ein/Aus */}
         <Card>
           <div className="grid grid-cols-2 gap-2">
@@ -60,10 +86,18 @@ export default function TreasuryNew() {
         <Card className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <Field label="Betrag (€)">
-              <Input type="number" step="0.01" placeholder="0,00" inputMode="decimal" />
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="0,00"
+                inputMode="decimal"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+              />
             </Field>
             <Field label="Datum">
-              <Input type="date" defaultValue="2026-06-23" />
+              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
             </Field>
           </div>
 
@@ -88,16 +122,23 @@ export default function TreasuryNew() {
           </Field>
 
           <Field label="Beschreibung">
-            <Textarea rows={3} placeholder="z. B. Bahngebühren Juni" />
+            <Textarea
+              rows={3}
+              placeholder="z. B. Bahngebühren Juni"
+              value={desc}
+              onChange={(e) => setDesc(e.target.value)}
+            />
           </Field>
         </Card>
+
+        {error && <div className="rounded-2xl bg-terra-bg px-4 py-3 text-[13px] text-terra">{error}</div>}
 
         <div className="flex gap-2">
           <Button type="button" variant="soft" size="lg" onClick={() => navigate('/treasury')}>
             Abbrechen
           </Button>
-          <Button type="submit" size="lg" className="flex-1">
-            Buchung speichern
+          <Button type="submit" size="lg" className="flex-1" disabled={busy}>
+            {busy ? 'Speichert…' : 'Buchung speichern'}
           </Button>
         </div>
       </form>
