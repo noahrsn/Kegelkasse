@@ -1,8 +1,10 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { Card, Button, Badge, Avatar, Field, Textarea, Input } from '../../components/ui'
 import { Sheet } from '../../components/Modal'
 import { cx, pal, creamLight } from '../../design/calm'
+import { useAuth } from '../../context/AuthContext.jsx'
+import { getEvent, listMembers, setRsvp, addEventGuest, removeEventGuest, deleteEvent } from '../../lib/api.js'
 import { eventDetail, currentUser } from '../../mock/data'
 
 export const RSVP = {
@@ -12,92 +14,135 @@ export const RSVP = {
   no_answer: { label: 'Keine Antwort', short: 'Keine Antwort', tone: 'neutral', dot: pal.inkDim },
 }
 
-export default function CalendarEvent() {
-  const navigate = useNavigate()
-  const ev = eventDetail
-  const noteRequired = ev.noteRequired
+const TYPE_LABEL = { single: 'Einzeltermin', recurring: 'Regeltermin', multi_day: 'Mehrtägig' }
 
-  const [myStatus, setMyStatus] = useState(ev.rsvpMode === 'opt_out' ? 'yes' : 'no_answer')
-  const [note, setNote] = useState('')
+export default function CalendarEvent() {
+  const { id } = useParams()
+  const { mockMode } = useAuth()
+  return mockMode ? <MockEvent /> : <LiveEvent eventId={id} />
+}
+
+/* ── Gemeinsame Präsentation ─────────────────────────────────────────────── */
+function EventView({
+  vm,
+  myStatus,
+  note,
+  onRespond,
+  onSaveNote,
+  onAddGuest,
+  onRemoveGuest,
+  canManage,
+  onEdit,
+  onDelete,
+  onStartSession,
+  busy,
+}) {
+  const navigate = useNavigate()
+  const noteRequired = vm.noteRequired
+
   const [noteSheet, setNoteSheet] = useState(null) // { status } | null
   const [draftNote, setDraftNote] = useState('')
-
-  const [myGuests, setMyGuests] = useState([])
   const [guestSheet, setGuestSheet] = useState(false)
   const [guestName, setGuestName] = useState('')
 
-  // Eigene Rückmeldung in die Liste einmischen
-  const responses = ev.responses.map((r) =>
-    r.name === currentUser.name
-      ? { ...r, status: myStatus, note: note || r.note, guests: myGuests }
-      : r,
-  )
-  const hasMe = ev.responses.some((r) => r.name === currentUser.name)
-  if (!hasMe) responses.push({ name: currentUser.name, status: myStatus, note, guests: myGuests })
-
   const grouped = {
-    yes: responses.filter((r) => r.status === 'yes'),
-    maybe: responses.filter((r) => r.status === 'maybe'),
-    no: responses.filter((r) => r.status === 'no'),
-    no_answer: responses.filter((r) => r.status === 'no_answer'),
+    yes: vm.responses.filter((r) => r.status === 'yes'),
+    maybe: vm.responses.filter((r) => r.status === 'maybe'),
+    no: vm.responses.filter((r) => r.status === 'no'),
+    no_answer: vm.responses.filter((r) => r.status === 'no_answer'),
   }
-
-  const allGuests = responses.flatMap((r) => (r.guests || []).map((g) => ({ name: g, by: r.name })))
+  const allGuests = vm.responses.flatMap((r) =>
+    (r.guests || []).map((g) => ({ id: g.id, name: g.name, by: r.name, own: g.own })),
+  )
 
   const respond = (status) => {
     if ((status === 'no' || status === 'maybe') && noteRequired) {
       setDraftNote(note)
       setNoteSheet({ status })
     } else {
-      setMyStatus(status)
+      onRespond(status, null)
     }
   }
   const saveNote = () => {
-    setMyStatus(noteSheet.status)
-    setNote(draftNote)
+    onSaveNote(noteSheet.status, draftNote)
     setNoteSheet(null)
   }
 
+  const d = new Date(vm.start)
+  const timeStr = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+
   return (
     <div className="space-y-5 pb-4">
-      <button onClick={() => navigate('/calendar')} className="text-[13px] font-semibold text-ink-soft">
-        ← Zurück zum Kalender
-      </button>
+      <div className="flex items-center justify-between">
+        <button onClick={() => navigate('/calendar')} className="text-[13px] font-semibold text-ink-soft">
+          ← Zurück zum Kalender
+        </button>
+        {canManage && (
+          <div className="flex gap-3 text-[13px] font-semibold">
+            <button onClick={onEdit} className="text-sage">
+              Bearbeiten
+            </button>
+            <button onClick={onDelete} className="text-terra" disabled={busy}>
+              Löschen
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Event-Kopf */}
       <Card tone="navy" className="space-y-4">
         <div className="flex items-start justify-between gap-4">
           <div>
             <Badge tone="sage" className="bg-white/15">
-              <span style={{ color: creamLight }}>Regeltermin</span>
+              <span style={{ color: creamLight }}>{TYPE_LABEL[vm.type] || 'Termin'}</span>
             </Badge>
-            <h1 className="mt-2 font-display text-3xl font-medium tracking-tight">{ev.title}</h1>
+            <h1 className="mt-2 font-display text-3xl font-medium tracking-tight">{vm.title}</h1>
           </div>
           <div className="text-right">
-            <div className="font-display text-5xl font-medium leading-none" style={{ color: creamLight }}>27</div>
-            <div className="mt-1 text-[12px] text-white/70">Juni</div>
+            <div className="font-display text-5xl font-medium leading-none" style={{ color: creamLight }}>
+              {d.getDate()}
+            </div>
+            <div className="mt-1 text-[12px] text-white/70">
+              {d.toLocaleDateString('de-DE', { month: 'long' })}
+            </div>
           </div>
         </div>
         <div className="flex flex-wrap gap-x-6 gap-y-1 text-[13px] text-white/80">
-          <span>🕢 19:30 Uhr</span>
-          <span>📍 {ev.lane}</span>
-          <span>⏳ Frist: {ev.deadlineH} h vorher</span>
-          <span>{ev.rsvpMode === 'opt_out' ? '✅ Opt-out (Standard: zugesagt)' : '✋ Opt-in (aktiv zusagen)'}</span>
+          <span>🕢 {timeStr} Uhr</span>
+          {vm.location && <span>📍 {vm.location}</span>}
+          <span>⏳ Frist: {vm.deadlineH} h vorher</span>
+          <span>
+            {vm.rsvpMode === 'opt_out' ? '✅ Opt-out (Standard: zugesagt)' : '✋ Opt-in (aktiv zusagen)'}
+          </span>
         </div>
-        <p className="text-[13px] leading-relaxed text-white/75">{ev.description}</p>
+        {vm.description && <p className="text-[13px] leading-relaxed text-white/75">{vm.description}</p>}
       </Card>
+
+      {/* Kegelabend aus diesem Termin starten (heute/vergangen) */}
+      {onStartSession && (
+        <Card tone="sage" className="flex flex-wrap items-center gap-3">
+          <span className="grid h-10 w-10 place-items-center rounded-full bg-white/40 text-lg">🎳</span>
+          <div className="min-w-0 flex-1">
+            <div className="text-[13px] font-semibold text-ink">Kegelabend erfassen</div>
+            <div className="text-[12px] text-ink-soft">Zusagen und Gäste werden übernommen.</div>
+          </div>
+          <Button variant="primary" size="sm" onClick={onStartSession}>
+            Starten
+          </Button>
+        </Card>
+      )}
 
       {/* Meine Rückmeldung */}
       <Card>
         <div className="text-[12px] font-semibold text-ink-soft">Deine Rückmeldung</div>
         <div className="mt-3 grid grid-cols-3 gap-2">
-          <RsvpBtn active={myStatus === 'yes'} tone="sage" onClick={() => respond('yes')}>
+          <RsvpBtn active={myStatus === 'yes'} tone="sage" disabled={busy} onClick={() => respond('yes')}>
             ✓ Zusagen
           </RsvpBtn>
-          <RsvpBtn active={myStatus === 'maybe'} tone="amber" onClick={() => respond('maybe')}>
+          <RsvpBtn active={myStatus === 'maybe'} tone="amber" disabled={busy} onClick={() => respond('maybe')}>
             ? Vielleicht
           </RsvpBtn>
-          <RsvpBtn active={myStatus === 'no'} tone="terra" onClick={() => respond('no')}>
+          <RsvpBtn active={myStatus === 'no'} tone="terra" disabled={busy} onClick={() => respond('no')}>
             ✕ Absagen
           </RsvpBtn>
         </div>
@@ -138,10 +183,20 @@ export default function CalendarEvent() {
         ) : (
           <div className="mt-3 flex flex-wrap gap-2">
             {allGuests.map((g, i) => (
-              <div key={i} className="flex items-center gap-2 rounded-full bg-cream px-3 py-1.5">
+              <div key={g.id || i} className="flex items-center gap-2 rounded-full bg-cream px-3 py-1.5">
                 <span className="text-sm">👤</span>
                 <span className="text-[13px] font-medium">{g.name}</span>
                 <span className="text-[11px] text-ink-dim">· {g.by.split(' ')[0]}</span>
+                {g.own && (
+                  <button
+                    onClick={() => onRemoveGuest(g)}
+                    disabled={busy}
+                    className="ml-1 text-[13px] text-ink-dim hover:text-terra"
+                    aria-label="Gast entfernen"
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -169,17 +224,16 @@ export default function CalendarEvent() {
             <Card className="p-0">
               {list.map((r, i) => (
                 <div
-                  key={i}
+                  key={r.name + i}
                   className={cx('flex items-center gap-3 p-3', i < list.length - 1 && 'border-b border-card-edge')}
                 >
                   <Avatar name={r.name} size={32} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="text-[14px] font-medium">{r.name}</span>
-                      {r.name === currentUser.name && <Badge tone="navy">Du</Badge>}
-                      {(r.guests || []).length > 0 && (
-                        <Badge tone="amber">+{r.guests.length} Gast</Badge>
-                      )}
+                      {r.isMe && <Badge tone="navy">Du</Badge>}
+                      {(r.guests || []).length > 0 && <Badge tone="amber">+{r.guests.length} Gast</Badge>}
+                      {r.late && <Badge tone="terra">Verspätet</Badge>}
                     </div>
                     {r.note && <div className="text-[12px] italic text-ink-dim">„{r.note}"</div>}
                   </div>
@@ -197,11 +251,7 @@ export default function CalendarEvent() {
         title={noteSheet ? `Notiz – ${RSVP[noteSheet.status].short}` : 'Notiz'}
         subtitle={noteRequired ? 'Für diese Antwort ist eine Notiz erforderlich.' : 'Optionale Notiz.'}
         footer={
-          <Button
-            className="w-full"
-            disabled={noteRequired && !draftNote.trim()}
-            onClick={saveNote}
-          >
+          <Button className="w-full" disabled={noteRequired && !draftNote.trim()} onClick={saveNote}>
             Antwort speichern
           </Button>
         }
@@ -230,7 +280,7 @@ export default function CalendarEvent() {
             className="w-full"
             disabled={!guestName.trim()}
             onClick={() => {
-              setMyGuests((g) => [...g, `${guestName.trim()} (Gast)`])
+              onAddGuest(guestName.trim())
               setGuestName('')
               setGuestSheet(false)
             }}
@@ -252,21 +302,265 @@ export default function CalendarEvent() {
   )
 }
 
-function RsvpBtn({ active, tone, onClick, children }) {
-  const on = {
-    sage: 'bg-sage text-white',
-    amber: 'bg-amber text-white',
-    terra: 'bg-terra text-white',
-  }[tone]
-  const off = {
-    sage: 'bg-sage-bg text-sage',
-    amber: 'bg-amber-bg text-amber',
-    terra: 'bg-terra-bg text-terra',
-  }[tone]
+/* ── Mock-Variante (Prototyp ohne Backend) ───────────────────────────────── */
+function MockEvent() {
+  const ev = eventDetail
+  const [myStatus, setMyStatus] = useState(ev.rsvpMode === 'opt_out' ? 'yes' : 'no_answer')
+  const [note, setNote] = useState('')
+  const [myGuests, setMyGuests] = useState([])
+
+  const responses = ev.responses.map((r) =>
+    r.name === currentUser.name
+      ? { ...r, status: myStatus, note: note || r.note, guests: toGuests(myGuests, true) }
+      : { ...r, guests: toGuests(r.guests) },
+  )
+  if (!ev.responses.some((r) => r.name === currentUser.name)) {
+    responses.push({ name: currentUser.name, status: myStatus, note, guests: toGuests(myGuests, true) })
+  }
+  responses.forEach((r) => {
+    if (r.name === currentUser.name) r.isMe = true
+  })
+
+  const vm = {
+    title: ev.title,
+    type: ev.type,
+    start: ev.date,
+    location: ev.lane,
+    deadlineH: ev.deadlineH,
+    rsvpMode: ev.rsvpMode,
+    noteRequired: ev.noteRequired,
+    description: ev.description,
+    responses,
+  }
+
+  return (
+    <EventView
+      vm={vm}
+      myStatus={myStatus}
+      note={note}
+      onRespond={(status) => setMyStatus(status)}
+      onSaveNote={(status, n) => {
+        setMyStatus(status)
+        setNote(n)
+      }}
+      onAddGuest={(name) => setMyGuests((g) => [...g, `${name} (Gast)`])}
+      onRemoveGuest={(g) => setMyGuests((list) => list.filter((x) => x !== g.name))}
+      canManage={false}
+      busy={false}
+    />
+  )
+}
+
+function toGuests(arr, own = false) {
+  return (arr || []).map((name) => ({ name, own }))
+}
+
+/* ── Echt-Variante (Supabase) ────────────────────────────────────────────── */
+function LiveEvent({ eventId }) {
+  const navigate = useNavigate()
+  const { activeGroupId, role, user, profile } = useAuth()
+  const canManage = role === 'admin' || role === 'präsident'
+
+  const [event, setEvent] = useState(null)
+  const [members, setMembers] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
+
+  const reload = useCallback(async () => {
+    const ev = await getEvent(eventId)
+    setEvent(ev)
+    return ev
+  }, [eventId])
+
+  useEffect(() => {
+    let alive = true
+    Promise.all([getEvent(eventId), listMembers(activeGroupId)])
+      .then(([ev, mem]) => {
+        if (!alive) return
+        if (!ev) return navigate('/calendar', { replace: true })
+        setEvent(ev)
+        setMembers(mem)
+        setLoading(false)
+      })
+      .catch((e) => {
+        console.error(e)
+        if (alive) {
+          setError('Termin konnte nicht geladen werden.')
+          setLoading(false)
+        }
+      })
+    return () => {
+      alive = false
+    }
+  }, [eventId, activeGroupId, navigate])
+
+  const myEntry = useMemo(
+    () => (event?.rsvps || []).find((r) => r.user_id === user?.id),
+    [event, user],
+  )
+  const optOut = event?.rsvp_mode === 'opt_out'
+  const myStatus = myEntry?.status || (optOut ? 'yes' : 'no_answer')
+  const myNote = myEntry?.note || ''
+
+  const vm = useMemo(() => {
+    if (!event) return null
+    const rsvpByUser = new Map((event.rsvps || []).map((r) => [r.user_id, r]))
+    const guestsByUser = new Map()
+    for (const g of event.guests || []) {
+      const arr = guestsByUser.get(g.invited_by) || []
+      arr.push({ id: g.id, name: g.guest_name, own: g.invited_by === user?.id })
+      guestsByUser.set(g.invited_by, arr)
+    }
+    const responses = members.map((m) => {
+      const entry = rsvpByUser.get(m.userId)
+      return {
+        name: m.name,
+        status: entry?.status || (optOut ? 'yes' : 'no_answer'),
+        note: entry?.note || '',
+        late: !!entry?.late_response,
+        guests: guestsByUser.get(m.userId) || [],
+        isMe: m.userId === user?.id,
+      }
+    })
+    return {
+      title: event.title,
+      type: event.type,
+      start: event.start_date,
+      location: event.location,
+      deadlineH: event.rsvp_deadline_hours,
+      rsvpMode: event.rsvp_mode,
+      noteRequired: event.rsvp_note_required,
+      description: event.description,
+      responses,
+    }
+  }, [event, members, optOut, user])
+
+  const doRespond = async (status, note) => {
+    setBusy(true)
+    setError(null)
+    try {
+      await setRsvp(eventId, status, note ?? (status === myStatus ? myNote : null))
+      await reload()
+    } catch (e) {
+      console.error(e)
+      setError(e.message || 'Rückmeldung fehlgeschlagen.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const doAddGuest = async (name) => {
+    setBusy(true)
+    try {
+      await addEventGuest(eventId, name)
+      await reload()
+    } catch (e) {
+      console.error(e)
+      setError(e.message || 'Gast konnte nicht hinzugefügt werden.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const doRemoveGuest = async (g) => {
+    if (!g.id) return
+    setBusy(true)
+    try {
+      await removeEventGuest(g.id)
+      await reload()
+    } catch (e) {
+      console.error(e)
+      setError(e.message || 'Gast konnte nicht entfernt werden.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const startSession = () => {
+    const yes = (event.rsvps || []).filter((r) => r.status === 'yes').map((r) => r.user_id)
+    const d = new Date(event.start_date)
+    navigate('/sessions/new', {
+      state: {
+        fromEvent: true,
+        eventId: event.id,
+        eventTitle: event.title,
+        eventWhen: d.toLocaleDateString('de-DE', {
+          weekday: 'short',
+          day: '2-digit',
+          month: 'long',
+        }),
+        eventDate: event.start_date.slice(0, 10),
+        presentIds: yes,
+        guests: (event.guests || []).map((g) => g.guest_name),
+      },
+    })
+  }
+
+  if (loading) {
+    return (
+      <Card>
+        <div className="py-8 text-center text-sm text-ink-dim">Lädt…</div>
+      </Card>
+    )
+  }
+  if (!vm) {
+    return (
+      <Card>
+        <div className="py-8 text-center text-sm text-terra">{error || 'Termin nicht gefunden.'}</div>
+      </Card>
+    )
+  }
+
+  // „Kegelabend starten" anbieten, sobald der Termin begonnen hat (heute/vergangen),
+  // solange noch kein Kegelabend verknüpft ist.
+  const started = new Date(event.start_date) <= new Date()
+
+  return (
+    <>
+      {error && (
+        <div className="mb-3 rounded-2xl bg-terra-bg px-4 py-3 text-[13px] text-terra">{error}</div>
+      )}
+      <EventView
+        vm={vm}
+        myStatus={myStatus}
+        note={myNote}
+        onRespond={doRespond}
+        onSaveNote={(status, n) => doRespond(status, n)}
+        onAddGuest={doAddGuest}
+        onRemoveGuest={doRemoveGuest}
+        canManage={canManage}
+        onEdit={() => navigate(`/calendar/${eventId}/edit`)}
+        onDelete={async () => {
+          if (!window.confirm('Diesen Termin wirklich löschen?')) return
+          setBusy(true)
+          try {
+            await deleteEvent(eventId)
+            navigate('/calendar')
+          } catch (e) {
+            console.error(e)
+            setError(e.message || 'Löschen fehlgeschlagen.')
+            setBusy(false)
+          }
+        }}
+        onStartSession={started ? startSession : null}
+        busy={busy}
+      />
+    </>
+  )
+}
+
+function RsvpBtn({ active, tone, onClick, disabled, children }) {
+  const on = { sage: 'bg-sage text-white', amber: 'bg-amber text-white', terra: 'bg-terra text-white' }[tone]
+  const off = { sage: 'bg-sage-bg text-sage', amber: 'bg-amber-bg text-amber', terra: 'bg-terra-bg text-terra' }[tone]
   return (
     <button
       onClick={onClick}
-      className={cx('rounded-2xl py-3.5 text-[13px] font-semibold transition', active ? on : off)}
+      disabled={disabled}
+      className={cx(
+        'rounded-2xl py-3.5 text-[13px] font-semibold transition disabled:opacity-60',
+        active ? on : off,
+      )}
     >
       {children}
     </button>

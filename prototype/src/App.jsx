@@ -25,6 +25,7 @@ import Members from './pages/Members'
 import Calendar from './pages/calendar/Calendar'
 import CalendarEvent from './pages/calendar/CalendarEvent'
 import CalendarNew from './pages/calendar/CalendarNew'
+import CalendarEdit from './pages/calendar/CalendarEdit'
 import Settings from './pages/Settings'
 import Stats from './pages/stats/Stats'
 import StatsAlltime from './pages/stats/StatsAlltime'
@@ -77,6 +78,7 @@ export default function App() {
       <Route path="/calendar" element={<Protected><Calendar /></Protected>} />
       <Route path="/calendar/new" element={<Protected><CalendarNew /></Protected>} />
       <Route path="/calendar/:id" element={<Protected><CalendarEvent /></Protected>} />
+      <Route path="/calendar/:id/edit" element={<Protected><CalendarEdit /></Protected>} />
       <Route path="/settings" element={<Protected><Settings /></Protected>} />
       <Route path="/stats" element={<Protected><Stats /></Protected>} />
       <Route path="/stats/alltime" element={<Protected><StatsAlltime /></Protected>} />

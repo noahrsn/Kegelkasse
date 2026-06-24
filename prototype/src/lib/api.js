@@ -229,6 +229,112 @@ export async function deleteSession(sessionId) {
   if (error) throw error
 }
 
+/* ──────────────────────────────────────────────────────────────────────────
+ * Phase 6 — Kegelkalender & Event-Management (RSVP, Gäste, Absagefristen)
+ * ────────────────────────────────────────────────────────────────────────── */
+
+/* Listenansicht über die View event_summaries (RSVP-Zähler je Termin).
+   no_answer / opt_out wird hier aus member_count abgeleitet (View liefert harte
+   Zähler). myStatus fällt bei fehlender Antwort auf den rsvp_mode-Default zurück. */
+export async function listEvents(groupId) {
+  const { data, error } = await supabase
+    .from('event_summaries')
+    .select('*')
+    .eq('group_id', groupId)
+    .order('start_date', { ascending: true })
+  if (error) throw error
+  return (data ?? []).map((e) => {
+    const yesRaw = Number(e.yes_count) || 0
+    const maybe = Number(e.maybe_count) || 0
+    const no = Number(e.no_count) || 0
+    const members = Number(e.member_count) || 0
+    const optOut = e.rsvp_mode === 'opt_out'
+    // opt_out: nicht-Antwortende gelten als zugesagt; opt_in: als „keine Antwort".
+    const noAnswer = optOut ? 0 : Math.max(members - (yesRaw + maybe + no), 0)
+    const yes = optOut ? Math.max(members - maybe - no, 0) : yesRaw
+    return {
+      id: e.id,
+      title: e.title,
+      type: e.type,
+      location: e.location,
+      start: e.start_date,
+      end: e.end_date,
+      rsvpMode: e.rsvp_mode,
+      deadlineH: e.rsvp_deadline_hours,
+      myStatus: e.my_status || (optOut ? 'yes' : 'no_answer'),
+      sessionId: e.session_id,
+      rsvp: { yes, maybe, no, no_answer: noAnswer },
+      guestCount: Number(e.guest_count) || 0,
+    }
+  })
+}
+
+/* Vollständiges Event-Detail inkl. Rückmeldungen + Gäste (für RSVP-Ansicht/Edit). */
+export async function getEvent(eventId) {
+  const { data, error } = await supabase
+    .from('events')
+    .select(
+      `id, group_id, title, description, location, type, start_date, end_date,
+       rsvp_mode, rsvp_note_required, rsvp_deadline_hours,
+       recurrence_interval, recurrence_mode, recurrence_monthday, recurrence_weekday, recurrence_nth,
+       rsvps:rsvp_entries(user_id, status, note, late_response),
+       guests:event_guests(id, guest_name, invited_by)`,
+    )
+    .eq('id', eventId)
+    .maybeSingle()
+  if (error) throw error
+  return data
+}
+
+/* Termin anlegen oder bearbeiten (RLS: nur admin/präsident). Rückgabe: event id. */
+export async function saveEvent(groupId, createdBy, row, eventId = null) {
+  if (eventId) {
+    const { error } = await supabase.from('events').update(row).eq('id', eventId)
+    if (error) throw error
+    return eventId
+  }
+  const { data, error } = await supabase
+    .from('events')
+    .insert({ ...row, group_id: groupId, created_by: createdBy })
+    .select('id')
+    .single()
+  if (error) throw error
+  return data.id
+}
+
+/* Termin löschen (RLS: nur admin/präsident). */
+export async function deleteEvent(eventId) {
+  const { error } = await supabase.from('events').delete().eq('id', eventId)
+  if (error) throw error
+}
+
+/* Eigene Rückmeldung setzen (RPC: Pflicht-Notiz + Late-Absage + Log). */
+export async function setRsvp(eventId, status, note = null) {
+  const { data, error } = await supabase.rpc('set_rsvp', {
+    p_event_id: eventId,
+    p_status: status,
+    p_note: note || null,
+  })
+  if (error) throw error
+  return data
+}
+
+/* Eigenen Gast zum Termin hinzufügen (RPC). Rückgabe: { id, guest_name, … }. */
+export async function addEventGuest(eventId, name) {
+  const { data, error } = await supabase.rpc('add_event_guest', {
+    p_event_id: eventId,
+    p_guest_name: name,
+  })
+  if (error) throw error
+  return data
+}
+
+/* Eigenen Gast (oder als admin/präsident) entfernen (RPC). */
+export async function removeEventGuest(guestId) {
+  const { error } = await supabase.rpc('remove_event_guest', { p_guest_id: guestId })
+  if (error) throw error
+}
+
 /* Wiederholungs-Presets des Wizards -> events-Spalten. */
 export function recurrenceFromPreset(preset) {
   switch (preset) {

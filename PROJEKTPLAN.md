@@ -716,9 +716,18 @@ Nicht berechtigte Sektionen werden ausgeblendet, nicht nur gesperrt.
 
 ---
 
-## Phase 6 — Kegelkalender & Event-Management
+## Phase 6 — Kegelkalender & Event-Management ✅
 
 **Ziel:** Vollständige Terminplanung mit RSVP-System.
+
+> **Status (umgesetzt):** Migration `006_phase6_calendar_rsvp.sql` — Spalte `events.location`,
+> View `event_summaries` (security_invoker, RSVP-Zähler + eigener Status + Gästezahl + Session-Link),
+> RPCs `set_rsvp` (Pflicht-Notiz + Late-Absage-Erkennung + Log), `add_event_guest`, `remove_event_guest`
+> (SECURITY DEFINER, analog Phase 5). Event-CRUD läuft über die RLS-Policies aus Migration 003.
+> Frontend: `calendar/`-Screens (Liste, Detail+RSVP, Anlegen, Bearbeiten) echt verdrahtet, Mock-Modus
+> bleibt. „Kegelabend starten" aus der Event-Detailansicht nachgezogen (war aus Phase 5 verschoben).
+> Verbleibend für spätere Phasen: E-Mail bei verspäteter Absage (Phase 9), automatische
+> Verspätungsstrafe (Phase 7), RSVP-Erinnerungen (Phase 9).
 
 ### Features
 
