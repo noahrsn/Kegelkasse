@@ -1,8 +1,10 @@
 // Theme-Steuerung: 'light' | 'dark' | 'system' — persistiert in localStorage.
+// Standard ist bewusst 'light' (warmes Off-White) — nicht 'system', nicht 'dark'.
 const KEY = 'kegelkasse-theme'
+const DEFAULT_THEME = 'light'
 
 export function getTheme() {
-  return localStorage.getItem(KEY) || 'system'
+  return localStorage.getItem(KEY) || DEFAULT_THEME
 }
 
 export function resolveDark(theme = getTheme()) {
@@ -20,8 +22,9 @@ export function applyTheme(theme = getTheme()) {
 }
 
 export function setTheme(theme) {
-  if (theme === 'system') localStorage.removeItem(KEY)
-  else localStorage.setItem(KEY, theme)
+  // 'system' wird bewusst explizit gespeichert (nicht über das Löschen des Keys),
+  // damit der Default ohne gespeicherte Wahl 'light' bleibt.
+  localStorage.setItem(KEY, theme)
   applyTheme(theme)
 }
 

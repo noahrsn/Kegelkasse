@@ -863,6 +863,13 @@ Nicht berechtigte Sektionen werden ausgeblendet, nicht nur gesperrt.
 - Geplante Benachrichtigungen (`debt_reminder`, `monthly_summary`) via **pg_cron** — cron-Job in Supabase ruft die Edge Function auf
 - Toggles pro Benachrichtigungstyp und Gruppe in den Kontoeinstellungen
 
+### Einladungsversand (verbindlich nachgezogen aus Phase 3)
+
+In Phase 3 wurde der Einladungslink (Kopieren/Reset) umgesetzt; die folgenden Versandwege waren dort nur Platzhalter und werden hier fest umgesetzt:
+
+- **E-Mail-Einladung:** Mitglieder direkt aus dem Einladen-Sheet (Mitgliederliste + Setup-Wizard Schritt 6) per Resend einladen — ersetzt den Platzhalter-Button „Per E-Mail senden".
+- **QR-Code:** QR-Code für den Einladungslink generieren (SVG, client- oder edge-seitig) — ersetzt den Platzhalter-Button „QR-Code zeigen".
+
 ---
 
 ## Phase 10 — Feinschliff & Sicherheit
@@ -886,6 +893,17 @@ Nicht berechtigte Sektionen werden ausgeblendet, nicht nur gesperrt.
 ### Frontend Build
 - Tailwind CSS als PostCSS-Build ab Tag 1 — kein CDN-Play-Modus
 - Build-Schritt: `npx tailwindcss -i app/static/css/input.css -o app/static/css/style.css --minify`
+
+### Medien & Avatare (Supabase Storage) — verbindlich nachgezogen aus Phase 3/4
+
+In Wizard und Einstellungen sind die Avatar-Buttons bislang Platzhalter; sie werden hier fest umgesetzt:
+
+- **Club-Avatar hochladen** (Setup-Wizard Schritt 1 + Einstellungen → Allgemein) — ersetzt die Platzhalter „Club-Avatar wählen" / „Bild hochladen".
+- Optional: **Mitglieder-Avatare** im Profil (statt generierter Initialen-Avatare).
+- Supabase **Storage-Bucket** mit RLS: schreibend nur der jeweilige Club-Admin (Club-Avatar) bzw. der eigene User (Profilbild); öffentlich lesbar für Gruppenmitglieder.
+
+### Darstellung / Theme
+- Standard-Theme ist **Hell** (warmes Off-White) — nicht „System", nicht „Dunkel". Umschaltbar im Profil (Hell / Dunkel / System), persistiert in `localStorage`. ✅ Umgesetzt.
 
 ---
 
@@ -913,7 +931,7 @@ Phase 10 →  Hardening, Tests, Sicherheit
 | Feature | Beschreibung |
 |---|---|
 | **PWA** | `manifest.json` + Service Worker → App auf Homescreen installierbar |
-| **QR-Code für Einladungslink** | SVG serverseitig generieren (`qrcode`-Library) |
+| ~~QR-Code für Einladungslink~~ | ✅ Verbindlich eingeplant in **Phase 9** (Einladungsversand) |
 | **Jahresabschluss-PDF** | Kassenbericht als PDF (`WeasyPrint`) |
 | **Bulk-Einladung per CSV** | Mehrere Mitglieder auf einmal einladen |
 
