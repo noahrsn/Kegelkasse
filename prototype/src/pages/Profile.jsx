@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Card, Button, Badge, PageTitle, Avatar, Field, Input, Toggle } from '../components/ui'
 import { eur, pal, cx, ROLE_LABEL } from '../design/calm'
 import { useAuth } from '../context/AuthContext.jsx'
-import { getGroup, listOpenDebts, getAwards } from '../lib/api.js'
+import { getGroup, listOpenDebts, getAwards, getNotifSettings, saveNotifSettings } from '../lib/api.js'
 import { currentUser, club, myDebts, awards } from '../mock/data'
 import { getTheme, setTheme } from '../theme'
 
@@ -24,6 +24,23 @@ export default function Profile() {
   const navigate = useNavigate()
   const { mockMode, activeGroupId, role, user, profile, signOut } = useAuth()
   const [notifs, setNotifs] = useState(() => Object.fromEntries(NOTIFS.map(([k, , v]) => [k, v])))
+
+  // Benachrichtigungs-Schalter laden (Echtmodus) bzw. einzeln speichern.
+  useEffect(() => {
+    if (mockMode || !activeGroupId) return
+    getNotifSettings(activeGroupId)
+      .then((s) => {
+        if (s) setNotifs((cur) => ({ ...cur, ...Object.fromEntries(NOTIFS.map(([k]) => [k, s[k] ?? cur[k]])) }))
+      })
+      .catch((e) => console.error(e))
+  }, [mockMode, activeGroupId])
+
+  const toggleNotif = (key, value) => {
+    setNotifs((s) => ({ ...s, [key]: value }))
+    if (!mockMode && activeGroupId && user) {
+      saveNotifSettings(activeGroupId, user.id, { [key]: value }).catch((e) => console.error(e))
+    }
+  }
 
   const [debts, setDebts] = useState(
     mockMode ? myDebts.filter((d) => !d.paid).map((d) => ({ description: d.desc, amount: d.amount })) : null,
@@ -173,12 +190,7 @@ export default function Profile() {
       <Card className="space-y-3.5">
         <div className="text-[12px] font-semibold text-ink-soft">Benachrichtigungen</div>
         {NOTIFS.map(([key, label]) => (
-          <Toggle
-            key={key}
-            label={label}
-            checked={notifs[key]}
-            onChange={(v) => setNotifs((s) => ({ ...s, [key]: v }))}
-          />
+          <Toggle key={key} label={label} checked={notifs[key]} onChange={(v) => toggleNotif(key, v)} />
         ))}
       </Card>
     </div>

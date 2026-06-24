@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { QRCodeSVG } from 'qrcode.react'
 import { Card, Button, Badge, PageTitle, Avatar, Bar, Field, Input } from '../components/ui'
 import { Sheet } from '../components/Modal'
 import { cx, eur, pal, ROLE_LABEL } from '../design/calm'
@@ -11,6 +12,7 @@ import {
   markMemberPaid,
   bookManualPenalty,
   cancelDebt,
+  sendInviteEmail,
 } from '../lib/api.js'
 import { members as seed } from '../mock/data'
 
@@ -416,10 +418,16 @@ function ManualPenaltySheet({ open, member, onClose, mockMode, groupId, onBooked
 }
 
 export function InviteBox({ token, onReset, canReset = false }) {
+  const { mockMode, activeGroup } = useAuth()
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://kegelkasse.de'
   const link = `${origin}/join/${token || 'pinroyal-7f3a9c'}`
   const [copied, setCopied] = useState(false)
   const [resetting, setResetting] = useState(false)
+  const [showQr, setShowQr] = useState(false)
+  const [emailMode, setEmailMode] = useState(false)
+  const [email, setEmail] = useState('')
+  const [sending, setSending] = useState(false)
+  const [sent, setSent] = useState(false)
 
   async function handleReset() {
     if (!onReset) return
@@ -428,6 +436,31 @@ export function InviteBox({ token, onReset, canReset = false }) {
       await onReset()
     } finally {
       setResetting(false)
+    }
+  }
+
+  async function sendInvite() {
+    if (!email.trim()) return
+    setSending(true)
+    try {
+      if (!mockMode) {
+        await sendInviteEmail(email.trim(), {
+          club: activeGroup?.name || 'Kegelclub',
+          url: link,
+          message: `Du wurdest zu ${activeGroup?.name || 'unserem Kegelclub'} eingeladen.`,
+        })
+      }
+      setSent(true)
+      setEmail('')
+      setTimeout(() => {
+        setSent(false)
+        setEmailMode(false)
+      }, 1800)
+    } catch (e) {
+      console.error(e)
+      alert(e.message || 'Versand fehlgeschlagen')
+    } finally {
+      setSending(false)
     }
   }
 
@@ -447,9 +480,38 @@ export function InviteBox({ token, onReset, canReset = false }) {
         </Button>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <Button variant="soft">Per E-Mail senden</Button>
-        <Button variant="soft">QR-Code zeigen</Button>
+        <Button variant={emailMode ? 'primary' : 'soft'} onClick={() => { setEmailMode((v) => !v); setShowQr(false) }}>
+          Per E-Mail senden
+        </Button>
+        <Button variant={showQr ? 'primary' : 'soft'} onClick={() => { setShowQr((v) => !v); setEmailMode(false) }}>
+          QR-Code {showQr ? 'verbergen' : 'zeigen'}
+        </Button>
       </div>
+
+      {emailMode && (
+        <div className="space-y-2 rounded-2xl bg-bg p-3">
+          <Field label="E-Mail-Adresse">
+            <Input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="name@example.de"
+              autoFocus
+            />
+          </Field>
+          <Button className="w-full" disabled={sending || !email.trim()} onClick={sendInvite}>
+            {sent ? '✓ Einladung gesendet' : sending ? 'Sendet…' : 'Einladung senden'}
+          </Button>
+        </div>
+      )}
+
+      {showQr && (
+        <div className="flex flex-col items-center gap-2 rounded-2xl bg-white p-4">
+          <QRCodeSVG value={link} size={168} bgColor="#ffffff" fgColor="#2b2b28" level="M" />
+          <span className="text-[11px] text-ink-dim">Scannen zum Beitreten</span>
+        </div>
+      )}
+
       {canReset ? (
         <button
           onClick={handleReset}

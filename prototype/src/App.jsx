@@ -31,6 +31,7 @@ import Stats from './pages/stats/Stats'
 import StatsAlltime from './pages/stats/StatsAlltime'
 import Profile from './pages/Profile'
 import Polls from './pages/Polls'
+import PollNew from './pages/PollNew'
 import Log from './pages/Log'
 
 /* App-Screen: geschützt + App-Shell (Sidebar / Bottom-Nav) */
@@ -85,6 +86,7 @@ export default function App() {
       <Route path="/stats/alltime" element={<Protected><StatsAlltime /></Protected>} />
       <Route path="/profile" element={<Protected><Profile /></Protected>} />
       <Route path="/polls" element={<Protected><Polls /></Protected>} />
+      <Route path="/polls/new" element={<Protected><PollNew /></Protected>} />
       <Route path="/log" element={<Protected><Log /></Protected>} />
 
       <Route path="/" element={<Navigate to="/dashboard" replace />} />

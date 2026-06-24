@@ -510,6 +510,78 @@ export async function listSessionStats(groupId) {
   }))
 }
 
+/* ──────────────────────────────────────────────────────────────────────────
+ * Phase 9 — Benachrichtigungen & Einladungsversand
+ * ────────────────────────────────────────────────────────────────────────── */
+
+/* Eigene Benachrichtigungs-Einstellungen je Gruppe (RLS filtert auf auth.uid()). */
+export async function getNotifSettings(groupId) {
+  const { data, error } = await supabase
+    .from('notification_settings')
+    .select('*')
+    .eq('group_id', groupId)
+    .maybeSingle()
+  if (error) throw error
+  return data
+}
+
+/* Einzelnen Schalter speichern (Upsert auf (user_id, group_id)). */
+export async function saveNotifSettings(groupId, userId, patch) {
+  const { error } = await supabase
+    .from('notification_settings')
+    .upsert({ user_id: userId, group_id: groupId, ...patch }, { onConflict: 'user_id,group_id' })
+  if (error) throw error
+}
+
+/* Einladung per E-Mail versenden (Edge Function send-email, Typ event_invitation).
+   Im Dev-Modus loggt die Function nur in die Konsole und liefert { ok: true }. */
+export async function sendInviteEmail(to, { club, url, message }) {
+  const { data, error } = await supabase.functions.invoke('send-email', {
+    body: { type: 'event_invitation', to, data: { club, url, message } },
+  })
+  if (error) throw error
+  return data
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Phase 8 — Abstimmungen & Umfragen
+ * ────────────────────────────────────────────────────────────────────────── */
+
+/* Alle Abstimmungen der Gruppe (RPC; Anonymität + Sichtbarkeit serverseitig). */
+export async function getPolls(groupId) {
+  const { data, error } = await supabase.rpc('get_polls', { p_group_id: groupId })
+  if (error) throw error
+  return data || []
+}
+
+/* Abstimmung anlegen (RPC; admin/präsident). options: Array von Label-Strings. */
+export async function createPoll(groupId, { title, description, type, anonymous, resultsVisible, deadline, options }) {
+  const { data, error } = await supabase.rpc('create_poll', {
+    p_group_id: groupId,
+    p_title: title,
+    p_description: description || null,
+    p_type: type,
+    p_anonymous: anonymous,
+    p_results_visible: resultsVisible,
+    p_deadline: deadline || null,
+    p_options: options,
+  })
+  if (error) throw error
+  return data
+}
+
+/* Stimme abgeben/ändern (RPC). optionIds: Array von Option-UUIDs. */
+export async function castVote(pollId, optionIds) {
+  const { error } = await supabase.rpc('cast_vote', { p_poll_id: pollId, p_option_ids: optionIds })
+  if (error) throw error
+}
+
+/* Abstimmung schließen (RPC; admin/präsident). */
+export async function closePoll(pollId) {
+  const { error } = await supabase.rpc('close_poll', { p_poll_id: pollId })
+  if (error) throw error
+}
+
 /* Aktivitätslog (View activity_log; Sichtbarkeit via RLS). */
 export async function listActivity(groupId, limit = 40) {
   const { data, error } = await supabase

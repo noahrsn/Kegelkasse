@@ -849,9 +849,19 @@ Nicht berechtigte Sektionen werden ausgeblendet, nicht nur gesperrt.
 
 ---
 
-## Phase 8 — Abstimmungen & Umfragen
+## Phase 8 — Abstimmungen & Umfragen ✅
 
 **Ziel:** Clubentscheidungen direkt in der App treffen.
+
+> **Status — umgesetzt ✅:** Migration `009_phase8_polls.sql`. `polls`/`poll_options`/`poll_votes`
+> haben RLS aktiv, aber bewusst KEINE Policies — jeder Zugriff läuft über SECURITY-DEFINER-RPCs,
+> wodurch die Anonymität serverseitig erzwungen ist (`poll_votes` ist nie direkt lesbar).
+> RPCs: `get_polls` (Aggregatzähler + eigene Stimme; Zwischenstände nur wenn geschlossen ODER
+> „offen"), `create_poll` (admin/präsident, 2–6 Optionen, 3 Typen), `cast_vote` (Stimme abgeben/
+> ändern, Typ-/Frist-Validierung), `close_poll`, `close_due_polls` (pg_cron, service_role).
+> Frontend: `Polls.jsx` (Liste, Abstimmen inkl. Mehrfachauswahl, Schließen, verdeckt/offen),
+> neue `PollNew.jsx` + Route `/polls/new`. Mock-Modus bleibt. (E-Mail-Benachrichtigungen → Phase 9;
+> pg_cron-Job für `close_due_polls` wird wie beim Monatsbeitrag separat eingerichtet.)
 
 ### Features
 - Abstimmung erstellen (Admin & Präsident): Frage + 2–6 Optionen
@@ -867,9 +877,25 @@ Nicht berechtigte Sektionen werden ausgeblendet, nicht nur gesperrt.
 
 ---
 
-## Phase 9 — Benachrichtigungen
+## Phase 9 — Benachrichtigungen ✅ (Kern)
 
 **Ziel:** E-Mail-Benachrichtigungen mit Opt-in-Kontrolle.
+
+> **Status — Kern umgesetzt ✅:** Migration `010_phase9_notifications.sql` — RLS-Policies für
+> `notification_settings` (jedes Mitglied verwaltet eigene Schalter je Gruppe; Frontend schreibt
+> direkt per Upsert) + Service-Role-Funktion `debt_reminder_recipients()` (Join mit `auth.users`,
+> respektiert `debt_reminder`-Schalter). Edge Functions ausgebaut + deployed: `send-email`
+> (typbasierte HTML-Templates `_shared/templates.ts` im Calm-Bento-Stil; Aufruf `{type,to,data}`
+> oder roh; Dev-Modus loggt nur in die Konsole) und `debt-reminder` (ermittelt Schuldner, sendet
+> je Reminder-Mail). Frontend: Profil-Benachrichtigungs-Toggles persistieren echt; Einladung im
+> `InviteBox` per E-Mail (Edge Function) **und** QR-Code (`qrcode.react`) — die beiden
+> Platzhalter-Buttons aus Phase 3 sind damit umgesetzt.
+>
+> **Offen für Produktion:** Live-Versand braucht einen Resend-API-Key (`ENVIRONMENT=production`).
+> Das automatische Auslösen pro Ereignis (`new_penalty`, `payment_received`, `session_approved`,
+> `new_poll`, …) aus den jeweiligen RPCs (via `pg_net`/Trigger → `send-email`) sowie die
+> pg_cron-Jobs für `debt-reminder`/`monthly_summary`/`close_due_polls` werden mit dem Live-Key
+> eingerichtet. Templates + Empfänger-Logik stehen bereits.
 
 ### Benachrichtigungstypen
 
