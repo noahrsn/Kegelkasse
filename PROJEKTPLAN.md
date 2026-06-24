@@ -929,9 +929,30 @@ In Phase 3 wurde der Einladungslink (Kopieren/Reset) umgesetzt; die folgenden Ve
 
 ---
 
-## Phase 10 — Feinschliff & Sicherheit
+## Phase 10 — Feinschliff & Sicherheit ✅ (Kern)
 
 **Ziel:** Production-ready auf localhost; vorbereitet für späteres Deployment.
+
+> **Status — Kern umgesetzt ✅ (stack-angepasst):** Migration `011_phase10_security_storage.sql`.
+> Vieles im Plantext bezieht sich auf den alten Python-Stack (slowapi/Pydantic/JWT-Cookies) —
+> in der Supabase+React-Architektur übernehmen Supabase Auth (Rate-Limit, JWT, Refresh) und der
+> JS-Client diese Aufgaben. Umgesetzt wurde:
+> - **DSGVO:** RPC `remove_member` (nur Admin) — entfernt Mitgliedschaft + Notif-Settings;
+>   pseudonymisiert das Profil (Name → „Gelöschtes Mitglied", Avatar entfernt), sobald keine
+>   Mitgliedschaft mehr besteht. UI: „Entfernen" in Settings → Mitglieder.
+> - **RLS-Härtung:** fehlende `awards`-SELECT-Policy ergänzt (Advisor-Lücke geschlossen).
+> - **Storage/Avatare** (Phase-3/4-Nachzug): Bucket `avatars` (public read via CDN, kein
+>   Listing) + scoped Write-Policies (`user/<uid>/`, `club/<gid>/` nur admin/präsident);
+>   `groups.avatar_url`/`profiles.avatar_url`. Frontend: Club-Avatar (Settings) + Profilbild
+>   (Profil) hochladen, `Avatar`-Component zeigt Bild.
+> - **CSP & Security-Header:** `prototype/public/_headers` (CSP, X-Frame-Options DENY,
+>   nosniff, Referrer-Policy, Permissions-Policy) für das statische Hosting.
+> - **Tests:** Vitest eingerichtet (`npm test`); Unit-Tests für CSV-Parsing (Beträge/Datum/IBAN)
+>   und Wiederholungsmuster — 11 Tests grün. Die SQL-Geschäftslogik (Kassenstand, Awards,
+>   Zahlungsabgleich, Verspätungsstrafe) ist über die DB-Tests der Phasen 7–9 abgedeckt.
+>
+> **Offen (Produktion):** „Leaked Password Protection" in Supabase Auth aktivieren (Dashboard-
+> Schalter); Jahresabschluss-PDF/PWA u. a. sind „Ideen & Erweiterungen". E2E-Tests optional.
 
 ### Sicherheit
 - Rate Limiting auf Auth-Endpunkten (`slowapi`)

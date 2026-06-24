@@ -511,6 +511,40 @@ export async function listSessionStats(groupId) {
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
+ * Phase 10 — Sicherheit, DSGVO & Avatare
+ * ────────────────────────────────────────────────────────────────────────── */
+
+/* Mitglied entfernen (RPC; nur Admin; DSGVO-Pseudonymisierung serverseitig). */
+export async function removeMember(groupId, userId) {
+  const { error } = await supabase.rpc('remove_member', { p_group_id: groupId, p_user_id: userId })
+  if (error) throw error
+}
+
+/* Datei in den avatars-Bucket laden und öffentliche URL zurückgeben.
+   path-Konvention: club/<groupId>/...  bzw.  user/<userId>/...  */
+export async function uploadAvatar(path, file) {
+  const { error } = await supabase.storage
+    .from('avatars')
+    .upload(path, file, { upsert: true, cacheControl: '3600' })
+  if (error) throw error
+  const { data } = supabase.storage.from('avatars').getPublicUrl(path)
+  return `${data.publicUrl}?v=${Date.now()}` // Cache-Buster nach Überschreiben
+}
+
+/* Eigenes Profilbild speichern (profiles self-update Policy). */
+export async function setMyAvatar(userId, url) {
+  const { error } = await supabase.from('profiles').update({ avatar_url: url }).eq('id', userId)
+  if (error) throw error
+}
+
+/* Eigene avatar_url laden. */
+export async function getMyAvatar(userId) {
+  const { data, error } = await supabase.from('profiles').select('avatar_url').eq('id', userId).maybeSingle()
+  if (error) throw error
+  return data?.avatar_url || null
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
  * Phase 9 — Benachrichtigungen & Einladungsversand
  * ────────────────────────────────────────────────────────────────────────── */
 

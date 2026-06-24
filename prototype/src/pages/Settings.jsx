@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Card, Button, PageTitle, Field, Input, Select, Tabs, Avatar, Empty } from '../components/ui'
 import { ROLE_LABEL, cx } from '../design/calm'
@@ -9,9 +9,11 @@ import {
   updateGroup,
   listMembers,
   updateMemberRole,
+  removeMember,
   listPenalties,
   resetInvite,
   saveRulebook,
+  uploadAvatar,
 } from '../lib/api.js'
 import { InviteBox } from './Members'
 
@@ -182,17 +184,51 @@ function useEditor(initial, onSave) {
 }
 
 function General({ group, onSave }) {
+  const { mockMode, activeGroupId } = useAuth()
   const ed = useEditor({ name: group.name || '' }, onSave)
+  const [avatar, setAvatar] = useState(group.avatar_url || null)
+  const [uploading, setUploading] = useState(false)
+  const fileRef = useRef(null)
+
+  const onPick = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (mockMode) return
+    setUploading(true)
+    try {
+      const ext = (file.name.split('.').pop() || 'png').toLowerCase()
+      const url = await uploadAvatar(`club/${activeGroupId}/avatar.${ext}`, file)
+      await onSave({ avatar_url: url })
+      setAvatar(url)
+    } catch (err) {
+      console.error(err)
+      alert(err.message || 'Upload fehlgeschlagen')
+    } finally {
+      setUploading(false)
+    }
+  }
+
   return (
     <div className="space-y-4">
       <Card className="space-y-4">
         <div className="flex items-center gap-4">
-          <div className="grid h-16 w-16 place-items-center rounded-2xl bg-terra-bg text-2xl font-bold text-terra">
-            {(ed.val.name?.[0] || 'K').toUpperCase()}
-          </div>
+          {avatar ? (
+            <img src={avatar} alt="" className="h-16 w-16 rounded-2xl object-cover" />
+          ) : (
+            <div className="grid h-16 w-16 place-items-center rounded-2xl bg-terra-bg text-2xl font-bold text-terra">
+              {(ed.val.name?.[0] || 'K').toUpperCase()}
+            </div>
+          )}
           <div>
             <div className="text-[13px] font-semibold">Club-Avatar</div>
-            <button className="mt-1 text-[12px] font-semibold text-sage">Bild hochladen</button>
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              className="mt-1 text-[12px] font-semibold text-sage"
+            >
+              {uploading ? 'Lädt…' : 'Bild hochladen'}
+            </button>
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPick} />
           </div>
         </div>
         <Field label="Vereinsname">
@@ -333,15 +369,17 @@ function Rulebook({ group, onSave }) {
 }
 
 function MembersTab({ mockMode, groupId, canEdit }) {
+  const { user } = useAuth()
   const [list, setList] = useState(
-    mockMode ? mockMembers.map((m) => ({ id: m.id, name: m.name, role: m.role })) : null,
+    mockMode ? mockMembers.map((m) => ({ id: m.id, userId: m.id, name: m.name, role: m.role })) : null,
   )
   const [savingId, setSavingId] = useState(null)
 
-  useEffect(() => {
+  const load = () => {
     if (mockMode || !groupId) return
     listMembers(groupId).then(setList)
-  }, [mockMode, groupId])
+  }
+  useEffect(load, [mockMode, groupId])
 
   async function changeRole(memberId, role) {
     setList((l) => l.map((m) => (m.id === memberId ? { ...m, role } : m)))
@@ -349,6 +387,24 @@ function MembersTab({ mockMode, groupId, canEdit }) {
     setSavingId(memberId)
     try {
       await updateMemberRole(memberId, role)
+    } finally {
+      setSavingId(null)
+    }
+  }
+
+  async function remove(m) {
+    if (!window.confirm(`${m.name} wirklich aus dem Club entfernen?`)) return
+    if (mockMode) {
+      setList((l) => l.filter((x) => x.id !== m.id))
+      return
+    }
+    setSavingId(m.id)
+    try {
+      await removeMember(groupId, m.userId)
+      load()
+    } catch (e) {
+      console.error(e)
+      alert(e.message || 'Entfernen fehlgeschlagen')
     } finally {
       setSavingId(null)
     }
@@ -367,12 +423,22 @@ function MembersTab({ mockMode, groupId, canEdit }) {
             value={m.role}
             disabled={!canEdit}
             onChange={(e) => changeRole(m.id, e.target.value)}
-            className="w-36 py-2 text-[13px] disabled:opacity-60"
+            className="w-32 py-2 text-[13px] disabled:opacity-60"
           >
             {Object.entries(ROLE_LABEL).map(([k, v]) => (
               <option key={k} value={k}>{v}</option>
             ))}
           </Select>
+          {canEdit && m.userId !== user?.id && (
+            <button
+              onClick={() => remove(m)}
+              disabled={savingId === m.id}
+              className="text-[12px] font-semibold text-terra hover:underline"
+              title="Mitglied entfernen"
+            >
+              Entfernen
+            </button>
+          )}
         </div>
       ))}
     </Card>

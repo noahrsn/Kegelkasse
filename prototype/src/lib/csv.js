@@ -33,14 +33,14 @@ function splitLine(line) {
 }
 
 /* "25,00" / "1.234,56" -> Number; Vorzeichen bleibt erhalten. */
-function parseAmount(raw) {
+export function parseAmount(raw) {
   if (!raw) return NaN
   const cleaned = raw.replace(/\./g, '').replace(',', '.').replace(/[^0-9.+-]/g, '')
   return parseFloat(cleaned)
 }
 
 /* "DD.MM.YY" oder "DD.MM.YYYY" -> "YYYY-MM-DD". */
-function parseDate(raw) {
+export function parseDate(raw) {
   if (!raw) return null
   const m = raw.trim().match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})$/)
   if (!m) return null

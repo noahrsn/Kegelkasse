@@ -92,17 +92,26 @@ export function Badge({ children, tone: t = 'neutral', className = '' }) {
 }
 
 /* ── Avatar ───────────────────────────────────────────────────────────── */
-export function Avatar({ name, size = 36, ring }) {
+export function Avatar({ name, size = 36, ring, src }) {
+  const style = {
+    width: size,
+    height: size,
+    boxShadow: ring ? `0 0 0 2px ${ring}` : undefined,
+  }
+  if (src) {
+    return (
+      <img
+        src={src}
+        alt={name || ''}
+        className="rounded-full object-cover shrink-0"
+        style={style}
+      />
+    )
+  }
   return (
     <div
       className="grid place-items-center rounded-full font-semibold text-white shrink-0"
-      style={{
-        width: size,
-        height: size,
-        background: accentFor(name),
-        fontSize: size * 0.36,
-        boxShadow: ring ? `0 0 0 2px ${ring}` : undefined,
-      }}
+      style={{ ...style, background: accentFor(name), fontSize: size * 0.36 }}
     >
       {initials(name)}
     </div>

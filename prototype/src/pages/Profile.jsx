@@ -1,9 +1,18 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Button, Badge, PageTitle, Avatar, Field, Input, Toggle } from '../components/ui'
 import { eur, pal, cx, ROLE_LABEL } from '../design/calm'
 import { useAuth } from '../context/AuthContext.jsx'
-import { getGroup, listOpenDebts, getAwards, getNotifSettings, saveNotifSettings } from '../lib/api.js'
+import {
+  getGroup,
+  listOpenDebts,
+  getAwards,
+  getNotifSettings,
+  saveNotifSettings,
+  getMyAvatar,
+  uploadAvatar,
+  setMyAvatar,
+} from '../lib/api.js'
 import { currentUser, club, myDebts, awards } from '../mock/data'
 import { getTheme, setTheme } from '../theme'
 
@@ -47,6 +56,31 @@ export default function Profile() {
   )
   const [pay, setPay] = useState(mockMode ? { iban: club.iban, paypal: club.paypal } : null)
   const [titles, setTitles] = useState(mockMode ? mockTitles : [])
+  const [avatarUrl, setAvatarUrl] = useState(null)
+  const [uploading, setUploading] = useState(false)
+  const fileRef = useRef(null)
+
+  useEffect(() => {
+    if (mockMode || !user) return
+    getMyAvatar(user.id).then(setAvatarUrl).catch((e) => console.error(e))
+  }, [mockMode, user])
+
+  const onPickAvatar = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file || !user) return
+    setUploading(true)
+    try {
+      const ext = (file.name.split('.').pop() || 'png').toLowerCase()
+      const url = await uploadAvatar(`user/${user.id}/avatar.${ext}`, file)
+      await setMyAvatar(user.id, url)
+      setAvatarUrl(url)
+    } catch (err) {
+      console.error(err)
+      alert(err.message || 'Upload fehlgeschlagen')
+    } finally {
+      setUploading(false)
+    }
+  }
 
   useEffect(() => {
     if (mockMode || !activeGroupId || !user) return
@@ -89,7 +123,20 @@ export default function Profile() {
 
       {/* Identität */}
       <Card className="flex flex-wrap items-center gap-4">
-        <Avatar name={name} size={64} />
+        <button
+          type="button"
+          onClick={() => !mockMode && fileRef.current?.click()}
+          className="relative shrink-0"
+          title={mockMode ? '' : 'Profilbild ändern'}
+        >
+          <Avatar name={name} size={64} src={avatarUrl} />
+          {!mockMode && (
+            <span className="absolute -bottom-1 -right-1 grid h-6 w-6 place-items-center rounded-full bg-ink text-[11px] text-bg">
+              {uploading ? '…' : '📷'}
+            </span>
+          )}
+        </button>
+        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPickAvatar} />
         <div className="flex-1">
           <div className="font-display text-2xl font-medium">{name}</div>
           <div className="text-[13px] text-ink-soft">{email}</div>
