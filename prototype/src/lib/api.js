@@ -123,6 +123,112 @@ export async function resetInvite(groupId) {
   return data
 }
 
+/* ──────────────────────────────────────────────────────────────────────────
+ * Phase 5 — Kegelabende: erfassen, einreichen, genehmigen
+ * ────────────────────────────────────────────────────────────────────────── */
+
+/* Listenansicht über die View session_summaries (Aggregat je Kegelabend). */
+export async function listSessions(groupId) {
+  const { data, error } = await supabase
+    .from('session_summaries')
+    .select('*')
+    .eq('group_id', groupId)
+    .order('date', { ascending: false })
+  if (error) throw error
+  return (data ?? []).map((s) => ({
+    id: s.id,
+    date: s.date,
+    status: s.status,
+    recordedBy: s.recorded_by_name || '—',
+    participants: Number(s.participant_count) || 0,
+    penalties: Number(s.penalty_count) || 0,
+    total: Number(s.total) || 0,
+  }))
+}
+
+/* Vollständiges Detail eines Kegelabends inkl. Teilnehmer + erfasste Strafen. */
+export async function getSession(sessionId) {
+  const { data, error } = await supabase
+    .from('sessions')
+    .select(
+      `id, group_id, event_id, date, status, recorded_by, submitted_at, approved_at,
+       recorder:recorded_by(first_name, last_name),
+       participants:session_participants(
+         id, user_id, guest_name, is_guest, is_late, guest_paid,
+         profiles(first_name, last_name),
+         penalties:session_penalties(id, catalog_id, count, amount,
+           penalties_catalog(name, icon))
+       )`,
+    )
+    .eq('id', sessionId)
+    .maybeSingle()
+  if (error) throw error
+  return data
+}
+
+/* Nächsten anstehenden Termin samt Zusagen + Gästen laden (Start aus Termin). */
+export async function getNextEvent(groupId) {
+  const { data, error } = await supabase
+    .from('events')
+    .select(
+      `id, title, start_date, type,
+       rsvps:rsvp_entries(status, user_id),
+       guests:event_guests(guest_name, invited_by)`,
+    )
+    .eq('group_id', groupId)
+    .gte('start_date', new Date().toISOString())
+    .order('start_date', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw error
+  return data
+}
+
+/* Entwurf oder Einreichung atomar speichern (RPC). Rückgabe: session id. */
+export async function saveSession({
+  groupId,
+  sessionId = null,
+  eventId = null,
+  date,
+  status,
+  participants,
+  absent = [],
+}) {
+  const { data, error } = await supabase.rpc('save_session', {
+    p_group_id: groupId,
+    p_session_id: sessionId,
+    p_event_id: eventId,
+    p_date: date,
+    p_status: status,
+    p_participants: participants,
+    p_absent: absent,
+  })
+  if (error) throw error
+  return data
+}
+
+/* Kegelabend genehmigen + Schulden buchen (RPC). Rückgabe: belastete Mitglieder. */
+export async function approveSession(sessionId) {
+  const { data, error } = await supabase.rpc('approve_session', { p_session_id: sessionId })
+  if (error) throw error
+  return data
+}
+
+/* Einreichung ablehnen → zurück an den Erfasser (Status draft). */
+export async function rejectSession(sessionId, reason) {
+  const { error } = await supabase.rpc('reject_session', {
+    p_session_id: sessionId,
+    p_reason: reason || null,
+  })
+  if (error) throw error
+}
+
+/* Eigenen Entwurf verwerfen. */
+export async function deleteSession(sessionId) {
+  const { error } = await supabase.rpc('delete_session', { p_session_id: sessionId })
+  if (error) throw error
+}
+
 /* Wiederholungs-Presets des Wizards -> events-Spalten. */
 export function recurrenceFromPreset(preset) {
   switch (preset) {

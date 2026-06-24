@@ -1,7 +1,15 @@
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Card, Badge, Button, PageTitle, Avatar, AvatarStack } from '../../components/ui'
+import { Card, Badge, Button, PageTitle, Avatar, AvatarStack, Empty } from '../../components/ui'
 import { eur, pal, creamLight, navyInk } from '../../design/calm'
-import { sessions, events, eventDetail, members } from '../../mock/data'
+import { useAuth } from '../../context/AuthContext.jsx'
+import { listSessions, getNextEvent, listMembers } from '../../lib/api.js'
+import {
+  sessions as mockSessions,
+  events as mockEvents,
+  eventDetail,
+  members as mockMembers,
+} from '../../mock/data'
 
 const STATUS = {
   draft: { label: 'Entwurf', tone: 'neutral' },
@@ -13,23 +21,80 @@ function fmtDate(d) {
   return new Date(d).toLocaleDateString('de-DE', { day: '2-digit', month: 'long', year: 'numeric' })
 }
 
+function fmtEventWhen(iso) {
+  const d = new Date(iso)
+  const day = d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: 'long' })
+  const time = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+  return `${day} · ${time} Uhr`
+}
+
 export default function Sessions() {
   const navigate = useNavigate()
-  const next = events.find((e) => !e.past)
+  const { mockMode, activeGroupId } = useAuth()
+
+  const [list, setList] = useState(mockMode ? mockSessions : null)
+  const [next, setNext] = useState(null) // { id, title, when, presentIds, guests, yesNames }
+
+  useEffect(() => {
+    if (mockMode) {
+      const ev = mockEvents.find((e) => !e.past)
+      if (ev) {
+        const presentIds = eventDetail.responses
+          .filter((r) => r.status === 'yes')
+          .map((r) => mockMembers.find((m) => m.name === r.name)?.id)
+          .filter(Boolean)
+        setNext({
+          id: ev.id,
+          title: eventDetail.title,
+          when: 'Sa, 27. Juni · 19:30 Uhr',
+          presentIds,
+          guests: eventDetail.responses.flatMap((r) => r.guests || []),
+          yesNames: eventDetail.responses.filter((r) => r.status === 'yes').map((r) => r.name),
+        })
+      }
+      return
+    }
+    if (!activeGroupId) return
+    setList(null)
+    listSessions(activeGroupId).then(setList).catch((e) => {
+      console.error(e)
+      setList([])
+    })
+    Promise.all([getNextEvent(activeGroupId), listMembers(activeGroupId)])
+      .then(([ev, members]) => {
+        if (!ev) return setNext(null)
+        const nameOf = (uid) => members.find((m) => m.userId === uid)?.name
+        const yes = (ev.rsvps || []).filter((r) => r.status === 'yes')
+        setNext({
+          id: ev.id,
+          title: ev.title,
+          when: fmtEventWhen(ev.start_date),
+          date: ev.start_date.slice(0, 10),
+          presentIds: yes.map((r) => r.user_id),
+          guests: (ev.guests || []).map((g) => g.guest_name),
+          yesNames: yes.map((r) => nameOf(r.user_id)).filter(Boolean),
+        })
+      })
+      .catch((e) => console.error(e))
+  }, [mockMode, activeGroupId])
 
   const startFromEvent = () => {
-    const presentIds = eventDetail.responses
-      .filter((r) => r.status === 'yes')
-      .map((r) => members.find((m) => m.name === r.name)?.id)
-      .filter(Boolean)
-    const guests = eventDetail.responses.flatMap((r) => r.guests || [])
+    if (!next) return
     navigate('/sessions/new', {
-      state: { fromEvent: true, eventTitle: eventDetail.title, presentIds, guests },
+      state: {
+        fromEvent: true,
+        eventId: next.id,
+        eventTitle: next.title,
+        eventWhen: next.when,
+        eventDate: next.date,
+        presentIds: next.presentIds,
+        guests: next.guests,
+      },
     })
   }
 
-  const yesNames = eventDetail.responses.filter((r) => r.status === 'yes').map((r) => r.name)
-  const guestCount = eventDetail.responses.reduce((a, r) => a + (r.guests?.length || 0), 0)
+  const pending = (list || []).find((s) => s.status === 'submitted')
+  const guestCount = next?.guests?.length || 0
 
   return (
     <div className="space-y-5">
@@ -51,13 +116,13 @@ export default function Sessions() {
                 Nächster Termin
               </div>
               <div className="truncate text-[15px] font-semibold">{next.title}</div>
-              <div className="text-[12px] text-white/70">Sa, 27. Juni · 19:30 Uhr · {next.lane}</div>
+              <div className="text-[12px] text-white/70">{next.when}</div>
             </div>
           </div>
           <div className="flex items-center gap-2.5">
-            <AvatarStack names={yesNames} ringColor={pal.navySurface} max={5} />
+            <AvatarStack names={next.yesNames} ringColor={pal.navySurface} max={5} />
             <span className="text-[12px] text-white/75">
-              {yesNames.length} zugesagt{guestCount > 0 ? ` · ${guestCount} Gäste` : ''}
+              {next.yesNames.length} zugesagt{guestCount > 0 ? ` · ${guestCount} Gäste` : ''}
             </span>
           </div>
           <button
@@ -75,60 +140,80 @@ export default function Sessions() {
       )}
 
       {/* Offene Einreichung hervorheben */}
-      {sessions.some((s) => s.status === 'submitted') && (
+      {pending && (
         <Card tone="amber" className="flex flex-wrap items-center gap-3">
           <span className="grid h-10 w-10 place-items-center rounded-full bg-bg/70 text-lg">⏳</span>
           <div className="flex-1">
-            <div className="text-[13px] font-semibold text-ink">Eine Einreichung wartet auf deine Freigabe</div>
-            <div className="text-[12px] text-ink-soft">Kegelabend 09.05. · Hans Meier · 12 Teilnehmer</div>
+            <div className="text-[13px] font-semibold text-ink">
+              Eine Einreichung wartet auf deine Freigabe
+            </div>
+            <div className="text-[12px] text-ink-soft">
+              Kegelabend {fmtDate(pending.date)} · {pending.recordedBy} · {pending.participants}{' '}
+              Teilnehmer
+            </div>
           </div>
-          <Button variant="primary" size="sm" onClick={() => navigate('/sessions/s1/review')}>
+          <Button variant="primary" size="sm" onClick={() => navigate(`/sessions/${pending.id}/review`)}>
             Jetzt prüfen
           </Button>
         </Card>
       )}
 
-      <div className="space-y-3">
-        {sessions.map((s) => {
-          const st = STATUS[s.status]
-          const to = s.status === 'submitted' ? `/sessions/${s.id}/review` : `/sessions/${s.id}`
-          return (
-            <Link key={s.id} to={to}>
-              <Card className="flex items-center gap-4 transition hover:border-ink/20">
-                <div
-                  className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-2xl"
-                  style={{ background: pal.bg }}
-                >
-                  <span className="font-display text-xl font-medium leading-none">
-                    {new Date(s.date).getDate()}
-                  </span>
-                  <span className="text-[10px] uppercase text-ink-dim">
-                    {new Date(s.date).toLocaleDateString('de-DE', { month: 'short' })}
-                  </span>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold">{fmtDate(s.date)}</span>
-                    <Badge tone={st.tone}>{st.label}</Badge>
+      {list == null ? (
+        <Card>
+          <div className="py-8 text-center text-sm text-ink-dim">Lädt…</div>
+        </Card>
+      ) : list.length === 0 ? (
+        <Card>
+          <Empty
+            icon="🎳"
+            title="Noch kein Kegelabend"
+            hint="Starte oben einen leeren Kegelabend oder übernimm einen anstehenden Termin."
+          />
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {list.map((s) => {
+            const st = STATUS[s.status] ?? STATUS.draft
+            const to =
+              s.status === 'draft' ? `/sessions/${s.id}` : `/sessions/${s.id}/review`
+            return (
+              <Link key={s.id} to={to}>
+                <Card className="flex items-center gap-4 transition hover:border-ink/20">
+                  <div
+                    className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-2xl"
+                    style={{ background: pal.bg }}
+                  >
+                    <span className="font-display text-xl font-medium leading-none">
+                      {new Date(s.date).getDate()}
+                    </span>
+                    <span className="text-[10px] uppercase text-ink-dim">
+                      {new Date(s.date).toLocaleDateString('de-DE', { month: 'short' })}
+                    </span>
                   </div>
-                  <div className="mt-1 flex items-center gap-2 text-[12px] text-ink-soft">
-                    <Avatar name={s.recordedBy} size={18} />
-                    <span>{s.recordedBy}</span>
-                    <span className="text-ink-dim">·</span>
-                    <span>{s.participants} Teiln.</span>
-                    <span className="text-ink-dim">·</span>
-                    <span>{s.penalties} Strafen</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">{fmtDate(s.date)}</span>
+                      <Badge tone={st.tone}>{st.label}</Badge>
+                    </div>
+                    <div className="mt-1 flex items-center gap-2 text-[12px] text-ink-soft">
+                      <Avatar name={s.recordedBy} size={18} />
+                      <span>{s.recordedBy}</span>
+                      <span className="text-ink-dim">·</span>
+                      <span>{s.participants} Teiln.</span>
+                      <span className="text-ink-dim">·</span>
+                      <span>{s.penalties} Strafen</span>
+                    </div>
                   </div>
-                </div>
-                <div className="text-right">
-                  <div className="font-mono text-lg font-semibold tnum">{eur(s.total)} €</div>
-                  <div className="text-[11px] text-ink-dim">Σ Strafen</div>
-                </div>
-              </Card>
-            </Link>
-          )
-        })}
-      </div>
+                  <div className="text-right">
+                    <div className="font-mono text-lg font-semibold tnum">{eur(s.total)} €</div>
+                    <div className="text-[11px] text-ink-dim">Σ Strafen</div>
+                  </div>
+                </Card>
+              </Link>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

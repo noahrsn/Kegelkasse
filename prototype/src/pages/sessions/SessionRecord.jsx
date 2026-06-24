@@ -1,37 +1,161 @@
-import { useMemo, useState } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { useNavigate, useLocation, useParams } from 'react-router-dom'
 import { Card, Button, Avatar, Badge, Input } from '../../components/ui'
 import { Sheet } from '../../components/Modal'
 import { cx, eur, pal } from '../../design/calm'
-import { members, penalties } from '../../mock/data'
+import { useAuth } from '../../context/AuthContext.jsx'
+import { listPenalties, listMembers, getSession, saveSession } from '../../lib/api.js'
+import { members as mockMembers, penalties as mockPenalties } from '../../mock/data'
 
-const activePenalties = penalties.filter((p) => p.active)
 let entrySeq = 1
+
+/* Katalog-DB-Zeile → UI-Form. */
+function normCatalog(rows) {
+  return rows
+    .filter((p) => p.active)
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      icon: p.icon,
+      amount: p.amount == null ? null : Number(p.amount),
+      manual: p.manual_amount,
+    }))
+}
+
+/* Einzel-Erfassungen → aggregierte session_penalties-Zeilen (count + Summe). */
+function aggregatePenalties(entries) {
+  const map = new Map()
+  for (const e of entries) {
+    const key = `${e.penId}|${e.amount}`
+    const cur = map.get(key) || { catalog_id: e.penId, count: 0, amount: 0 }
+    cur.count += 1
+    cur.amount += e.amount
+    map.set(key, cur)
+  }
+  return [...map.values()].map((v) => ({
+    catalog_id: v.catalog_id,
+    count: v.count,
+    amount: Number(v.amount.toFixed(2)),
+  }))
+}
 
 export default function SessionRecord() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { id } = useParams()
+  const { mockMode, activeGroupId } = useAuth()
 
-  // Teilnehmer ggf. aus dem Termin übernommen (siehe SessionNew)
-  const initial = location.state?.roster
-  const [roster, setRoster] = useState(() =>
-    initial && initial.length
-      ? initial.map((p) => ({ ...p, entries: [] }))
-      : members.slice(0, 8).map((m) => ({ ...m, isGuest: false, late: false, entries: [] })),
+  const isLive = id === 'live'
+  const existingId = isLive ? null : id
+
+  // Katalog (aktive Strafen) + Mitgliederpool (für Nachzügler/Abwesende).
+  const [catalog, setCatalog] = useState(mockMode ? normCatalog(mockPenalties) : null)
+  const [pool, setPool] = useState(
+    mockMode ? mockMembers.map((m) => ({ userId: m.id, name: m.name })) : null,
   )
 
+  // Kontext des Kegelabends.
+  const [ctx, setCtx] = useState({
+    groupId: location.state?.groupId || activeGroupId,
+    eventId: location.state?.eventId || null,
+    date: location.state?.date || null,
+    title: location.state?.title || 'Kegelabend',
+    when: location.state?.when || null,
+  })
+
+  const [roster, setRoster] = useState(() => {
+    const initial = location.state?.roster
+    if (initial && initial.length) return initial.map((p) => ({ ...p, entries: [] }))
+    if (mockMode)
+      return mockMembers.slice(0, 8).map((m) => ({
+        id: m.id,
+        userId: m.id,
+        name: m.name,
+        isGuest: false,
+        late: false,
+        entries: [],
+      }))
+    return []
+  })
+  const [loading, setLoading] = useState(!mockMode && !isLive)
+
   const [mode, setMode] = useState('fast') // 'fast' (Standard) | 'detailed'
-  const [active, setActive] = useState(null) // index in roster
-  const [manualFor, setManualFor] = useState(null) // penId, der einen Betrag braucht
+  const [active, setActive] = useState(null)
+  const [manualFor, setManualFor] = useState(null)
   const [manualVal, setManualVal] = useState('')
   const [lateOpen, setLateOpen] = useState(false)
   const [submitOpen, setSubmitOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  // Echtmodus: Katalog + Mitglieder laden.
+  useEffect(() => {
+    if (mockMode || !activeGroupId) return
+    listPenalties(activeGroupId).then((rows) => setCatalog(normCatalog(rows))).catch(console.error)
+    listMembers(activeGroupId)
+      .then((rows) => setPool(rows.map((m) => ({ userId: m.userId, name: m.name }))))
+      .catch(console.error)
+  }, [mockMode, activeGroupId])
+
+  // Echtmodus: bestehenden Entwurf nachladen (z. B. „fortsetzen").
+  useEffect(() => {
+    if (mockMode || isLive || !existingId) return
+    setLoading(true)
+    getSession(existingId)
+      .then((s) => {
+        if (!s) return navigate('/sessions')
+        if (s.status !== 'draft') return navigate(`/sessions/${existingId}/review`)
+        setCtx({
+          groupId: s.group_id,
+          eventId: s.event_id,
+          date: s.date,
+          title: 'Kegelabend',
+          when: new Date(s.date).toLocaleDateString('de-DE', {
+            weekday: 'short',
+            day: '2-digit',
+            month: 'long',
+          }),
+        })
+        setRoster(
+          (s.participants || []).map((p) => ({
+            id: p.id,
+            userId: p.user_id,
+            name: p.is_guest
+              ? p.guest_name
+              : `${p.profiles?.first_name ?? ''} ${p.profiles?.last_name ?? ''}`.trim() || '—',
+            isGuest: p.is_guest,
+            late: p.is_late,
+            entries: (p.penalties || []).flatMap((sp) =>
+              Array.from({ length: sp.count }, () => ({
+                id: entrySeq++,
+                penId: sp.catalog_id,
+                amount: Number(sp.amount) / sp.count,
+              })),
+            ),
+          })),
+        )
+      })
+      .catch((e) => {
+        console.error(e)
+        alert('Konnte den Kegelabend nicht laden: ' + (e?.message || e))
+      })
+      .finally(() => setLoading(false))
+  }, [mockMode, isLive, existingId, navigate])
+
+  // Kein Roster + kein Backend → zurück zur Konfiguration (z. B. Reload auf /live).
+  useEffect(() => {
+    if (isLive && (!location.state?.roster || roster.length === 0) && !mockMode) {
+      navigate('/sessions/new', { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const sumFor = (p) => p.entries.reduce((a, e) => a + e.amount, 0)
   const countPen = (p, penId) => p.entries.filter((e) => e.penId === penId).length
-
   const total = useMemo(() => roster.reduce((acc, p) => acc + sumFor(p), 0), [roster])
   const countTotal = useMemo(() => roster.reduce((acc, p) => acc + p.entries.length, 0), [roster])
+
+  const cat = catalog || []
+  const findPen = (penId) => cat.find((p) => p.id === penId)
 
   const addEntry = (idx, penId, amount) =>
     setRoster((r) =>
@@ -52,10 +176,9 @@ export default function SessionRecord() {
       }),
     )
 
-  // Strafe antippen — bei manuellem Betrag erst Eingabe öffnen.
-  // Im Schnell-Modus schließt sich das Sheet direkt → nur 2 Klicks pro Strafe.
   const tap = (penId) => {
-    const pen = activePenalties.find((p) => p.id === penId)
+    const pen = findPen(penId)
+    if (!pen) return
     if (pen.manual) {
       setManualVal('')
       setManualFor(penId)
@@ -73,17 +196,67 @@ export default function SessionRecord() {
     if (mode === 'fast') setActive(null)
   }
 
-  const absentMembers = members.filter((m) => !roster.some((r) => r.id === m.id))
+  // Abwesende = Pool minus bereits erfasste Mitglieder.
+  const rosterUserIds = new Set(roster.filter((p) => !p.isGuest).map((p) => p.userId))
+  const absentMembers = (pool || []).filter((m) => !rosterUserIds.has(m.userId))
+
+  // Nachzügler: erhält automatisch die Verspätungsstrafe (Fallback: erste feste Strafe).
+  const latePenalty =
+    cat.find((p) => !p.manual && /versp/i.test(p.name)) || cat.find((p) => !p.manual) || null
   const addLate = (m) => {
-    const avg = [
-      { id: entrySeq++, penId: 'p1', amount: 0.5 },
-      { id: entrySeq++, penId: 'p1', amount: 0.5 },
-    ]
-    setRoster((r) => [...r, { ...m, isGuest: false, late: true, entries: avg }])
+    const entries = latePenalty
+      ? [{ id: entrySeq++, penId: latePenalty.id, amount: latePenalty.amount }]
+      : []
+    setRoster((r) => [
+      ...r,
+      { id: 'late-' + m.userId, userId: m.userId, name: m.name, isGuest: false, late: true, entries },
+    ])
     setLateOpen(false)
   }
 
+  // Speichern / Einreichen.
+  const persist = async (status) => {
+    if (mockMode) {
+      navigate('/sessions')
+      return
+    }
+    if (saving) return
+    setSaving(true)
+    try {
+      const participants = roster.map((p) => ({
+        user_id: p.isGuest ? null : p.userId,
+        guest_name: p.isGuest ? p.name : null,
+        is_guest: p.isGuest,
+        is_late: !!p.late,
+        penalties: aggregatePenalties(p.entries),
+      }))
+      await saveSession({
+        groupId: ctx.groupId,
+        sessionId: existingId,
+        eventId: ctx.eventId,
+        date: ctx.date,
+        status,
+        participants,
+        absent: absentMembers.map((m) => m.userId),
+      })
+      setSubmitOpen(false)
+      navigate('/sessions')
+    } catch (e) {
+      alert('Speichern fehlgeschlagen: ' + (e?.message || e))
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const current = active != null ? roster[active] : null
+
+  if (loading) {
+    return (
+      <Card>
+        <div className="py-12 text-center text-sm text-ink-dim">Kegelabend wird geladen…</div>
+      </Card>
+    )
+  }
 
   return (
     <div className="space-y-4 pb-4">
@@ -93,7 +266,8 @@ export default function SessionRecord() {
           <div className="text-[11px] uppercase tracking-[0.14em] text-ink-dim">
             Laufende Erfassung · Entwurf
           </div>
-          <h1 className="mt-1 font-display text-3xl font-medium tracking-tight">Kegelabend Juni</h1>
+          <h1 className="mt-1 font-display text-3xl font-medium tracking-tight">{ctx.title}</h1>
+          {ctx.when && <div className="text-[12px] text-ink-dim">{ctx.when}</div>}
         </div>
         <Card className="flex items-center gap-4 py-2.5">
           <div>
@@ -175,15 +349,15 @@ export default function SessionRecord() {
 
       {/* Sticky-Abschluss */}
       <div className="sticky bottom-24 lg:bottom-4 flex gap-2">
-        <Button variant="soft" size="lg" onClick={() => navigate('/sessions')}>
-          Speichern
+        <Button variant="soft" size="lg" onClick={() => persist('draft')} disabled={saving}>
+          {saving ? '…' : 'Speichern'}
         </Button>
-        <Button size="lg" className="flex-1 shadow-lg" onClick={() => setSubmitOpen(true)}>
+        <Button size="lg" className="flex-1 shadow-lg" onClick={() => setSubmitOpen(true)} disabled={saving}>
           Einreichen · {eur(total)} €
         </Button>
       </div>
 
-      {/* Strafen-Sheet — Inhalt je nach Modus */}
+      {/* Strafen-Sheet */}
       <Sheet
         open={active != null}
         onClose={() => {
@@ -212,19 +386,19 @@ export default function SessionRecord() {
           ) : undefined
         }
       >
-        {/* Manuelle Betragseingabe */}
         {manualFor ? (
           <ManualEntry
-            pen={activePenalties.find((p) => p.id === manualFor)}
+            pen={findPen(manualFor)}
             value={manualVal}
             onChange={setManualVal}
             onConfirm={confirmManual}
             onCancel={() => setManualFor(null)}
           />
         ) : mode === 'fast' ? (
-          <FastGrid current={current} countPen={countPen} onTap={tap} />
+          <FastGrid catalog={cat} current={current} countPen={countPen} onTap={tap} />
         ) : (
           <DetailList
+            catalog={cat}
             current={current}
             countPen={countPen}
             onPlus={(penId) => tap(penId)}
@@ -232,7 +406,6 @@ export default function SessionRecord() {
           />
         )}
 
-        {/* Zuletzt erfasst (mit Undo) */}
         {!manualFor && current && current.entries.length > 0 && (
           <div className="mt-4 border-t border-card-edge pt-3">
             <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-dim">
@@ -243,7 +416,7 @@ export default function SessionRecord() {
                 .slice(-6)
                 .reverse()
                 .map((e) => {
-                  const pen = activePenalties.find((p) => p.id === e.penId)
+                  const pen = findPen(e.penId)
                   return (
                     <button
                       key={e.id}
@@ -266,21 +439,23 @@ export default function SessionRecord() {
         open={lateOpen}
         onClose={() => setLateOpen(false)}
         title="Nachzügler hinzufügen"
-        subtitle="Erhält automatisch die Durchschnittsstrafe."
+        subtitle="Erhält automatisch die Verspätungsstrafe."
       >
         <div className="space-y-2">
           {absentMembers.length === 0 && (
-            <p className="py-6 text-center text-[13px] text-ink-dim">Alle Mitglieder sind bereits dabei.</p>
+            <p className="py-6 text-center text-[13px] text-ink-dim">
+              Alle Mitglieder sind bereits dabei.
+            </p>
           )}
           {absentMembers.map((m) => (
             <button
-              key={m.id}
+              key={m.userId}
               onClick={() => addLate(m)}
               className="flex w-full items-center gap-3 rounded-2xl border border-card-edge p-3 text-left hover:border-ink/20"
             >
               <Avatar name={m.name} size={36} />
               <span className="flex-1 font-medium">{m.name}</span>
-              <span className="text-[12px] font-semibold text-amber">+ Ø Strafe</span>
+              <span className="text-[12px] font-semibold text-amber">+ Verspätung</span>
             </button>
           ))}
         </div>
@@ -294,11 +469,11 @@ export default function SessionRecord() {
         subtitle="Danach prüft der Kassenwart und gibt frei."
         footer={
           <div className="flex gap-2">
-            <Button variant="soft" className="flex-1" onClick={() => setSubmitOpen(false)}>
+            <Button variant="soft" className="flex-1" onClick={() => setSubmitOpen(false)} disabled={saving}>
               Zurück
             </Button>
-            <Button className="flex-1" onClick={() => navigate('/sessions')}>
-              Einreichen
+            <Button className="flex-1" onClick={() => persist('submitted')} disabled={saving}>
+              {saving ? 'Reicht ein…' : 'Einreichen'}
             </Button>
           </div>
         }
@@ -314,10 +489,10 @@ export default function SessionRecord() {
 }
 
 /* ── Schnell-Modus: 1-Klick-Raster ────────────────────────────────────── */
-function FastGrid({ current, countPen, onTap }) {
+function FastGrid({ catalog, current, countPen, onTap }) {
   return (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-      {activePenalties.map((pen) => {
+      {catalog.map((pen) => {
         const n = current ? countPen(current, pen.id) : 0
         return (
           <button
@@ -346,10 +521,10 @@ function FastGrid({ current, countPen, onTap }) {
 }
 
 /* ── Detailliert-Modus: Stepper ───────────────────────────────────────── */
-function DetailList({ current, countPen, onPlus, onMinus }) {
+function DetailList({ catalog, current, countPen, onPlus, onMinus }) {
   return (
     <div className="grid grid-cols-1 gap-2">
-      {activePenalties.map((pen) => {
+      {catalog.map((pen) => {
         const n = current ? countPen(current, pen.id) : 0
         return (
           <div
@@ -416,7 +591,11 @@ function ManualEntry({ pen, value, onChange, onConfirm, onCancel }) {
         <Button variant="soft" className="flex-1" onClick={onCancel}>
           Abbrechen
         </Button>
-        <Button className="flex-1" onClick={onConfirm} disabled={!(parseFloat((value || '').replace(',', '.')) > 0)}>
+        <Button
+          className="flex-1"
+          onClick={onConfirm}
+          disabled={!(parseFloat((value || '').replace(',', '.')) > 0)}
+        >
           Hinzufügen
         </Button>
       </div>

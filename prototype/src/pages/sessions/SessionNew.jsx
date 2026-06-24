@@ -1,28 +1,51 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Card, Button, PageTitle, Avatar, Field, Input } from '../../components/ui'
 import { Sheet } from '../../components/Modal'
 import { cx } from '../../design/calm'
-import { members, events } from '../../mock/data'
+import { useAuth } from '../../context/AuthContext.jsx'
+import { listMembers } from '../../lib/api.js'
+import { members as mockMembers } from '../../mock/data'
+
+/* Normalisiert Mitglieder auf { id, userId, name } (Mock: id == userId). */
+function normalizeMockMembers() {
+  return mockMembers.map((m) => ({ id: m.id, userId: m.id, name: m.name }))
+}
 
 export default function SessionNew() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { mockMode, activeGroupId } = useAuth()
   const fromEvent = location.state?.fromEvent
-  const event = events.find((e) => !e.past)
 
-  const [present, setPresent] = useState(() =>
-    fromEvent
-      ? new Set(location.state.presentIds || [])
-      : new Set(members.slice(0, 8).map((m) => m.id)),
-  )
+  const [members, setMembers] = useState(mockMode ? normalizeMockMembers() : null)
+  const [present, setPresent] = useState(() => new Set(location.state?.presentIds || []))
+  const [presetDone, setPresetDone] = useState(mockMode) // Default-Auswahl gesetzt?
   const [guests, setGuests] = useState(() =>
-    fromEvent
-      ? (location.state.guests || []).map((name, i) => ({ id: 'ge' + i, name }))
-      : [{ id: 'g1', name: 'Uwe (Gast von Hans)' }],
+    (location.state?.guests || []).map((name, i) => ({ id: 'ge' + i, name })),
   )
   const [guestOpen, setGuestOpen] = useState(false)
   const [guestName, setGuestName] = useState('')
+
+  // Mitglieder laden (Echtmodus).
+  useEffect(() => {
+    if (mockMode || !activeGroupId) return
+    listMembers(activeGroupId)
+      .then((rows) => setMembers(rows.map((m) => ({ id: m.userId, userId: m.userId, name: m.name }))))
+      .catch((e) => {
+        console.error(e)
+        setMembers([])
+      })
+  }, [mockMode, activeGroupId])
+
+  // Default-Anwesenheit setzen, sobald Mitglieder da sind:
+  //  - aus Termin: nur die Zusagen (presentIds bereits gesetzt)
+  //  - leerer Start: standardmäßig alle anwesend.
+  useEffect(() => {
+    if (!members || presetDone) return
+    if (!fromEvent) setPresent(new Set(members.map((m) => m.id)))
+    setPresetDone(true)
+  }, [members, fromEvent, presetDone])
 
   const toggle = (id) => {
     setPresent((prev) => {
@@ -32,22 +55,45 @@ export default function SessionNew() {
     })
   }
 
+  const list = members || []
   const presentCount = present.size
-  const absentCount = members.length - presentCount
+  const absentCount = list.length - presentCount
 
   const start = () => {
-    const presentMembers = members
+    const presentMembers = list
       .filter((m) => present.has(m.id))
-      .map((m) => ({ id: m.id, name: m.name, isGuest: false, late: false }))
-    const guestRoster = guests.map((g) => ({ id: g.id, name: g.name, isGuest: true, late: false }))
-    navigate('/sessions/live', { state: { roster: [...presentMembers, ...guestRoster] } })
+      .map((m) => ({ id: m.id, userId: m.userId, name: m.name, isGuest: false, late: false }))
+    const guestRoster = guests.map((g) => ({
+      id: g.id,
+      userId: null,
+      name: g.name,
+      isGuest: true,
+      late: false,
+    }))
+    const absent = list.filter((m) => !present.has(m.id)).map((m) => m.userId)
+
+    navigate('/sessions/live', {
+      state: {
+        roster: [...presentMembers, ...guestRoster],
+        absent,
+        groupId: activeGroupId,
+        eventId: location.state?.eventId || null,
+        date: location.state?.eventDate || null,
+        title: fromEvent ? location.state.eventTitle : 'Kegelabend',
+        when: location.state?.eventWhen || null,
+      },
+    })
   }
+
+  const title = fromEvent ? location.state.eventTitle : 'Neuer Kegelabend'
+  const when =
+    location.state?.eventWhen ||
+    new Date().toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: 'long' })
 
   return (
     <div className="space-y-5 pb-4">
       <PageTitle kicker="Kegelabend starten" title="Wer ist dabei?" />
 
-      {/* Hinweis bei Übernahme aus Termin */}
       {fromEvent && (
         <Card tone="sage" className="flex items-center gap-3 py-3">
           <span className="text-lg">✓</span>
@@ -58,12 +104,12 @@ export default function SessionNew() {
         </Card>
       )}
 
-      {/* Event-Kontext */}
+      {/* Kontext */}
       <Card tone="navy" className="flex items-center gap-3">
         <span className="grid h-11 w-11 place-items-center rounded-2xl bg-white/10 text-xl">🎳</span>
         <div className="flex-1">
-          <div className="text-[13px] font-semibold">{fromEvent ? location.state.eventTitle : event.title}</div>
-          <div className="text-[12px] text-white/70">Sa, 27. Juni · 19:30 Uhr · {event.lane}</div>
+          <div className="text-[13px] font-semibold">{title}</div>
+          <div className="text-[12px] text-white/70">{when}</div>
         </div>
       </Card>
 
@@ -80,37 +126,44 @@ export default function SessionNew() {
           <h2 className="text-[13px] font-semibold text-ink-soft">Mitglieder</h2>
           <button
             className="text-[12px] font-semibold text-sage"
-            onClick={() => setPresent(new Set(members.map((m) => m.id)))}
+            onClick={() => setPresent(new Set(list.map((m) => m.id)))}
           >
             Alle anwesend
           </button>
         </div>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {members.map((m) => {
-            const on = present.has(m.id)
-            return (
-              <button
-                key={m.id}
-                onClick={() => toggle(m.id)}
-                className={cx(
-                  'flex items-center gap-3 rounded-2xl border p-3 text-left transition',
-                  on ? 'border-sage bg-sage-bg' : 'border-card-edge bg-card',
-                )}
-              >
-                <Avatar name={m.name} size={34} />
-                <span className="flex-1 text-[14px] font-medium">{m.name}</span>
-                <span
+
+        {members == null ? (
+          <Card>
+            <div className="py-6 text-center text-sm text-ink-dim">Lädt…</div>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {list.map((m) => {
+              const on = present.has(m.id)
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => toggle(m.id)}
                   className={cx(
-                    'grid h-6 w-6 place-items-center rounded-full text-[12px] font-bold',
-                    on ? 'bg-sage text-white' : 'bg-card-edge text-ink-dim',
+                    'flex items-center gap-3 rounded-2xl border p-3 text-left transition',
+                    on ? 'border-sage bg-sage-bg' : 'border-card-edge bg-card',
                   )}
                 >
-                  {on ? '✓' : ''}
-                </span>
-              </button>
-            )
-          })}
-        </div>
+                  <Avatar name={m.name} size={34} />
+                  <span className="flex-1 text-[14px] font-medium">{m.name}</span>
+                  <span
+                    className={cx(
+                      'grid h-6 w-6 place-items-center rounded-full text-[12px] font-bold',
+                      on ? 'bg-sage text-white' : 'bg-card-edge text-ink-dim',
+                    )}
+                  >
+                    {on ? '✓' : ''}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {/* Gäste */}
@@ -144,7 +197,12 @@ export default function SessionNew() {
 
       {/* Sticky-Start */}
       <div className="sticky bottom-24 lg:bottom-4">
-        <Button size="lg" className="w-full shadow-lg" onClick={start}>
+        <Button
+          size="lg"
+          className="w-full shadow-lg"
+          disabled={members == null || presentCount + guests.length === 0}
+          onClick={start}
+        >
           Erfassung starten · {presentCount + guests.length} Personen
         </Button>
       </div>
