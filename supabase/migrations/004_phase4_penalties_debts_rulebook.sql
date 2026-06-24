@@ -45,7 +45,9 @@ AS $$
 DECLARE
   edited_at TIMESTAMPTZ := now();
 BEGIN
-  IF group_role(p_group_id) NOT IN ('admin', 'präsident') THEN
+  -- COALESCE: Nicht-Mitglieder liefern group_role() = NULL; `NULL NOT IN (...)`
+  -- ergäbe NULL und würde die Prüfung „fail-open" durchlassen.
+  IF COALESCE(group_role(p_group_id), '') NOT IN ('admin', 'präsident') THEN
     RAISE EXCEPTION 'Keine Berechtigung für das Vereinsregelwerk';
   END IF;
 
@@ -61,6 +63,28 @@ $$;
 
 REVOKE EXECUTE ON FUNCTION public.set_rulebook(UUID, TEXT) FROM anon, public;
 GRANT  EXECUTE ON FUNCTION public.set_rulebook(UUID, TEXT) TO authenticated;
+
+-- 2b. Härtung der bestehenden reset_invite_token() (Phase 3): dieselbe
+--     NULL-Lücke — ein authentifizierter Nicht-Mitglied (group_role = NULL)
+--     hätte den Einladungs-Token einer fremden Gruppe zurücksetzen können.
+CREATE OR REPLACE FUNCTION public.reset_invite_token(p_group_id UUID)
+RETURNS TEXT
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  new_token TEXT;
+BEGIN
+  IF COALESCE(group_role(p_group_id), '') NOT IN ('admin', 'präsident') THEN
+    RAISE EXCEPTION 'Keine Berechtigung';
+  END IF;
+
+  new_token := encode(extensions.gen_random_bytes(9), 'hex');
+  UPDATE groups SET invite_token = new_token WHERE id = p_group_id;
+  RETURN new_token;
+END;
+$$;
 
 -- ----------------------------------------------------------------------------
 -- 3. book_monthly_fees — Monatsbeitrag je Gruppe buchen
