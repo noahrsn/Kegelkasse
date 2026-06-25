@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useLocation, useParams } from 'react-router-dom'
-import { Card, Button, Avatar, Badge, Input, Toggle } from '../../components/ui'
+import { Card, Button, Avatar, Badge, Input } from '../../components/ui'
 import { Sheet } from '../../components/Modal'
 import { cx, eur, pal } from '../../design/calm'
 import { useAuth } from '../../context/AuthContext.jsx'
@@ -126,7 +126,10 @@ export default function SessionRecord() {
               : `${p.profiles?.first_name ?? ''} ${p.profiles?.last_name ?? ''}`.trim() || '—',
             isGuest: p.is_guest,
             late: p.is_late,
+            lateAvg: p.is_late ? Number(p.avg_amount) || 0 : null,
             early: p.is_early_leave,
+            earlyAvg: p.is_early_leave ? Number(p.avg_amount) || 0 : 0,
+            earlyAtSeq: null,
             entries: (p.penalties || []).flatMap((sp) =>
               Array.from({ length: sp.count }, () => ({
                 id: entrySeq++,
@@ -152,9 +155,28 @@ export default function SessionRecord() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const sumFor = (p) => p.entries.reduce((a, e) => a + e.amount, 0)
+  const entriesSum = (p) => p.entries.reduce((a, e) => a + e.amount, 0)
   const countPen = (p, penId) => p.entries.filter((e) => e.penId === penId).length
-  const total = useMemo(() => roster.reduce((acc, p) => acc + sumFor(p), 0), [roster])
+
+  // Frühgeher: Schnitt der Strafen, die seit seinem Weggang (Sequenzstand earlyAtSeq)
+  // bei den übrigen Anwesenden anfielen. Nach Reload (earlyAtSeq == null) der fixe Wert.
+  const earlyAvgLive = (p) => {
+    if (!p.early) return 0
+    if (p.earlyAtSeq == null) return p.earlyAvg || 0
+    const cut = p.earlyAtSeq
+    const goneBefore = (q) => q.early && q.earlyAtSeq != null && q.earlyAtSeq <= cut
+    let sumPost = 0
+    for (const q of roster) {
+      if (q === p || q.isGuest || goneBefore(q)) continue
+      for (const e of q.entries) if (e.id >= cut) sumPost += e.amount
+    }
+    const n = roster.filter((q) => q !== p && !q.isGuest && !goneBefore(q)).length
+    return n > 0 ? Math.round((sumPost / n) * 100) / 100 : 0
+  }
+  // Konto in dieser Session: eigene Strafen + Nachzügler-Start + Frühgeher-Schnitt.
+  const effectiveSum = (p) => entriesSum(p) + (p.lateAvg || 0) + earlyAvgLive(p)
+
+  const total = useMemo(() => roster.reduce((acc, p) => acc + effectiveSum(p), 0), [roster])
   const countTotal = useMemo(() => roster.reduce((acc, p) => acc + p.entries.length, 0), [roster])
 
   const cat = catalog || []
@@ -203,25 +225,39 @@ export default function SessionRecord() {
   const rosterUserIds = new Set(roster.filter((p) => !p.isGuest).map((p) => p.userId))
   const absentMembers = (pool || []).filter((m) => !rosterUserIds.has(m.userId))
 
-  // Nachzügler: keine Verspätungsstrafe — erhält bei Genehmigung den Durchschnitt
-  // der voll Anwesenden. Wird hier nur als „late" markiert (reversibel im Sheet).
+  // Nachzügler: bekommt beim Hinzukommen den AKTUELLEN Durchschnitt aller bisher
+  // erfassten Strafen als fixe Startstrafe (Snapshot) und sammelt danach normal
+  // weiter. Das Nachzügler-Sein ist endgültig (Korrektur nur durch Entfernen).
   const addLate = (m) => {
+    const base = roster.filter((p) => !p.isGuest)
+    const sum = base.reduce((a, p) => a + entriesSum(p), 0)
+    const lateAvg = base.length > 0 ? Math.round((sum / base.length) * 100) / 100 : 0
     setRoster((r) => [
       ...r,
-      { id: 'late-' + m.userId, userId: m.userId, name: m.name, isGuest: false, late: true, early: false, entries: [] },
+      {
+        id: 'late-' + m.userId,
+        userId: m.userId,
+        name: m.name,
+        isGuest: false,
+        late: true,
+        lateAvg,
+        early: false,
+        earlyAtSeq: null,
+        earlyAvg: 0,
+        entries: [],
+      },
     ])
     setLateOpen(false)
   }
 
-  // Status eines Teilnehmers umschalten (Nachzügler / Frühgeher) — beides reversibel.
-  const setStatus = (idx, key) =>
+  // Frühgeher: ab Klick „Ab jetzt abwesend" werden weitere Strafen gemerkt
+  // (Sequenzstand earlyAtSeq); am Ende bekommt die Person den Schnitt davon.
+  // Reversibel (Fehlklick-Korrektur).
+  const markEarly = (idx) =>
+    setRoster((r) => r.map((p, i) => (i === idx ? { ...p, early: true, earlyAtSeq: entrySeq } : p)))
+  const unmarkEarly = (idx) =>
     setRoster((r) =>
-      r.map((p, i) => {
-        if (i !== idx) return p
-        if (key === 'late') return { ...p, late: !p.late, early: false }
-        if (key === 'early') return { ...p, early: !p.early, late: false }
-        return p
-      }),
+      r.map((p, i) => (i === idx ? { ...p, early: false, earlyAtSeq: null, earlyAvg: 0 } : p)),
     )
   // Nachzügler wieder aus der Liste entfernen (z. B. versehentlich hinzugefügt).
   const removeParticipant = (idx) => {
@@ -244,6 +280,7 @@ export default function SessionRecord() {
         is_guest: p.isGuest,
         is_late: !!p.late,
         is_early_leave: !!p.early,
+        avg_amount: p.late ? p.lateAvg || 0 : p.early ? earlyAvgLive(p) : null,
         penalties: aggregatePenalties(p.entries),
       }))
       await saveSession({
@@ -324,7 +361,7 @@ export default function SessionRecord() {
       {/* Teilnehmerliste */}
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {roster.map((p, i) => {
-          const s = sumFor(p)
+          const s = effectiveSum(p)
           const n = p.entries.length
           return (
             <button
@@ -341,11 +378,13 @@ export default function SessionRecord() {
                   {p.isGuest && <Badge tone="cream">Gast</Badge>}
                 </div>
                 <div className="mt-0.5 text-[12px] text-ink-dim">
-                  {p.late || p.early
-                    ? 'Bekommt den Durchschnitt'
-                    : n > 0
-                      ? `${n} Strafen erfasst`
-                      : 'Noch nichts erfasst'}
+                  {p.late
+                    ? `Start-Schnitt ${eur(p.lateAvg || 0)} €${n > 0 ? ` · ${n} Strafen` : ''}`
+                    : p.early
+                      ? `Abwesend · + Schnitt ${eur(earlyAvgLive(p))} €${n > 0 ? ` · ${n} Strafen` : ''}`
+                      : n > 0
+                        ? `${n} Strafen erfasst`
+                        : 'Noch nichts erfasst'}
                 </div>
               </div>
               <div className="text-right">
@@ -360,16 +399,6 @@ export default function SessionRecord() {
           )
         })}
       </div>
-
-      {/* Abwesenden-Durchschnittsstrafe */}
-      <Card tone="cream" className="py-3">
-        <Toggle
-          checked={chargeAbsentAvg}
-          onChange={setChargeAbsentAvg}
-          label="Abwesende mit Durchschnitt belasten"
-          hint={`Nach Genehmigung bekommen die ${absentMembers.length} abwesenden Mitglieder den Schnitt aller Strafen als offenen Beitrag.`}
-        />
-      </Card>
 
       {/* Nachzügler */}
       <button
@@ -401,7 +430,7 @@ export default function SessionRecord() {
           current
             ? mode === 'fast' && !manualFor
               ? 'Strafe antippen — wird sofort übernommen'
-              : `Aktuell ${eur(sumFor(current))} € · ${current.entries.length} Strafen`
+              : `Aktuell ${eur(effectiveSum(current))} € · ${current.entries.length} Strafen`
             : ''
         }
         footer={
@@ -429,18 +458,48 @@ export default function SessionRecord() {
                 Aus Liste entfernen
               </button>
             </div>
-            <div className="flex gap-2">
-              <StatusChip active={current.late} onClick={() => setStatus(active, 'late')}>
-                🕐 Nachzügler
-              </StatusChip>
-              <StatusChip active={current.early} onClick={() => setStatus(active, 'early')}>
-                🚪 Geht früher
-              </StatusChip>
-            </div>
-            {(current.late || current.early) && (
-              <p className="mt-2 text-[11px] text-ink-dim">
-                Bekommt bei der Genehmigung den Durchschnitt der voll Anwesenden — keine
-                einzeln erfassten Strafen, keine Verspätungsstrafe.
+
+            {current.late && (
+              <p className="text-[12px] text-ink-soft">
+                🕐 <span className="font-semibold">Nachzügler</span> · Startguthaben{' '}
+                <span className="font-mono">{eur(current.lateAvg || 0)} €</span> (Durchschnitt beim
+                Hinzukommen). Sammelt darüber hinaus normal eigene Strafen.
+              </p>
+            )}
+
+            {!current.late && current.early && (
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[12px] text-ink-soft">
+                  🚪 <span className="font-semibold">Abwesend</span> · Schnitt seit Weggang{' '}
+                  <span className="font-mono font-semibold">{eur(earlyAvgLive(current))} €</span>
+                </span>
+                <button
+                  onClick={() => unmarkEarly(active)}
+                  className="shrink-0 text-[11px] font-semibold text-ink-soft hover:underline"
+                >
+                  Zurücknehmen
+                </button>
+              </div>
+            )}
+
+            {!current.late && !current.early && mode === 'detailed' && (
+              <>
+                <button
+                  onClick={() => markEarly(active)}
+                  className="w-full rounded-xl border border-amber bg-amber-bg px-3 py-2 text-[12px] font-semibold text-amber"
+                >
+                  🚪 Ab jetzt abwesend
+                </button>
+                <p className="mt-2 text-[11px] text-ink-dim">
+                  Ab dem Klick zählen alle weiteren Strafen; am Ende bekommt die Person den
+                  Durchschnitt dieser Strafen seit dem Weggang.
+                </p>
+              </>
+            )}
+
+            {!current.late && !current.early && mode !== 'detailed' && (
+              <p className="text-[11px] text-ink-dim">
+                Frühgeher („Ab jetzt abwesend") wird im Detailliert-Modus gesetzt.
               </p>
             )}
           </div>
@@ -463,34 +522,8 @@ export default function SessionRecord() {
             countPen={countPen}
             onPlus={(penId) => tap(penId)}
             onMinus={(penId) => removeLastPen(active, penId)}
+            onRemoveEntry={(entryId) => removeEntryId(active, entryId)}
           />
-        )}
-
-        {!manualFor && current && current.entries.length > 0 && (
-          <div className="mt-4 border-t border-card-edge pt-3">
-            <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-dim">
-              Zuletzt erfasst
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {[...current.entries]
-                .slice(-6)
-                .reverse()
-                .map((e) => {
-                  const pen = findPen(e.penId)
-                  return (
-                    <button
-                      key={e.id}
-                      onClick={() => removeEntryId(active, e.id)}
-                      className="flex items-center gap-1.5 rounded-full bg-terra-bg px-2.5 py-1 text-[12px] font-medium text-terra"
-                    >
-                      <span>{pen?.icon}</span>
-                      <span className="font-mono">{eur(e.amount)} €</span>
-                      <span className="text-terra/60">✕</span>
-                    </button>
-                  )
-                })}
-            </div>
-          </div>
         )}
       </Sheet>
 
@@ -580,12 +613,55 @@ function FastGrid({ catalog, current, countPen, onTap }) {
   )
 }
 
-/* ── Detailliert-Modus: Stepper ───────────────────────────────────────── */
-function DetailList({ catalog, current, countPen, onPlus, onMinus }) {
+/* ── Detailliert-Modus: Stepper (Standard) / Chips (manuell) ───────────── */
+function DetailList({ catalog, current, countPen, onPlus, onMinus, onRemoveEntry }) {
   return (
     <div className="grid grid-cols-1 gap-2">
       {catalog.map((pen) => {
         const n = current ? countPen(current, pen.id) : 0
+        // Manuelle Strafe: kein Stepper — eigener „Erfassen"-Button und die erfassten
+        // Beträge direkt darunter als entfernbare Chips (jeder Betrag ist eigenständig).
+        if (pen.manual) {
+          const items = current ? current.entries.filter((e) => e.penId === pen.id) : []
+          return (
+            <div
+              key={pen.id}
+              className={cx(
+                'rounded-2xl border p-2.5 transition',
+                items.length > 0 ? 'border-terra/40 bg-terra-bg/50' : 'border-card-edge',
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <span className="grid h-10 w-10 place-items-center rounded-xl bg-bg text-lg">{pen.icon}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[14px] font-semibold">{pen.name}</div>
+                  <div className="font-mono text-[12px] text-ink-dim">€ manuell</div>
+                </div>
+                <button
+                  onClick={() => onPlus(pen.id)}
+                  className="shrink-0 rounded-full px-3 py-1.5 text-[12px] font-semibold text-bg"
+                  style={{ background: pal.sage }}
+                >
+                  + Erfassen
+                </button>
+              </div>
+              {items.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {items.map((e) => (
+                    <button
+                      key={e.id}
+                      onClick={() => onRemoveEntry(e.id)}
+                      className="flex items-center gap-1.5 rounded-full bg-terra-bg px-2.5 py-1 text-[12px] font-medium text-terra"
+                    >
+                      <span className="font-mono">{eur(e.amount)} €</span>
+                      <span className="text-terra/60">✕</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        }
         return (
           <div
             key={pen.id}
@@ -597,9 +673,7 @@ function DetailList({ catalog, current, countPen, onPlus, onMinus }) {
             <span className="grid h-10 w-10 place-items-center rounded-xl bg-bg text-lg">{pen.icon}</span>
             <div className="min-w-0 flex-1">
               <div className="text-[14px] font-semibold">{pen.name}</div>
-              <div className="font-mono text-[12px] text-ink-dim">
-                {pen.manual ? '€ manuell' : `${eur(pen.amount)} €`}
-              </div>
+              <div className="font-mono text-[12px] text-ink-dim">{`${eur(pen.amount)} €`}</div>
             </div>
             <div className="flex items-center gap-2">
               <Stepper minus disabled={n === 0} onClick={() => onMinus(pen.id)} />
@@ -660,20 +734,6 @@ function ManualEntry({ pen, value, onChange, onConfirm, onCancel }) {
         </Button>
       </div>
     </div>
-  )
-}
-
-function StatusChip({ active, onClick, children }) {
-  return (
-    <button
-      onClick={onClick}
-      className={cx(
-        'flex-1 rounded-xl border px-3 py-2 text-[12px] font-semibold transition',
-        active ? 'border-amber bg-amber-bg text-amber' : 'border-card-edge bg-card text-ink-soft',
-      )}
-    >
-      {children}
-    </button>
   )
 }
 

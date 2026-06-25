@@ -21,6 +21,10 @@ function fromDb(s) {
       sp.count,
       Number(sp.amount),
     ])
+    // Fixer Ø-Aufschlag (Nachzügler-Start bzw. Frühgeher-Schnitt) — additiv zu den
+    // eigenen Strafen, im Frontend berechnet und in avg_amount gespeichert.
+    const avgCharge =
+      !p.is_guest && (p.is_late || p.is_early_leave) ? Number(p.avg_amount) || 0 : null
     return {
       id: p.id,
       name: p.is_guest
@@ -30,19 +34,17 @@ function fromDb(s) {
       paid: p.guest_paid,
       late: p.is_late,
       early: p.is_early_leave,
+      avgCharge,
+      avgLabel: p.is_late
+        ? 'Nachzügler-Schnitt'
+        : p.is_early_leave
+          ? 'Schnitt (früher gegangen)'
+          : null,
       items,
     }
   })
-  // Durchschnitt der voll Anwesenden (= Betrag, den Nachzügler/Frühgeher bekommen).
-  const fullMembers = participants.filter((p) => !p.isGuest && !p.late && !p.early)
-  const fullCount = fullMembers.length
-  const fullTotal = fullMembers.reduce((a, p) => a + p.items.reduce((b, [, , amt]) => b + amt, 0), 0)
-  const avg = fullCount > 0 ? Math.round((fullTotal / fullCount) * 100) / 100 : 0
-  participants.forEach((p) => {
-    p.avgCharge = !p.isGuest && (p.late || p.early) ? avg : null
-  })
   const total = participants.reduce(
-    (a, p) => a + (p.avgCharge != null ? p.avgCharge : p.items.reduce((b, [, , amt]) => b + amt, 0)),
+    (a, p) => a + p.items.reduce((b, [, , amt]) => b + amt, 0) + (p.avgCharge || 0),
     0,
   )
   return {
@@ -176,8 +178,8 @@ export default function SessionReview() {
       <div className="space-y-2">
         {detail.participants.map((p) => {
           const sum = p.items.reduce((a, [, , amt]) => a + amt, 0)
-          const isAvg = p.avgCharge != null
-          const shown = isAvg ? p.avgCharge : sum
+          const hasAvg = (p.avgCharge || 0) > 0
+          const shown = sum + (p.avgCharge || 0)
           const isOpen = open.has(p.id)
           return (
             <Card key={p.id} className="p-0 overflow-hidden">
@@ -191,7 +193,8 @@ export default function SessionReview() {
                     {p.isGuest && <Badge tone="sage">{p.paid ? 'bar bezahlt' : 'Gast'}</Badge>}
                   </div>
                   <div className="text-[12px] text-ink-dim">
-                    {isAvg ? 'Durchschnitt der Anwesenden' : `${p.items.length} Posten`}
+                    {`${p.items.length} Posten`}
+                    {hasAvg && ` · + ${p.avgLabel}`}
                   </div>
                 </div>
                 <span className="font-mono font-semibold tnum text-terra">{eur(shown)} €</span>
@@ -199,7 +202,7 @@ export default function SessionReview() {
               </button>
               {isOpen && (
                 <div className="border-t border-card-edge bg-bg/50 px-4 py-2">
-                  {p.items.length === 0 && (
+                  {p.items.length === 0 && !hasAvg && (
                     <div className="py-1.5 text-[13px] text-ink-dim">Keine Strafen erfasst.</div>
                   )}
                   {p.items.map(([name, count, amt], i) => (
@@ -210,6 +213,12 @@ export default function SessionReview() {
                       <span className="font-mono tnum">{eur(amt)} €</span>
                     </div>
                   ))}
+                  {hasAvg && (
+                    <div className="flex items-center justify-between py-1.5 text-[13px]">
+                      <span className="text-ink-soft">{p.avgLabel}</span>
+                      <span className="font-mono tnum">{eur(p.avgCharge)} €</span>
+                    </div>
+                  )}
                 </div>
               )}
             </Card>
