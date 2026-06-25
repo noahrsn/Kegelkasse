@@ -986,6 +986,35 @@ In Wizard und Einstellungen sind die Avatar-Buttons bislang Platzhalter; sie wer
 
 ---
 
+## Phase 11 — Nacherfassung, Vorab-Mitglieder & Abwesenden-Schnitt ✅
+
+**Ziel:** Drei Praxis-Erweiterungen aus dem laufenden Betrieb.
+
+> **Status — umgesetzt ✅:** Migration `012_phase11_edit_placeholders_absent.sql`.
+
+### Features
+
+- **Genehmigte Kegelabende nachbearbeiten:** Kassenwart/Admin können einen
+  bereits genehmigten Kegelabend über „Zur Bearbeitung freigeben" (RPC
+  `reopen_session`) wieder öffnen. Die gebuchten Schulden des Abends werden
+  zurückgesetzt (inkl. Zahlungs-Verknüpfungen), der Status fällt auf `draft`;
+  danach normal bearbeiten → einreichen → erneut genehmigen. Kassenbuch-
+  Transaktionen bleiben erhalten und müssen ggf. neu abgeglichen werden.
+- **Vorab angelegte Mitglieder (`group_placeholders`):** Admin/Präsident legen
+  schon bei der Club-Einrichtung (Setup-Wizard Schritt 6) oder später in
+  Einstellungen → Mitglieder Mitglieder mit Namen an. Beim Beitritt über den
+  Einladungslink prüft `list_unclaimed_placeholders(token)`, ob es offene
+  Vorab-Mitglieder gibt: Wenn ja, wählt der neue Nutzer „Das bin ich" (übernimmt
+  Rolle + IBAN, setzt den Profilnamen) oder „neu anlegen". Gibt es keine, läuft
+  der Beitritt direkt durch (kein Auswahlmenü). `join_group` nimmt dafür optional
+  eine `p_placeholder_id`.
+- **Abwesenden-Durchschnittsstrafe:** Häkchen pro Kegelabend (Start + laufende
+  Erfassung). Ist es gesetzt, bekommen nach der Genehmigung alle nicht
+  anwesenden Mitglieder den Schnitt aller Strafen (Σ Mitglieder-Strafen ÷ Anzahl
+  Anwesende) als offenen Beitrag gebucht. Gespeichert in `sessions.charge_absent_avg`.
+
+---
+
 ## Reihenfolge der Umsetzung
 
 ```

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useLocation, useParams } from 'react-router-dom'
-import { Card, Button, Avatar, Badge, Input } from '../../components/ui'
+import { Card, Button, Avatar, Badge, Input, Toggle } from '../../components/ui'
 import { Sheet } from '../../components/Modal'
 import { cx, eur, pal } from '../../design/calm'
 import { useAuth } from '../../context/AuthContext.jsx'
@@ -79,6 +79,7 @@ export default function SessionRecord() {
   })
   const [loading, setLoading] = useState(!mockMode && !isLive)
 
+  const [chargeAbsentAvg, setChargeAbsentAvg] = useState(!!location.state?.chargeAbsentAvg)
   const [mode, setMode] = useState('fast') // 'fast' (Standard) | 'detailed'
   const [active, setActive] = useState(null)
   const [manualFor, setManualFor] = useState(null)
@@ -104,6 +105,7 @@ export default function SessionRecord() {
       .then((s) => {
         if (!s) return navigate('/sessions')
         if (s.status !== 'draft') return navigate(`/sessions/${existingId}/review`)
+        setChargeAbsentAvg(!!s.charge_absent_avg)
         setCtx({
           groupId: s.group_id,
           eventId: s.event_id,
@@ -238,6 +240,7 @@ export default function SessionRecord() {
         status,
         participants,
         absent: absentMembers.map((m) => m.userId),
+        chargeAbsentAvg,
       })
       setSubmitOpen(false)
       navigate('/sessions')
@@ -338,6 +341,16 @@ export default function SessionRecord() {
           )
         })}
       </div>
+
+      {/* Abwesenden-Durchschnittsstrafe */}
+      <Card tone="cream" className="py-3">
+        <Toggle
+          checked={chargeAbsentAvg}
+          onChange={setChargeAbsentAvg}
+          label="Abwesende mit Durchschnitt belasten"
+          hint={`Nach Genehmigung bekommen die ${absentMembers.length} abwesenden Mitglieder den Schnitt aller Strafen als offenen Beitrag.`}
+        />
+      </Card>
 
       {/* Nachzügler */}
       <button

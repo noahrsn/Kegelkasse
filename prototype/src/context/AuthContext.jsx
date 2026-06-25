@@ -144,8 +144,11 @@ function SupabaseProvider({ children }) {
   )
 
   const joinGroup = useCallback(
-    async (token) => {
-      const { data, error } = await supabase.rpc('join_group', { p_token: token })
+    async (token, placeholderId = null) => {
+      const { data, error } = await supabase.rpc('join_group', {
+        p_token: token,
+        p_placeholder_id: placeholderId,
+      })
       if (error) throw error
       await loadUserData(user?.id)
       setActiveGroupId(data)

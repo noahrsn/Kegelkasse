@@ -124,6 +124,56 @@ export async function resetInvite(groupId) {
   return data
 }
 
+/* ── Vorab angelegte Mitglieder (Platzhalter, Phase 11) ──────────────────── */
+
+/* Alle Vorab-Mitglieder einer Gruppe (inkl. bereits übernommener). */
+export async function listPlaceholders(groupId) {
+  const { data, error } = await supabase
+    .from('group_placeholders')
+    .select('id, first_name, last_name, iban, role, claimed_by')
+    .eq('group_id', groupId)
+    .order('first_name', { ascending: true })
+  if (error) throw error
+  return (data ?? []).map((p) => ({
+    id: p.id,
+    name: `${p.first_name} ${p.last_name}`.trim(),
+    firstName: p.first_name,
+    lastName: p.last_name,
+    iban: p.iban || '',
+    role: p.role,
+    claimed: !!p.claimed_by,
+  }))
+}
+
+/* Vorab-Mitglied anlegen (admin/präsident). Rückgabe: id. */
+export async function addPlaceholder(groupId, { firstName, lastName = '', iban = '', role = 'mitglied' }) {
+  const { data, error } = await supabase.rpc('add_placeholder', {
+    p_group_id: groupId,
+    p_first_name: firstName,
+    p_last_name: lastName,
+    p_iban: iban || null,
+    p_role: role,
+  })
+  if (error) throw error
+  return data
+}
+
+/* Vorab-Mitglied löschen (nur solange nicht übernommen). */
+export async function removePlaceholder(id) {
+  const { error } = await supabase.rpc('remove_placeholder', { p_id: id })
+  if (error) throw error
+}
+
+/* Offene Vorab-Mitglieder per Einladungstoken (für die Beitritts-Auswahl). */
+export async function listUnclaimedPlaceholders(token) {
+  const { data, error } = await supabase.rpc('list_unclaimed_placeholders', { p_token: token })
+  if (error) throw error
+  return (data ?? []).map((p) => ({
+    id: p.id,
+    name: `${p.first_name} ${p.last_name}`.trim(),
+  }))
+}
+
 /* ──────────────────────────────────────────────────────────────────────────
  * Phase 5 — Kegelabende: erfassen, einreichen, genehmigen
  * ────────────────────────────────────────────────────────────────────────── */
@@ -152,7 +202,7 @@ export async function getSession(sessionId) {
   const { data, error } = await supabase
     .from('sessions')
     .select(
-      `id, group_id, event_id, date, status, recorded_by, submitted_at, approved_at,
+      `id, group_id, event_id, date, status, recorded_by, submitted_at, approved_at, charge_absent_avg,
        recorder:recorded_by(first_name, last_name),
        participants:session_participants(
          id, user_id, guest_name, is_guest, is_late, guest_paid,
@@ -194,6 +244,7 @@ export async function saveSession({
   status,
   participants,
   absent = [],
+  chargeAbsentAvg = false,
 }) {
   const { data, error } = await supabase.rpc('save_session', {
     p_group_id: groupId,
@@ -203,6 +254,7 @@ export async function saveSession({
     p_status: status,
     p_participants: participants,
     p_absent: absent,
+    p_charge_absent_avg: chargeAbsentAvg,
   })
   if (error) throw error
   return data
@@ -227,6 +279,12 @@ export async function rejectSession(sessionId, reason) {
 /* Eigenen Entwurf verwerfen. */
 export async function deleteSession(sessionId) {
   const { error } = await supabase.rpc('delete_session', { p_session_id: sessionId })
+  if (error) throw error
+}
+
+/* Genehmigten Kegelabend zur Bearbeitung freigeben (Buchung zurücksetzen → draft). */
+export async function reopenSession(sessionId) {
+  const { error } = await supabase.rpc('reopen_session', { p_session_id: sessionId })
   if (error) throw error
 }
 

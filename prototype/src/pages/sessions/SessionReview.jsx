@@ -4,7 +4,7 @@ import { Card, Button, Avatar, Badge, PageTitle, Textarea, Field } from '../../c
 import { Sheet } from '../../components/Modal'
 import { cx, eur } from '../../design/calm'
 import { useAuth } from '../../context/AuthContext.jsx'
-import { getSession, approveSession, rejectSession } from '../../lib/api.js'
+import { getSession, approveSession, rejectSession, reopenSession } from '../../lib/api.js'
 import { sessionDetail as mockDetail } from '../../mock/data'
 
 const APPROVE_ROLES = ['admin', 'kassenwart']
@@ -52,6 +52,7 @@ export default function SessionReview() {
   const [open, setOpen] = useState(() => new Set())
   const [rejectOpen, setRejectOpen] = useState(false)
   const [approveOpen, setApproveOpen] = useState(false)
+  const [reopenOpen, setReopenOpen] = useState(false)
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -91,6 +92,19 @@ export default function SessionReview() {
     } catch (e) {
       alert('Genehmigen fehlgeschlagen: ' + (e?.message || e))
     } finally {
+      setBusy(false)
+    }
+  }
+
+  const doReopen = async () => {
+    if (mockMode) return navigate(`/sessions/${id}`)
+    if (busy) return
+    setBusy(true)
+    try {
+      await reopenSession(id)
+      navigate(`/sessions/${id}`) // → Bearbeitung (Status jetzt Entwurf)
+    } catch (e) {
+      alert('Freigeben fehlgeschlagen: ' + (e?.message || e))
       setBusy(false)
     }
   }
@@ -186,9 +200,22 @@ export default function SessionReview() {
 
       {/* Aktionen */}
       {isApproved ? (
-        <Card tone="sage" className="text-center text-[13px] font-semibold text-ink">
-          ✓ Genehmigt — Schulden wurden gebucht.
-        </Card>
+        <div className="space-y-2">
+          <Card tone="sage" className="text-center text-[13px] font-semibold text-ink">
+            ✓ Genehmigt — Schulden wurden gebucht.
+          </Card>
+          {canApprove && (
+            <Button
+              variant="soft"
+              size="lg"
+              className="w-full"
+              onClick={() => setReopenOpen(true)}
+              disabled={busy}
+            >
+              ✎ Zur Bearbeitung freigeben
+            </Button>
+          )}
+        </div>
       ) : !canApprove ? (
         <Card className="text-center text-[13px] text-ink-soft">
           Nur Kassenwart oder Admin können diese Einreichung freigeben.
@@ -250,6 +277,30 @@ export default function SessionReview() {
         <div className="rounded-2xl bg-sage-bg p-4 text-[13px] text-ink-soft">
           <strong className="text-ink">{eur(detail.total)} €</strong> werden auf {memberCount} Mitglieder
           verteilt. Gastschulden gelten als bar beglichen.
+        </div>
+      </Sheet>
+
+      <Sheet
+        open={reopenOpen}
+        onClose={() => setReopenOpen(false)}
+        title="Zur Bearbeitung freigeben?"
+        subtitle="Der Kegelabend wird wieder zum Entwurf."
+        footer={
+          <div className="flex gap-2">
+            <Button variant="soft" className="flex-1" onClick={() => setReopenOpen(false)} disabled={busy}>
+              Zurück
+            </Button>
+            <Button className="flex-1" onClick={doReopen} disabled={busy}>
+              {busy ? 'Gibt frei…' : 'Freigeben & bearbeiten'}
+            </Button>
+          </div>
+        }
+      >
+        <div className="rounded-2xl bg-amber-bg p-4 text-[13px] text-ink-soft">
+          Die bereits gebuchten Schulden dieses Kegelabends werden{' '}
+          <strong className="text-ink">zurückgesetzt</strong>. Nach dem Bearbeiten muss er erneut
+          eingereicht und genehmigt werden. Bereits zugeordnete Zahlungen im Kassenbuch bleiben
+          erhalten und müssen ggf. neu abgeglichen werden.
         </div>
       </Sheet>
     </div>

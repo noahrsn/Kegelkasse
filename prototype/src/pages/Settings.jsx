@@ -14,6 +14,9 @@ import {
   resetInvite,
   saveRulebook,
   uploadAvatar,
+  listPlaceholders,
+  addPlaceholder,
+  removePlaceholder,
 } from '../lib/api.js'
 import { InviteBox } from './Members'
 
@@ -413,34 +416,146 @@ function MembersTab({ mockMode, groupId, canEdit }) {
   if (!list) return <Card><div className="py-6 text-center text-sm text-ink-dim">Lädt…</div></Card>
 
   return (
-    <Card className="p-0">
-      {list.map((m, i) => (
-        <div key={m.id} className={cx('flex items-center gap-3 p-3', i < list.length - 1 && 'border-b border-card-edge')}>
-          <Avatar name={m.name} size={36} />
-          <span className="flex-1 text-[14px] font-medium">{m.name}</span>
-          {savingId === m.id && <span className="text-[11px] text-ink-dim">…</span>}
-          <Select
-            value={m.role}
-            disabled={!canEdit}
-            onChange={(e) => changeRole(m.id, e.target.value)}
-            className="w-32 py-2 text-[13px] disabled:opacity-60"
-          >
-            {Object.entries(ROLE_LABEL).map(([k, v]) => (
-              <option key={k} value={k}>{v}</option>
-            ))}
-          </Select>
-          {canEdit && m.userId !== user?.id && (
-            <button
-              onClick={() => remove(m)}
-              disabled={savingId === m.id}
-              className="text-[12px] font-semibold text-terra hover:underline"
-              title="Mitglied entfernen"
+    <div className="space-y-5">
+      <Card className="p-0">
+        {list.map((m, i) => (
+          <div key={m.id} className={cx('flex items-center gap-3 p-3', i < list.length - 1 && 'border-b border-card-edge')}>
+            <Avatar name={m.name} size={36} />
+            <span className="flex-1 text-[14px] font-medium">{m.name}</span>
+            {savingId === m.id && <span className="text-[11px] text-ink-dim">…</span>}
+            <Select
+              value={m.role}
+              disabled={!canEdit}
+              onChange={(e) => changeRole(m.id, e.target.value)}
+              className="w-32 py-2 text-[13px] disabled:opacity-60"
             >
-              Entfernen
-            </button>
-          )}
+              {Object.entries(ROLE_LABEL).map(([k, v]) => (
+                <option key={k} value={k}>{v}</option>
+              ))}
+            </Select>
+            {canEdit && m.userId !== user?.id && (
+              <button
+                onClick={() => remove(m)}
+                disabled={savingId === m.id}
+                className="text-[12px] font-semibold text-terra hover:underline"
+                title="Mitglied entfernen"
+              >
+                Entfernen
+              </button>
+            )}
+          </div>
+        ))}
+      </Card>
+
+      <div>
+        <h3 className="mb-2 text-[13px] font-semibold text-ink-soft">Vorab angelegte Mitglieder</h3>
+        <PlaceholderManager mockMode={mockMode} groupId={groupId} canEdit={canEdit} />
+      </div>
+    </div>
+  )
+}
+
+/* ── Vorab-Mitglieder (Platzhalter) verwalten — auch im Setup-Wizard genutzt ── */
+export function PlaceholderManager({ mockMode, groupId, canEdit = true }) {
+  const [list, setList] = useState(mockMode ? [] : null)
+  const [first, setFirst] = useState('')
+  const [last, setLast] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const load = () => {
+    if (mockMode || !groupId) return
+    listPlaceholders(groupId)
+      .then((rows) => setList(rows.filter((p) => !p.claimed)))
+      .catch(() => setList([]))
+  }
+  useEffect(load, [mockMode, groupId])
+
+  async function add() {
+    const fn = first.trim()
+    if (!fn) return
+    if (mockMode) {
+      setList((l) => [...(l || []), { id: 'tmp' + Date.now(), name: `${fn} ${last.trim()}`.trim() }])
+      setFirst(''); setLast('')
+      return
+    }
+    setBusy(true)
+    try {
+      await addPlaceholder(groupId, { firstName: fn, lastName: last.trim() })
+      setFirst(''); setLast('')
+      load()
+    } catch (e) {
+      alert(e.message || 'Anlegen fehlgeschlagen')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function remove(id) {
+    if (mockMode) return setList((l) => l.filter((p) => p.id !== id))
+    setBusy(true)
+    try {
+      await removePlaceholder(id)
+      load()
+    } catch (e) {
+      alert(e.message || 'Löschen fehlgeschlagen')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const items = list || []
+
+  return (
+    <Card className="space-y-3">
+      <p className="text-[12px] text-ink-soft">
+        Lege Mitglieder schon vor der Anmeldung an. Beim Beitritt über den Einladungslink kann sich
+        jeder seinen Namen aus dieser Liste auswählen.
+      </p>
+
+      {list == null ? (
+        <div className="py-3 text-center text-[12px] text-ink-dim">Lädt…</div>
+      ) : items.length === 0 ? (
+        <p className="rounded-2xl border border-dashed border-card-edge p-3 text-center text-[12px] text-ink-dim">
+          Noch keine vorab angelegten Mitglieder.
+        </p>
+      ) : (
+        <div className="space-y-1.5">
+          {items.map((p) => (
+            <div key={p.id} className="flex items-center gap-3 rounded-2xl bg-bg px-3 py-2">
+              <Avatar name={p.name} size={32} />
+              <span className="flex-1 text-[14px] font-medium">{p.name}</span>
+              <span className="rounded-full bg-amber-bg px-2 py-0.5 text-[10px] font-semibold text-amber">
+                noch nicht registriert
+              </span>
+              {canEdit && (
+                <button
+                  onClick={() => remove(p.id)}
+                  disabled={busy}
+                  className="text-[12px] font-semibold text-terra hover:underline"
+                >
+                  Löschen
+                </button>
+              )}
+            </div>
+          ))}
         </div>
-      ))}
+      )}
+
+      {canEdit && (
+        <div className="flex flex-wrap items-end gap-2 border-t border-card-edge pt-3">
+          <div className="min-w-[8rem] flex-1">
+            <Field label="Vorname">
+              <Input value={first} onChange={(e) => setFirst(e.target.value)} placeholder="z. B. Petra" />
+            </Field>
+          </div>
+          <div className="min-w-[8rem] flex-1">
+            <Field label="Nachname">
+              <Input value={last} onChange={(e) => setLast(e.target.value)} placeholder="optional" />
+            </Field>
+          </div>
+          <Button onClick={add} disabled={busy || !first.trim()}>+ Anlegen</Button>
+        </div>
+      )}
     </Card>
   )
 }

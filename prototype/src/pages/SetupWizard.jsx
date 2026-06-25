@@ -14,6 +14,7 @@ import {
   recurrenceFromPreset,
 } from '../lib/api.js'
 import { InviteBox } from './Members'
+import { PlaceholderManager } from './Settings'
 
 const DEFAULT_RULEBOOK = `# Regelwerk\n\n## §1 Kegelabend\nJeder 4. Samstag im Monat. Beginn 19:30 Uhr.\n\n## §2 Strafen\nStrafen werden gemäß Katalog erfasst und sind bis zur Frist zu begleichen.\n\n## §3 Beiträge\nDer Monatsbeitrag wird am 1. des Monats gebucht.`
 
@@ -150,7 +151,7 @@ export default function SetupWizard() {
           {n === 3 && <StepPenalties />}
           {n === 4 && <StepEvents form={form} set={set} />}
           {n === 5 && <StepRulebook form={form} set={set} />}
-          {n === 6 && <StepInvite token={token} mockMode={mockMode} />}
+          {n === 6 && <StepInvite token={token} mockMode={mockMode} groupId={activeGroupId} />}
         </div>
 
         {error && <p className="mt-4 text-[12px] font-medium text-terra">{error}</p>}
@@ -283,13 +284,18 @@ function StepRulebook({ form, set }) {
   )
 }
 
-function StepInvite({ token, mockMode }) {
+function StepInvite({ token, mockMode, groupId }) {
   return (
-    <div>
+    <div className="space-y-5">
       <Intro>Fast geschafft! Lade deine Mitglieder ein – oder hole das später nach.</Intro>
       <Card>
         <InviteBox token={mockMode ? undefined : token} />
       </Card>
+
+      <div>
+        <h3 className="mb-2 text-[13px] font-semibold text-ink-soft">Mitglieder vorab anlegen</h3>
+        <PlaceholderManager mockMode={mockMode} groupId={groupId} />
+      </div>
     </div>
   )
 }
