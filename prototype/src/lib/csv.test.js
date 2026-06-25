@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseAmount, parseDate, normIban, nameSimilarity, bestNameMatch } from './csv.js'
+import { parseAmount, parseDate, normIban, nameSimilarity, bestNameMatch, parseSparkasseCsv } from './csv.js'
 import { recurrenceFromPreset } from './api.js'
 
 describe('parseAmount (Sparkasse-Beträge)', () => {
@@ -69,6 +69,38 @@ describe('bestNameMatch', () => {
   })
   it('gibt null bei fremdem Zahlungspflichtigen', () => {
     expect(bestNameMatch('Rewe Markt GmbH', members)).toBeNull()
+  })
+})
+
+describe('parseSparkasseCsv (echtes Sparkassen-Format)', () => {
+  // Hilfsmittel: String als ISO-8859-1-„Datei" verpacken.
+  const asFile = (text) => {
+    const bytes = Uint8Array.from(text, (c) => c.charCodeAt(0) & 0xff)
+    return { arrayBuffer: async () => bytes.buffer }
+  }
+
+  // Header enthält „Lastschrift Ursprungsbetrag" VOR der echten Spalte „Betrag".
+  const header =
+    '"Auftragskonto";"Buchungstag";"Valutadatum";"Buchungstext";"Verwendungszweck";' +
+    '"Glaeubiger ID";"Mandatsreferenz";"Kundenreferenz (End-to-End)";"Sammlerreferenz";' +
+    '"Lastschrift Ursprungsbetrag";"Auslagenersatz Ruecklastschrift";' +
+    '"Beguenstigter/Zahlungspflichtiger";"Kontonummer/IBAN";"BIC (SWIFT-Code)";' +
+    '"Betrag";"Waehrung";"Info"'
+  const row =
+    '"DE74320500001064286402";"17.04.26";"17.04.26";"GUTSCHR. UEBERW. DAUERAUFTR";' +
+    '"Monatsbeitrag ";"";"";"";"";"";"";"Hendrik Wilmsen";"DE52320613842001731010";' +
+    '"GENODED1GDL";"25,00";"EUR";"Umsatz gebucht"'
+
+  it('nimmt die exakte Spalte „Betrag", nicht „…Ursprungsbetrag"', async () => {
+    const { rows, error } = await parseSparkasseCsv(asFile(`${header}\n${row}\n`))
+    expect(error).toBeNull()
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({
+      date: '2026-04-17',
+      amount: 25,
+      name: 'Hendrik Wilmsen',
+      iban: 'DE52320613842001731010',
+    })
   })
 })
 

@@ -150,10 +150,17 @@ async function sha256Hex(str) {
     .join('')
 }
 
-/* Spaltenindex per Header-Name finden (case-insensitiv, contains). */
+/* Spaltenindex per Header-Name finden (case-insensitiv).
+ * Erst exakter Treffer, dann Teilstring – sonst würde z. B. „Lastschrift
+ * Ursprungsbetrag" fälschlich vor der echten Spalte „Betrag" matchen. */
 function findCol(header, ...needles) {
+  const norm = header.map((h) => h.trim().toLowerCase())
   for (const n of needles) {
-    const idx = header.findIndex((h) => h.toLowerCase().includes(n.toLowerCase()))
+    const idx = norm.findIndex((h) => h === n.toLowerCase())
+    if (idx >= 0) return idx
+  }
+  for (const n of needles) {
+    const idx = norm.findIndex((h) => h.includes(n.toLowerCase()))
     if (idx >= 0) return idx
   }
   return -1
