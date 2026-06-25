@@ -130,7 +130,7 @@ export default function Sessions() {
             className="w-full rounded-full py-3 text-[14px] font-semibold"
             style={{ background: creamLight, color: navyInk }}
           >
-            Kegelabend starten · Anwesenheit übernehmen
+            Kegelabend starten
           </button>
           <p className="text-[11px] text-white/60">
             Zusagen und mitgebrachte Gäste werden übernommen — vor dem Start kannst du alles noch
