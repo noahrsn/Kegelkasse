@@ -225,9 +225,6 @@ export default function Profile() {
         <Field label="E-Mail">
           <Input defaultValue={email} />
         </Field>
-        <Field label="Eigene IBAN" hint="Für den automatischen Zahlungsabgleich.">
-          <Input defaultValue={mockMode ? club.iban : ''} className="font-mono" placeholder="DE…" />
-        </Field>
         <div className="flex justify-end">
           <Button>Speichern</Button>
         </div>

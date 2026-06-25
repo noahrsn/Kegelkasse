@@ -126,6 +126,7 @@ export default function SessionRecord() {
               : `${p.profiles?.first_name ?? ''} ${p.profiles?.last_name ?? ''}`.trim() || '—',
             isGuest: p.is_guest,
             late: p.is_late,
+            early: p.is_early_leave,
             entries: (p.penalties || []).flatMap((sp) =>
               Array.from({ length: sp.count }, () => ({
                 id: entrySeq++,
@@ -202,18 +203,30 @@ export default function SessionRecord() {
   const rosterUserIds = new Set(roster.filter((p) => !p.isGuest).map((p) => p.userId))
   const absentMembers = (pool || []).filter((m) => !rosterUserIds.has(m.userId))
 
-  // Nachzügler: erhält automatisch die Verspätungsstrafe (Fallback: erste feste Strafe).
-  const latePenalty =
-    cat.find((p) => !p.manual && /versp/i.test(p.name)) || cat.find((p) => !p.manual) || null
+  // Nachzügler: keine Verspätungsstrafe — erhält bei Genehmigung den Durchschnitt
+  // der voll Anwesenden. Wird hier nur als „late" markiert (reversibel im Sheet).
   const addLate = (m) => {
-    const entries = latePenalty
-      ? [{ id: entrySeq++, penId: latePenalty.id, amount: latePenalty.amount }]
-      : []
     setRoster((r) => [
       ...r,
-      { id: 'late-' + m.userId, userId: m.userId, name: m.name, isGuest: false, late: true, entries },
+      { id: 'late-' + m.userId, userId: m.userId, name: m.name, isGuest: false, late: true, early: false, entries: [] },
     ])
     setLateOpen(false)
+  }
+
+  // Status eines Teilnehmers umschalten (Nachzügler / Frühgeher) — beides reversibel.
+  const setStatus = (idx, key) =>
+    setRoster((r) =>
+      r.map((p, i) => {
+        if (i !== idx) return p
+        if (key === 'late') return { ...p, late: !p.late, early: false }
+        if (key === 'early') return { ...p, early: !p.early, late: false }
+        return p
+      }),
+    )
+  // Nachzügler wieder aus der Liste entfernen (z. B. versehentlich hinzugefügt).
+  const removeParticipant = (idx) => {
+    setActive(null)
+    setRoster((r) => r.filter((_, i) => i !== idx))
   }
 
   // Speichern / Einreichen.
@@ -230,6 +243,7 @@ export default function SessionRecord() {
         guest_name: p.isGuest ? p.name : null,
         is_guest: p.isGuest,
         is_late: !!p.late,
+        is_early_leave: !!p.early,
         penalties: aggregatePenalties(p.entries),
       }))
       await saveSession({
@@ -323,10 +337,15 @@ export default function SessionRecord() {
                 <div className="flex items-center gap-2">
                   <span className="truncate font-semibold">{p.name}</span>
                   {p.late && <Badge tone="amber">Nachzügler</Badge>}
+                  {p.early && <Badge tone="amber">Geht früher</Badge>}
                   {p.isGuest && <Badge tone="cream">Gast</Badge>}
                 </div>
                 <div className="mt-0.5 text-[12px] text-ink-dim">
-                  {n > 0 ? `${n} Strafen erfasst` : 'Noch nichts erfasst'}
+                  {p.late || p.early
+                    ? 'Bekommt den Durchschnitt'
+                    : n > 0
+                      ? `${n} Strafen erfasst`
+                      : 'Noch nichts erfasst'}
                 </div>
               </div>
               <div className="text-right">
@@ -399,6 +418,34 @@ export default function SessionRecord() {
           ) : undefined
         }
       >
+        {!manualFor && current && !current.isGuest && (
+          <div className="mb-4 rounded-2xl bg-bg p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-[12px] font-semibold text-ink-soft">Anwesenheit</span>
+              <button
+                onClick={() => removeParticipant(active)}
+                className="text-[11px] font-semibold text-terra hover:underline"
+              >
+                Aus Liste entfernen
+              </button>
+            </div>
+            <div className="flex gap-2">
+              <StatusChip active={current.late} onClick={() => setStatus(active, 'late')}>
+                🕐 Nachzügler
+              </StatusChip>
+              <StatusChip active={current.early} onClick={() => setStatus(active, 'early')}>
+                🚪 Geht früher
+              </StatusChip>
+            </div>
+            {(current.late || current.early) && (
+              <p className="mt-2 text-[11px] text-ink-dim">
+                Bekommt bei der Genehmigung den Durchschnitt der voll Anwesenden — keine
+                einzeln erfassten Strafen, keine Verspätungsstrafe.
+              </p>
+            )}
+          </div>
+        )}
+
         {manualFor ? (
           <ManualEntry
             pen={findPen(manualFor)}
@@ -452,7 +499,7 @@ export default function SessionRecord() {
         open={lateOpen}
         onClose={() => setLateOpen(false)}
         title="Nachzügler hinzufügen"
-        subtitle="Erhält automatisch die Verspätungsstrafe."
+        subtitle="Bekommt den Durchschnitt der Anwesenden statt einzelner Strafen."
       >
         <div className="space-y-2">
           {absentMembers.length === 0 && (
@@ -468,7 +515,7 @@ export default function SessionRecord() {
             >
               <Avatar name={m.name} size={36} />
               <span className="flex-1 font-medium">{m.name}</span>
-              <span className="text-[12px] font-semibold text-amber">+ Verspätung</span>
+              <span className="text-[12px] font-semibold text-amber">+ Nachzügler</span>
             </button>
           ))}
         </div>
@@ -613,6 +660,20 @@ function ManualEntry({ pen, value, onChange, onConfirm, onCancel }) {
         </Button>
       </div>
     </div>
+  )
+}
+
+function StatusChip({ active, onClick, children }) {
+  return (
+    <button
+      onClick={onClick}
+      className={cx(
+        'flex-1 rounded-xl border px-3 py-2 text-[12px] font-semibold transition',
+        active ? 'border-amber bg-amber-bg text-amber' : 'border-card-edge bg-card text-ink-soft',
+      )}
+    >
+      {children}
+    </button>
   )
 }
 

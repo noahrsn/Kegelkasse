@@ -54,6 +54,94 @@ export function normIban(s) {
   return (s || '').replace(/\s+/g, '').toUpperCase()
 }
 
+/* ── Fuzzy-Namensabgleich (Phase 12) ─────────────────────────────────────────
+ * Zahlungen werden über den Namen zugeordnet (keine IBAN mehr). Die Schreibweise
+ * im Kontoauszug weicht oft leicht ab („Voß"/„Voss", Tippfehler, Reihenfolge,
+ * Initialen) — deshalb tolerant statt exakt.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/* Name normalisieren: Kleinbuchstaben, Umlaute/Akzente + ß auflösen, nur Buchstaben. */
+export function normalizeName(s) {
+  return (s || '')
+    .toLowerCase()
+    .replace(/ß/g, 'ss')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '') // Akzente entfernen (ä→a, é→e …)
+    .replace(/[^a-z\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/* Levenshtein-Distanz (iterativ, O(n·m)). */
+export function levenshtein(a, b) {
+  if (a === b) return 0
+  if (!a.length) return b.length
+  if (!b.length) return a.length
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i)
+  for (let i = 1; i <= a.length; i++) {
+    let cur = [i]
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost)
+    }
+    prev = cur
+  }
+  return prev[b.length]
+}
+
+/* Ähnlichkeit zweier Tokens (0–1); Initialen matchen per Präfix. */
+function tokenSim(a, b) {
+  if (a === b) return 1
+  if ((a.length === 1 && b.startsWith(a)) || (b.length === 1 && a.startsWith(b))) return 0.95
+  const max = Math.max(a.length, b.length)
+  return max ? 1 - levenshtein(a, b) / max : 0
+}
+
+/* Ähnlichkeit zweier Namen (0–1). Berücksichtigt Wortreihenfolge + Tippfehler. */
+export function nameSimilarity(a, b) {
+  const na = normalizeName(a)
+  const nb = normalizeName(b)
+  if (!na || !nb) return 0
+  if (na === nb) return 1
+
+  const ta = na.split(' ')
+  const tb = nb.split(' ')
+  // Jedes Token des Mitgliedsnamens (b) bestmöglich auf ein CSV-Token (a) abbilden.
+  let sum = 0
+  for (const t of tb) {
+    let best = 0
+    for (const u of ta) best = Math.max(best, tokenSim(t, u))
+    sum += best
+  }
+  const tokenScore = sum / tb.length
+
+  // Zusätzlich die sortierten Vollnamen vergleichen (fängt reine Tippfehler).
+  const sa = [...ta].sort().join('')
+  const sb = [...tb].sort().join('')
+  const full = Math.max(sa.length, sb.length)
+  const fullScore = full ? 1 - levenshtein(sa, sb) / full : 0
+
+  return Math.max(tokenScore, fullScore)
+}
+
+/* Bestes Mitglied für einen CSV-Namen finden (oder null).
+ * members: [{ userId, name }]. Schwelle bewusst tolerant. */
+export function bestNameMatch(csvName, members, threshold = 0.6) {
+  let best = null
+  let bestScore = 0
+  for (const m of members || []) {
+    const score = nameSimilarity(csvName, m.name)
+    if (score > bestScore) {
+      bestScore = score
+      best = m
+    }
+  }
+  if (best && bestScore >= threshold) {
+    return { userId: best.userId, score: bestScore }
+  }
+  return null
+}
+
 async function sha256Hex(str) {
   const bytes = new TextEncoder().encode(str)
   const digest = await crypto.subtle.digest('SHA-256', bytes)

@@ -4,26 +4,22 @@ import { Card, Button, Badge, PageTitle } from '../../components/ui'
 import { cx, eur } from '../../design/calm'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { listMembers, importTransactions } from '../../lib/api.js'
-import { parseSparkasseCsv, normIban } from '../../lib/csv.js'
+import { parseSparkasseCsv, normIban, bestNameMatch } from '../../lib/csv.js'
 import { csvPreview, members as mockMembers } from '../../mock/data'
 
 const MATCH = {
-  iban: { label: 'IBAN-Match', tone: 'sage' },
-  name: { label: 'Name (prüfen)', tone: 'amber' },
+  name: { label: 'Name (sicher)', tone: 'sage' },
+  fuzzy: { label: 'Name (prüfen)', tone: 'amber' },
   none: { label: 'Kein Match', tone: 'terra' },
 }
 
-const norm = (s) => (s || '').toLowerCase().replace(/[^a-zäöüß ]/g, '').trim()
-
-/* Eine geparste Zeile gegen die Mitglieder matchen (IBAN sicher, Name unsicher). */
+/* Eine geparste Zeile über den Namen matchen (tolerant ggü. Schreibweise). */
 function matchRow(row, members) {
   if (row.amount <= 0) return { match: 'none', matchedUser: null }
-  const byIban = members.find((m) => m.iban && normIban(m.iban) === row.iban)
-  if (byIban) return { match: 'iban', matchedUser: byIban.userId }
-  const rn = norm(row.name)
-  const byName = members.find((m) => rn && (rn === norm(m.name) || norm(m.name).includes(rn) || rn.includes(norm(m.name))))
-  if (byName) return { match: 'name', matchedUser: byName.userId }
-  return { match: 'none', matchedUser: null }
+  const hit = bestNameMatch(row.name, members)
+  if (!hit) return { match: 'none', matchedUser: null }
+  // Hohe Ähnlichkeit gilt als sicher, knappe Treffer als „bitte prüfen".
+  return { match: hit.score >= 0.9 ? 'name' : 'fuzzy', matchedUser: hit.userId }
 }
 
 export default function TreasuryImport() {

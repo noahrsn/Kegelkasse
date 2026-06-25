@@ -1015,6 +1015,33 @@ In Wizard und Einstellungen sind die Avatar-Buttons bislang Platzhalter; sie wer
 
 ---
 
+## Phase 12 — Namens-Zahlungsabgleich & Durchschnitt für Teil-Anwesende ✅
+
+**Ziel:** Praxisanpassungen aus dem Betrieb.
+
+> **Status — umgesetzt ✅:** Migration `013_phase12_avg_late_early.sql` + Frontend.
+
+### Features
+
+- **Keine Mitglieder-IBAN mehr:** Mitglieder können (und müssen) keine eigene
+  IBAN hinterlegen — das Feld im Profil und die IBAN-Anzeige im Mitglied-Detail
+  sind entfernt. Nur die Club-IBAN (Zahlungsempfang) bleibt.
+- **Zahlungsabgleich über den Namen (tolerant):** Der CSV-Import ordnet Zahlungen
+  nicht mehr per IBAN, sondern per **Name** zu — fehlertolerant gegenüber
+  Schreibweise (ß/ss, Akzente, Reihenfolge, Tippfehler, Initialen) via
+  `nameSimilarity`/`bestNameMatch` (Levenshtein + Token-Abgleich in `lib/csv.js`).
+  Treffer ≥ 0,9 gelten als „sicher", knappere als „prüfen".
+- **Nachzügler = Durchschnitt statt Verspätungsstrafe:** Wer verspätet dazukommt,
+  bekommt nicht mehr eine Verspätungsstrafe, sondern den Durchschnitt der voll
+  Anwesenden (Σ Strafen ÷ Anzahl voll Anwesende).
+- **Frühgeher:** Neuer Teilnehmer-Status „geht früher" (`session_participants.
+  is_early_leave`), analog zum Nachzügler — bekommt ebenfalls den Durchschnitt.
+- **Reversibel:** Nachzügler- und Frühgeher-Status sind in der laufenden Erfassung
+  pro Person frei umschaltbar; Nachzügler lassen sich wieder aus der Liste
+  entfernen.
+
+---
+
 ## Reihenfolge der Umsetzung
 
 ```

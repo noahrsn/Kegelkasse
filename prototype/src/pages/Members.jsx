@@ -331,11 +331,6 @@ function MemberSheet({ member, onClose, canManage, mockMode, groupId, onChanged 
             </div>
           )}
 
-          <div className="rounded-2xl bg-bg p-4">
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-dim">IBAN</div>
-            <div className="mt-1 font-mono text-[13px]">{member.iban || '— nicht hinterlegt —'}</div>
-          </div>
-
           {canManage && (
             <button
               onClick={() => setPenaltyOpen(true)}

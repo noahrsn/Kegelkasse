@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseAmount, parseDate, normIban } from './csv.js'
+import { parseAmount, parseDate, normIban, nameSimilarity, bestNameMatch } from './csv.js'
 import { recurrenceFromPreset } from './api.js'
 
 describe('parseAmount (Sparkasse-Beträge)', () => {
@@ -33,6 +33,42 @@ describe('parseDate (DD.MM.YY → ISO)', () => {
 describe('normIban', () => {
   it('entfernt Leerzeichen und macht Großbuchstaben', () => {
     expect(normIban('de81 3205 0000 0002 8025 69')).toBe('DE81320500000002802569')
+  })
+})
+
+describe('nameSimilarity (toleranter Namensabgleich)', () => {
+  it('identische Namen → 1', () => {
+    expect(nameSimilarity('Martin Haas', 'Martin Haas')).toBe(1)
+  })
+  it('toleriert ß/ss', () => {
+    expect(nameSimilarity('Karin Voß', 'Karin Voss')).toBe(1)
+  })
+  it('ignoriert die Reihenfolge', () => {
+    expect(nameSimilarity('Haas Martin', 'Martin Haas')).toBeGreaterThan(0.9)
+  })
+  it('toleriert kleine Tippfehler', () => {
+    expect(nameSimilarity('Martin Hass', 'Martin Haas')).toBeGreaterThan(0.8)
+  })
+  it('matcht Initialen (M. Haas)', () => {
+    expect(nameSimilarity('M. Haas', 'Martin Haas')).toBeGreaterThan(0.6)
+  })
+  it('fremde Namen → niedrig', () => {
+    expect(nameSimilarity('Rewe Markt GmbH', 'Martin Haas')).toBeLessThan(0.5)
+  })
+})
+
+describe('bestNameMatch', () => {
+  const members = [
+    { userId: 'u1', name: 'Martin Haas' },
+    { userId: 'u2', name: 'Karin Voss' },
+    { userId: 'u3', name: 'Petra Lang' },
+  ]
+  it('findet den besten Treffer trotz Tippfehler', () => {
+    expect(bestNameMatch('Karin Voß', members)?.userId).toBe('u2')
+    expect(bestNameMatch('Petra Lng', members)?.userId).toBe('u3')
+  })
+  it('gibt null bei fremdem Zahlungspflichtigen', () => {
+    expect(bestNameMatch('Rewe Markt GmbH', members)).toBeNull()
   })
 })
 

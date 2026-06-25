@@ -96,16 +96,6 @@ export default function SessionNew() {
     <div className="space-y-5 pb-4">
       <PageTitle kicker="Kegelabend starten" title="Wer ist dabei?" />
 
-      {fromEvent && (
-        <Card tone="sage" className="flex items-center gap-3 py-3">
-          <span className="text-lg">✓</span>
-          <div className="flex-1 text-[12px] text-ink-soft">
-            <strong className="text-ink">Anwesenheit aus „{location.state.eventTitle}" übernommen.</strong>{' '}
-            Du kannst sie hier noch anpassen.
-          </div>
-        </Card>
-      )}
-
       {/* Kontext */}
       <Card tone="navy" className="flex items-center gap-3">
         <span className="grid h-11 w-11 place-items-center rounded-2xl bg-white/10 text-xl">🎳</span>

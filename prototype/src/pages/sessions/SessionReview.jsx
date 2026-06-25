@@ -28,10 +28,23 @@ function fromDb(s) {
         : `${p.profiles?.first_name ?? ''} ${p.profiles?.last_name ?? ''}`.trim() || '—',
       isGuest: p.is_guest,
       paid: p.guest_paid,
+      late: p.is_late,
+      early: p.is_early_leave,
       items,
     }
   })
-  const total = participants.reduce((a, p) => a + p.items.reduce((b, [, , amt]) => b + amt, 0), 0)
+  // Durchschnitt der voll Anwesenden (= Betrag, den Nachzügler/Frühgeher bekommen).
+  const fullMembers = participants.filter((p) => !p.isGuest && !p.late && !p.early)
+  const fullCount = fullMembers.length
+  const fullTotal = fullMembers.reduce((a, p) => a + p.items.reduce((b, [, , amt]) => b + amt, 0), 0)
+  const avg = fullCount > 0 ? Math.round((fullTotal / fullCount) * 100) / 100 : 0
+  participants.forEach((p) => {
+    p.avgCharge = !p.isGuest && (p.late || p.early) ? avg : null
+  })
+  const total = participants.reduce(
+    (a, p) => a + (p.avgCharge != null ? p.avgCharge : p.items.reduce((b, [, , amt]) => b + amt, 0)),
+    0,
+  )
   return {
     id: s.id,
     date: s.date,
@@ -163,6 +176,8 @@ export default function SessionReview() {
       <div className="space-y-2">
         {detail.participants.map((p) => {
           const sum = p.items.reduce((a, [, , amt]) => a + amt, 0)
+          const isAvg = p.avgCharge != null
+          const shown = isAvg ? p.avgCharge : sum
           const isOpen = open.has(p.id)
           return (
             <Card key={p.id} className="p-0 overflow-hidden">
@@ -171,11 +186,15 @@ export default function SessionReview() {
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <span className="font-semibold">{p.name}</span>
+                    {p.late && <Badge tone="amber">Nachzügler</Badge>}
+                    {p.early && <Badge tone="amber">Geht früher</Badge>}
                     {p.isGuest && <Badge tone="sage">{p.paid ? 'bar bezahlt' : 'Gast'}</Badge>}
                   </div>
-                  <div className="text-[12px] text-ink-dim">{p.items.length} Posten</div>
+                  <div className="text-[12px] text-ink-dim">
+                    {isAvg ? 'Durchschnitt der Anwesenden' : `${p.items.length} Posten`}
+                  </div>
                 </div>
-                <span className="font-mono font-semibold tnum text-terra">{eur(sum)} €</span>
+                <span className="font-mono font-semibold tnum text-terra">{eur(shown)} €</span>
                 <span className={cx('text-ink-dim transition', isOpen && 'rotate-180')}>⌄</span>
               </button>
               {isOpen && (

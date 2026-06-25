@@ -97,8 +97,8 @@ export const transactions = [
 
 // Vorschau für CSV-Import
 export const csvPreview = [
-  { id: 'r1', date: '2026-05-12', name: 'Karin Voss', iban: 'DE44 5001 0517 0648 4898 90', amount: 25.0, match: 'iban', matchedMember: 'Karin Voss' },
-  { id: 'r2', date: '2026-05-11', name: 'M. Haas', iban: 'DE89 3704 0044 0532 0130 00', amount: 17.6, match: 'iban', matchedMember: 'Martin Haas' },
+  { id: 'r1', date: '2026-05-12', name: 'Karin Voss', iban: 'DE44 5001 0517 0648 4898 90', amount: 25.0, match: 'name', matchedMember: 'Karin Voss' },
+  { id: 'r2', date: '2026-05-11', name: 'M. Haas', iban: 'DE89 3704 0044 0532 0130 00', amount: 17.6, match: 'fuzzy', matchedMember: 'Martin Haas' },
   { id: 'r3', date: '2026-05-10', name: 'Petra Lang', iban: 'DE00 0000 0000 0000 0000 00', amount: 11.2, match: 'name', matchedMember: 'Petra Lang' },
   { id: 'r4', date: '2026-05-09', name: 'Rewe Markt GmbH', iban: 'DE55 1234 5678 9012 3456 78', amount: -22.5, match: 'none', matchedMember: null },
 ]
