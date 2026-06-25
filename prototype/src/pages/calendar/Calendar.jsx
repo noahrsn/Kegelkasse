@@ -144,23 +144,31 @@ function DateChip({ d, muted }) {
 function EventRow({ e, navigate }) {
   const t = TYPE[e.type] ?? TYPE.single
   const r = RSVP[e.myStatus] ?? RSVP.no_answer
+  const cancelled = e.status === 'cancelled'
   return (
     <button onClick={() => navigate(`/calendar/${e.id}`)} className="w-full text-left">
-      <Card className="flex items-center gap-3 transition hover:border-ink/20">
-        <DateChip d={e.start} />
+      <Card
+        className={cx(
+          'flex items-center gap-3 transition hover:border-ink/20',
+          cancelled && 'border-terra/40 bg-terra-bg/40',
+        )}
+      >
+        <DateChip d={e.start} muted={cancelled} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-semibold">{e.title}</span>
-            <Badge tone={t.tone}>{t.label}</Badge>
+            <span className={cx('font-semibold', cancelled && 'text-terra line-through')}>{e.title}</span>
+            {cancelled ? <Badge tone="terra">Abgesagt</Badge> : <Badge tone={t.tone}>{t.label}</Badge>}
           </div>
           <div className="mt-0.5 text-[12px] text-ink-soft">
             {fmt(e.start)} · {time(e.start)} Uhr{e.location ? ` · ${e.location}` : ''}
           </div>
-          <div className="mt-2 text-[11px] text-ink-dim">
-            {e.rsvp.yes} zugesagt · {e.rsvp.no_answer} keine Antwort
-          </div>
+          {!cancelled && (
+            <div className="mt-2 text-[11px] text-ink-dim">
+              {e.rsvp.yes} zugesagt · {e.rsvp.no_answer} keine Antwort
+            </div>
+          )}
         </div>
-        <Badge tone={r.tone}>{r.label}</Badge>
+        {!cancelled && <Badge tone={r.tone}>{r.label}</Badge>}
       </Card>
     </button>
   )

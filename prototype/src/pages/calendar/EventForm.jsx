@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Card, Button, PageTitle, Field, Input, Textarea, Select, Toggle } from '../../components/ui'
 import { cx } from '../../design/calm'
 import { useAuth } from '../../context/AuthContext.jsx'
-import { saveEvent, deleteEvent } from '../../lib/api.js'
+import { saveEvent, deleteEvent, createEventSeries, updateEventSeries } from '../../lib/api.js'
 
 const TYPES = [
   { key: 'single', label: 'Einzeltermin', icon: '📅' },
@@ -158,8 +158,23 @@ export default function EventForm({ event = null, eventId = null }) {
 
   const set = (patch) => setS((prev) => ({ ...prev, ...patch }))
   const isEdit = !!eventId
+  const isSeries = isEdit && !!event?.series_id
   const isWeekly = s.turnus === 'weekly' || s.turnus === 'biweekly'
   const isMonthly = ['monthly', 'quarterly', 'halfyearly', 'yearly'].includes(s.turnus)
+
+  // Beim Bearbeiten eines Serien-Termins: nur diesen oder die ganze (künftige) Serie?
+  const [scope, setScope] = useState('single')
+
+  /* Minimal-Update für genau einen Serien-Termin (Typ/Serie/Rhythmus bleiben). */
+  const buildOccurrenceRow = () => ({
+    title: s.title.trim(),
+    location: s.location.trim() || null,
+    description: s.description.trim() || null,
+    rsvp_mode: s.optOut ? 'opt_out' : 'opt_in',
+    rsvp_note_required: s.noteRequired,
+    rsvp_deadline_hours: Number(s.deadlineH) || 0,
+    start_date: joinISO(s.date, s.time),
+  })
 
   const submit = async (e) => {
     e.preventDefault()
@@ -174,6 +189,23 @@ export default function EventForm({ event = null, eventId = null }) {
     }
     setSaving(true)
     try {
+      // Neue Serie anlegen → echte Einzeltermine ausrollen.
+      if (!isEdit && s.type === 'recurring') {
+        const id = await createEventSeries(activeGroupId, buildRow(s))
+        navigate(`/calendar/${id}`)
+        return
+      }
+      // Serien-Termin bearbeiten: ganze (künftige) Serie oder nur dieser Termin.
+      if (isSeries && scope === 'series') {
+        await updateEventSeries(event.series_id, buildRow(s), s.time)
+        navigate(`/calendar/${eventId}`)
+        return
+      }
+      if (isSeries) {
+        await saveEvent(activeGroupId, user.id, buildOccurrenceRow(), eventId)
+        navigate(`/calendar/${eventId}`)
+        return
+      }
       const id = await saveEvent(activeGroupId, user.id, buildRow(s), eventId)
       navigate(`/calendar/${id}`)
     } catch (err) {
@@ -202,23 +234,63 @@ export default function EventForm({ event = null, eventId = null }) {
       <PageTitle kicker="Termine" title={isEdit ? 'Termin bearbeiten' : 'Termin anlegen'} />
 
       <form className="space-y-4" onSubmit={submit}>
-        {/* Typ */}
-        <div className="grid grid-cols-3 gap-2">
-          {TYPES.map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => set({ type: t.key })}
-              className={cx(
-                'rounded-2xl border p-3 text-center transition',
-                s.type === t.key ? 'border-ink bg-card' : 'border-card-edge bg-card/50',
-              )}
-            >
-              <div className="text-2xl">{t.icon}</div>
-              <div className="mt-1 text-[12px] font-semibold">{t.label}</div>
-            </button>
-          ))}
-        </div>
+        {/* Typ — bei Serien-Terminen nicht änderbar */}
+        {!isSeries && (
+          <div className="grid grid-cols-3 gap-2">
+            {TYPES.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => set({ type: t.key })}
+                className={cx(
+                  'rounded-2xl border p-3 text-center transition',
+                  s.type === t.key ? 'border-ink bg-card' : 'border-card-edge bg-card/50',
+                )}
+              >
+                <div className="text-2xl">{t.icon}</div>
+                <div className="mt-1 text-[12px] font-semibold">{t.label}</div>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Bearbeitungsumfang bei Serien-Terminen */}
+        {isSeries && (
+          <Card className="space-y-3">
+            <div className="text-[12px] font-semibold text-ink-soft">Was möchtest du bearbeiten?</div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setScope('single')}
+                className={cx(
+                  'rounded-2xl border p-3 text-left transition',
+                  scope === 'single' ? 'border-ink bg-card' : 'border-card-edge bg-card/50',
+                )}
+              >
+                <div className="text-[13px] font-semibold">Nur dieser Termin</div>
+                <div className="text-[11px] text-ink-dim">Datum, Uhrzeit & Details</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setScope('series')}
+                className={cx(
+                  'rounded-2xl border p-3 text-left transition',
+                  scope === 'series' ? 'border-ink bg-card' : 'border-card-edge bg-card/50',
+                )}
+              >
+                <div className="text-[13px] font-semibold">Ganze Serie</div>
+                <div className="text-[11px] text-ink-dim">Alle künftigen Termine</div>
+              </button>
+            </div>
+            {scope === 'series' && (
+              <p className="text-[11px] text-ink-dim">
+                Titel, Ort, Beschreibung, Uhrzeit & RSVP gelten für alle künftigen Termine. Der
+                Rhythmus (Wochentag/Tag im Monat) bleibt unverändert — dafür Serie löschen und neu
+                anlegen.
+              </p>
+            )}
+          </Card>
+        )}
 
         <Card className="space-y-4">
           <Field label="Titel">
@@ -229,7 +301,22 @@ export default function EventForm({ event = null, eventId = null }) {
             />
           </Field>
 
-          {s.type === 'recurring' ? (
+          {isSeries ? (
+            scope === 'series' ? (
+              <Field label="Uhrzeit" hint="Gilt für alle künftigen Termine der Serie">
+                <Input type="time" step={300} value={s.time} onChange={(e) => set({ time: e.target.value })} />
+              </Field>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Datum">
+                  <Input type="date" value={s.date} onChange={(e) => set({ date: e.target.value })} />
+                </Field>
+                <Field label="Uhrzeit">
+                  <Input type="time" step={300} value={s.time} onChange={(e) => set({ time: e.target.value })} />
+                </Field>
+              </div>
+            )
+          ) : s.type === 'recurring' ? (
             <div className="space-y-4 rounded-2xl bg-bg p-4">
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Turnus">
@@ -242,7 +329,7 @@ export default function EventForm({ event = null, eventId = null }) {
                   </Select>
                 </Field>
                 <Field label="Uhrzeit">
-                  <Input type="time" value={s.time} onChange={(e) => set({ time: e.target.value })} />
+                  <Input type="time" step={300} value={s.time} onChange={(e) => set({ time: e.target.value })} />
                 </Field>
               </div>
 
@@ -339,7 +426,7 @@ export default function EventForm({ event = null, eventId = null }) {
                 <Input type="date" value={s.endDate} onChange={(e) => set({ endDate: e.target.value })} />
               </Field>
               <Field label="Uhrzeit">
-                <Input type="time" value={s.time} onChange={(e) => set({ time: e.target.value })} />
+                <Input type="time" step={300} value={s.time} onChange={(e) => set({ time: e.target.value })} />
               </Field>
             </div>
           ) : (
@@ -348,7 +435,7 @@ export default function EventForm({ event = null, eventId = null }) {
                 <Input type="date" value={s.date} onChange={(e) => set({ date: e.target.value })} />
               </Field>
               <Field label="Uhrzeit">
-                <Input type="time" value={s.time} onChange={(e) => set({ time: e.target.value })} />
+                <Input type="time" step={300} value={s.time} onChange={(e) => set({ time: e.target.value })} />
               </Field>
             </div>
           )}
@@ -439,7 +526,15 @@ export default function EventForm({ event = null, eventId = null }) {
             Abbrechen
           </Button>
           <Button type="submit" size="lg" className="flex-1" disabled={saving}>
-            {saving ? 'Speichert…' : isEdit ? 'Änderungen speichern' : 'Termin anlegen'}
+            {saving
+              ? 'Speichert…'
+              : isSeries && scope === 'series'
+                ? 'Serie speichern'
+                : isEdit
+                  ? 'Änderungen speichern'
+                  : s.type === 'recurring'
+                    ? 'Serie anlegen'
+                    : 'Termin anlegen'}
           </Button>
         </div>
 

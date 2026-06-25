@@ -10,7 +10,7 @@ import {
   updateGroup,
   listPenalties,
   insertPenalties,
-  insertEvent,
+  createEventSeries,
   recurrenceFromPreset,
 } from '../lib/api.js'
 import { InviteBox } from './Members'
@@ -96,9 +96,9 @@ export default function SetupWizard() {
         const [hh, mm] = (form.time || '19:30').split(':')
         const start = new Date()
         start.setHours(Number(hh) || 19, Number(mm) || 30, 0, 0)
-        await insertEvent(activeGroupId, user.id, {
+        // Regeltermin-Serie ausrollen (echte Einzeltermine, rollierend ~12 Monate).
+        await createEventSeries(activeGroupId, {
           title: 'Kegelabend',
-          type: 'recurring',
           start_date: start.toISOString(),
           rsvp_mode: 'opt_in',
           ...recurrenceFromPreset(form.recurrence),
@@ -260,7 +260,7 @@ function StepEvents({ form, set }) {
               </Select>
             </Field>
             <Field label="Uhrzeit">
-              <Input type="time" value={form.time} onChange={set('time')} />
+              <Input type="time" step={300} value={form.time} onChange={set('time')} />
             </Field>
           </div>
         )}

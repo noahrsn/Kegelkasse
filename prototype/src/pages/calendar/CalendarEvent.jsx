@@ -4,7 +4,16 @@ import { Card, Button, Badge, Avatar, Field, Textarea, Input } from '../../compo
 import { Sheet } from '../../components/Modal'
 import { cx, pal, creamLight } from '../../design/calm'
 import { useAuth } from '../../context/AuthContext.jsx'
-import { getEvent, listMembers, setRsvp, addEventGuest, removeEventGuest, deleteEvent } from '../../lib/api.js'
+import {
+  getEvent,
+  listMembers,
+  setRsvp,
+  addEventGuest,
+  removeEventGuest,
+  deleteEvent,
+  setEventCancelled,
+  deleteEventSeries,
+} from '../../lib/api.js'
 import { eventDetail, currentUser } from '../../mock/data'
 
 export const RSVP = {
@@ -34,11 +43,14 @@ function EventView({
   canManage,
   onEdit,
   onDelete,
+  onToggleCancel,
+  onDeleteSeries,
   onStartSession,
   busy,
 }) {
   const navigate = useNavigate()
   const noteRequired = vm.noteRequired
+  const cancelled = vm.status === 'cancelled'
 
   const [noteSheet, setNoteSheet] = useState(null) // { status } | null
   const [draftNote, setDraftNote] = useState('')
@@ -78,16 +90,32 @@ function EventView({
           ← Zurück zum Kalender
         </button>
         {canManage && (
-          <div className="flex gap-3 text-[13px] font-semibold">
+          <div className="flex flex-wrap justify-end gap-x-3 gap-y-1 text-[13px] font-semibold">
             <button onClick={onEdit} className="text-sage">
               Bearbeiten
             </button>
+            {onToggleCancel && (
+              <button onClick={onToggleCancel} className="text-amber" disabled={busy}>
+                {cancelled ? 'Reaktivieren' : 'Absagen'}
+              </button>
+            )}
             <button onClick={onDelete} className="text-terra" disabled={busy}>
               Löschen
             </button>
+            {onDeleteSeries && (
+              <button onClick={onDeleteSeries} className="text-terra" disabled={busy}>
+                Serie löschen
+              </button>
+            )}
           </div>
         )}
       </div>
+
+      {cancelled && (
+        <div className="rounded-2xl bg-terra-bg px-4 py-3 text-[13px] font-semibold text-terra">
+          ❌ Dieser Termin ist abgesagt. Rückmeldungen sind nicht möglich.
+        </div>
+      )}
 
       {/* Event-Kopf */}
       <Card tone="navy" className="space-y-4">
@@ -136,13 +164,13 @@ function EventView({
       <Card>
         <div className="text-[12px] font-semibold text-ink-soft">Deine Rückmeldung</div>
         <div className="mt-3 grid grid-cols-3 gap-2">
-          <RsvpBtn active={myStatus === 'yes'} tone="sage" disabled={busy} onClick={() => respond('yes')}>
+          <RsvpBtn active={myStatus === 'yes'} tone="sage" disabled={busy || cancelled} onClick={() => respond('yes')}>
             ✓ Zusagen
           </RsvpBtn>
-          <RsvpBtn active={myStatus === 'maybe'} tone="amber" disabled={busy} onClick={() => respond('maybe')}>
+          <RsvpBtn active={myStatus === 'maybe'} tone="amber" disabled={busy || cancelled} onClick={() => respond('maybe')}>
             ? Vielleicht
           </RsvpBtn>
-          <RsvpBtn active={myStatus === 'no'} tone="terra" disabled={busy} onClick={() => respond('no')}>
+          <RsvpBtn active={myStatus === 'no'} tone="terra" disabled={busy || cancelled} onClick={() => respond('no')}>
             ✕ Absagen
           </RsvpBtn>
         </div>
@@ -426,6 +454,8 @@ function LiveEvent({ eventId }) {
     return {
       title: event.title,
       type: event.type,
+      status: event.status,
+      seriesId: event.series_id,
       start: event.start_date,
       location: event.location,
       deadlineH: event.rsvp_deadline_hours,
@@ -513,8 +543,37 @@ function LiveEvent({ eventId }) {
   }
 
   // „Kegelabend starten" anbieten, sobald der Termin begonnen hat (heute/vergangen),
-  // solange noch kein Kegelabend verknüpft ist.
+  // solange noch kein Kegelabend verknüpft und der Termin nicht abgesagt ist.
+  const cancelled = event.status === 'cancelled'
   const started = new Date(event.start_date) <= new Date()
+
+  const toggleCancel = async () => {
+    const next = !cancelled
+    if (!window.confirm(next ? 'Diesen Termin absagen?' : 'Diesen Termin wieder aktivieren?')) return
+    setBusy(true)
+    try {
+      await setEventCancelled(eventId, next)
+      await reload()
+    } catch (e) {
+      console.error(e)
+      setError(e.message || 'Aktion fehlgeschlagen.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const onDeleteSeries = async () => {
+    if (!window.confirm('Alle künftigen Termine dieser Serie löschen?')) return
+    setBusy(true)
+    try {
+      await deleteEventSeries(event.series_id)
+      navigate('/calendar')
+    } catch (e) {
+      console.error(e)
+      setError(e.message || 'Serie löschen fehlgeschlagen.')
+      setBusy(false)
+    }
+  }
 
   return (
     <>
@@ -543,7 +602,9 @@ function LiveEvent({ eventId }) {
             setBusy(false)
           }
         }}
-        onStartSession={started ? startSession : null}
+        onToggleCancel={canManage ? toggleCancel : null}
+        onDeleteSeries={canManage && event.series_id ? onDeleteSeries : null}
+        onStartSession={started && !cancelled ? startSession : null}
         busy={busy}
       />
     </>

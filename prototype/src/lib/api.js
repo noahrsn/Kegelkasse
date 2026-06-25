@@ -315,6 +315,8 @@ export async function listEvents(groupId) {
       id: e.id,
       title: e.title,
       type: e.type,
+      status: e.status || 'active',
+      seriesId: e.series_id || null,
       location: e.location,
       start: e.start_date,
       end: e.end_date,
@@ -333,7 +335,7 @@ export async function getEvent(eventId) {
   const { data, error } = await supabase
     .from('events')
     .select(
-      `id, group_id, title, description, location, type, start_date, end_date,
+      `id, group_id, title, description, location, type, status, series_id, start_date, end_date,
        rsvp_mode, rsvp_note_required, rsvp_deadline_hours,
        recurrence_interval, recurrence_mode, recurrence_monthday, recurrence_weekday, recurrence_nth,
        rsvps:rsvp_entries(user_id, status, note, late_response),
@@ -392,6 +394,62 @@ export async function addEventGuest(eventId, name) {
 export async function removeEventGuest(guestId) {
   const { error } = await supabase.rpc('remove_event_guest', { p_guest_id: guestId })
   if (error) throw error
+}
+
+/* Regeltermin-Serie ausrollen (RPC: admin/präsident). Erzeugt je künftigem Termin
+   eine echte events-Zeile (rollierend ~12 Monate). Rückgabe: id des frühesten Termins. */
+export async function createEventSeries(groupId, row, horizonMonths = 12) {
+  const { data, error } = await supabase.rpc('create_event_series', {
+    p_group_id: groupId,
+    p_title: row.title,
+    p_description: row.description ?? null,
+    p_location: row.location ?? null,
+    p_start: row.start_date,
+    p_rsvp_mode: row.rsvp_mode ?? 'opt_in',
+    p_rsvp_note_required: row.rsvp_note_required ?? false,
+    p_rsvp_deadline_hours: row.rsvp_deadline_hours ?? 0,
+    p_recurrence_interval: row.recurrence_interval ?? null,
+    p_recurrence_mode: row.recurrence_mode ?? null,
+    p_recurrence_monthday: row.recurrence_monthday ?? null,
+    p_recurrence_weekday: row.recurrence_weekday ?? null,
+    p_recurrence_nth: row.recurrence_nth ?? null,
+    p_horizon_months: horizonMonths,
+  })
+  if (error) throw error
+  return data
+}
+
+/* Einzelnen Termin absagen / reaktivieren (RPC: admin/präsident). */
+export async function setEventCancelled(eventId, cancelled) {
+  const { error } = await supabase.rpc('set_event_cancelled', {
+    p_event_id: eventId,
+    p_cancelled: cancelled,
+  })
+  if (error) throw error
+}
+
+/* Gemeinsame Felder + Uhrzeit aller ZUKÜNFTIGEN Termine einer Serie ändern (RPC).
+   p_time = 'HH:MM' (lokale Uhrzeit) oder null, wenn die Zeit nicht geändert wird. */
+export async function updateEventSeries(seriesId, row, time = null) {
+  const { data, error } = await supabase.rpc('update_event_series', {
+    p_series_id: seriesId,
+    p_title: row.title,
+    p_description: row.description ?? null,
+    p_location: row.location ?? null,
+    p_time: time,
+    p_rsvp_mode: row.rsvp_mode,
+    p_rsvp_note_required: row.rsvp_note_required,
+    p_rsvp_deadline_hours: row.rsvp_deadline_hours,
+  })
+  if (error) throw error
+  return data
+}
+
+/* Zukünftige Termine einer Serie löschen (RPC: admin/präsident). Rückgabe: Anzahl. */
+export async function deleteEventSeries(seriesId) {
+  const { data, error } = await supabase.rpc('delete_event_series', { p_series_id: seriesId })
+  if (error) throw error
+  return data
 }
 
 /* Wiederholungs-Presets des Wizards -> events-Spalten. */
