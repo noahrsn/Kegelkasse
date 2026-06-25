@@ -28,7 +28,9 @@ Deno.serve(async (req) => {
     });
     if (error) return jsonResponse({ error: error.message }, 403);
 
-    // TODO (Phase 7): awards-calculate triggern, Benachrichtigungen versenden.
+    // Awards werden live über die RPC group_awards berechnet (keine Persistenz,
+    // kein separater Trigger nötig). Die E-Mail-Benachrichtigung zur Genehmigung
+    // wird mit dem Resend-Live-Key über send-email ergänzt (Phase 9, Produktion).
     return jsonResponse({ ok: true, session_id, booked: data });
   } catch (err) {
     return jsonResponse({ error: String(err) }, 500);

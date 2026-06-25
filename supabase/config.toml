@@ -39,13 +39,10 @@ double_confirm_changes = true
 enable_confirmations = true
 
 # Edge Functions (Deno/TypeScript)
+# Hinweis: CSV-Import läuft client-seitig (lib/csv.js) + RPC import_transactions,
+# Awards werden live über RPC group_awards berechnet — daher keine eigenen
+# Edge Functions dafür.
 [functions.session-approve]
-verify_jwt = true
-
-[functions.csv-import]
-verify_jwt = true
-
-[functions.awards-calculate]
 verify_jwt = true
 
 # Geplante Jobs (via pg_cron getriggert) — kein User-JWT.

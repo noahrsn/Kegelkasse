@@ -169,13 +169,14 @@ kegelkasse/
 │   └── functions/               # Supabase Edge Functions (Deno/TypeScript)
 │       ├── _shared/
 │       │   ├── supabase.ts      # Supabase-Client für Edge Functions
-│       │   └── resend.ts        # Resend E-Mail-Helper
-│       ├── session-approve/     # Session genehmigen + Schulden buchen
-│       ├── csv-import/          # CSV-Import Sparkasse-Format
-│       ├── awards-calculate/    # Award-Berechnung nach Session-Genehmigung
+│       │   ├── resend.ts        # Resend E-Mail-Helper
+│       │   └── templates.ts     # HTML-E-Mail-Templates (Calm-Bento-Stil)
+│       ├── session-approve/     # Session genehmigen + Schulden buchen (RPC-Trigger)
 │       ├── monthly-fee/         # Monatsbeitrag buchen (via pg_cron)
 │       ├── debt-reminder/       # Wöchentlicher Schulden-Reminder (via pg_cron)
 │       └── send-email/          # Zentraler E-Mail-Versand via Resend
+│       # Hinweis: CSV-Import läuft client-seitig (lib/csv.js + RPC import_transactions),
+│       # Awards live über RPC group_awards — daher keine eigenen Edge Functions.
 ├── src/                         # React+Vite Frontend (aus Phase 1 weiterentwickelt)
 │   ├── main.jsx
 │   ├── App.jsx
