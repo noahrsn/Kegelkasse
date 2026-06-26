@@ -93,7 +93,7 @@ export default function SessionRecord() {
     if (mockMode || !activeGroupId) return
     listPenalties(activeGroupId).then((rows) => setCatalog(normCatalog(rows))).catch(console.error)
     listMembers(activeGroupId)
-      .then((rows) => setPool(rows.map((m) => ({ userId: m.userId, name: m.name }))))
+      .then((rows) => setPool(rows.map((m) => ({ userId: m.userId, name: m.name, isPlaceholder: m.isPlaceholder }))))
       .catch(console.error)
   }, [mockMode, activeGroupId])
 
@@ -547,7 +547,14 @@ export default function SessionRecord() {
               className="flex w-full items-center gap-3 rounded-2xl border border-card-edge p-3 text-left hover:border-ink/20"
             >
               <Avatar name={m.name} size={36} />
-              <span className="flex-1 font-medium">{m.name}</span>
+              <span className="flex-1 font-medium">
+                {m.name}
+                {m.isPlaceholder && (
+                  <span className="ml-2 rounded-full bg-amber-bg px-2 py-0.5 text-[10px] font-semibold text-amber">
+                    nicht registriert
+                  </span>
+                )}
+              </span>
               <span className="text-[12px] font-semibold text-amber">+ Nachzügler</span>
             </button>
           ))}

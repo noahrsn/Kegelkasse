@@ -70,6 +70,7 @@ export default function Members() {
               name: m.name,
               role: m.role,
               iban: m.iban,
+              isPlaceholder: m.isPlaceholder,
               debt: d ? d.open : 0,
               openCount: d ? d.openCount : 0,
               penalties: d ? d.penalties : 0,
@@ -150,6 +151,7 @@ export default function Members() {
                   <div className="flex items-center gap-2">
                     <span className="truncate font-semibold">{m.name}</span>
                     <Badge tone={roleTone[m.role]}>{ROLE_LABEL[m.role]}</Badge>
+                    {m.isPlaceholder && <Badge tone="amber">Nicht registriert</Badge>}
                   </div>
                   {m.attendance != null ? (
                     <div className="mt-1.5 flex items-center gap-2">
@@ -261,7 +263,7 @@ function MemberSheet({ member, onClose, canManage, mockMode, groupId, onChanged 
         open={member != null && !penaltyOpen}
         onClose={onClose}
         title={member.name}
-        subtitle={ROLE_LABEL[member.role]}
+        subtitle={ROLE_LABEL[member.role] + (member.isPlaceholder ? ' · Nicht registriert' : '')}
         footer={
           member.debt > 0 && canManage ? (
             <Button variant="sage" className="w-full" disabled={busy} onClick={markPaid}>

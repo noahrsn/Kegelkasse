@@ -508,8 +508,10 @@ export function PlaceholderManager({ mockMode, groupId, canEdit = true }) {
   return (
     <Card className="space-y-3">
       <p className="text-[12px] text-ink-soft">
-        Lege Mitglieder schon vor der Anmeldung an. Beim Beitritt über den Einladungslink kann sich
-        jeder seinen Namen aus dieser Liste auswählen.
+        Lege Mitglieder schon vor der Anmeldung an. Sie zählen sofort als vollwertige Mitglieder –
+        du kannst ihnen Strafen und Kegelabende zuordnen –, sind aber als „nicht registriert"
+        markiert. Beim Beitritt über den Einladungslink wählt jeder seinen Namen aus dieser Liste;
+        die bis dahin angesammelten Strafen und Schulden wandern dann auf den echten Account.
       </p>
 
       {list == null ? (

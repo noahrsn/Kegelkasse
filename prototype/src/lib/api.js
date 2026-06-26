@@ -101,7 +101,7 @@ export async function insertEvent(groupId, createdBy, row) {
 export async function listMembers(groupId) {
   const { data, error } = await supabase
     .from('group_members')
-    .select('id, role, user_id, iban, profiles(first_name, last_name)')
+    .select('id, role, user_id, iban, profiles(first_name, last_name, is_placeholder)')
     .eq('group_id', groupId)
   if (error) throw error
   return (data ?? []).map((m) => ({
@@ -110,6 +110,7 @@ export async function listMembers(groupId) {
     role: m.role,
     iban: m.iban || '',
     name: m.profiles ? `${m.profiles.first_name} ${m.profiles.last_name}`.trim() : '—',
+    isPlaceholder: !!m.profiles?.is_placeholder,
   }))
 }
 
@@ -124,28 +125,28 @@ export async function resetInvite(groupId) {
   return data
 }
 
-/* ── Vorab angelegte Mitglieder (Platzhalter, Phase 11) ──────────────────── */
+/* ── Vorab angelegte Mitglieder (Platzhalter-Mitglieder, Phase 15) ───────────
+ * Vorangelegte Mitglieder sind echte group_members mit einem Ghost-Profil
+ * (is_placeholder = true). Sie verhalten sich überall wie normale Mitglieder
+ * (Strafen, Kegelabende, Schulden, Beitrag) und tragen nur den Tag
+ * „Nicht registriert", bis sie beim Beitritt übernommen werden.
+ * ─────────────────────────────────────────────────────────────────────────── */
 
-/* Alle Vorab-Mitglieder einer Gruppe (inkl. bereits übernommener). */
+/* Alle noch nicht übernommenen Vorab-Mitglieder einer Gruppe. id = user_id. */
 export async function listPlaceholders(groupId) {
-  const { data, error } = await supabase
-    .from('group_placeholders')
-    .select('id, first_name, last_name, iban, role, claimed_by')
-    .eq('group_id', groupId)
-    .order('first_name', { ascending: true })
-  if (error) throw error
-  return (data ?? []).map((p) => ({
-    id: p.id,
-    name: `${p.first_name} ${p.last_name}`.trim(),
-    firstName: p.first_name,
-    lastName: p.last_name,
-    iban: p.iban || '',
-    role: p.role,
-    claimed: !!p.claimed_by,
-  }))
+  const members = await listMembers(groupId)
+  return members
+    .filter((m) => m.isPlaceholder)
+    .map((m) => ({
+      id: m.userId,
+      name: m.name,
+      iban: m.iban || '',
+      role: m.role,
+      claimed: false,
+    }))
 }
 
-/* Vorab-Mitglied anlegen (admin/präsident). Rückgabe: id. */
+/* Vorab-Mitglied anlegen (admin/präsident). Rückgabe: user_id des Ghosts. */
 export async function addPlaceholder(groupId, { firstName, lastName = '', iban = '', role = 'mitglied' }) {
   const { data, error } = await supabase.rpc('add_placeholder', {
     p_group_id: groupId,
@@ -158,9 +159,22 @@ export async function addPlaceholder(groupId, { firstName, lastName = '', iban =
   return data
 }
 
-/* Vorab-Mitglied löschen (nur solange nicht übernommen). */
-export async function removePlaceholder(id) {
-  const { error } = await supabase.rpc('remove_placeholder', { p_id: id })
+/* Stammdaten eines Vorab-Mitglieds ändern (admin/präsident). */
+export async function updatePlaceholder(groupId, userId, { firstName, lastName = '', iban = '', role = 'mitglied' }) {
+  const { error } = await supabase.rpc('update_placeholder', {
+    p_group_id: groupId,
+    p_user_id: userId,
+    p_first_name: firstName,
+    p_last_name: lastName,
+    p_iban: iban || null,
+    p_role: role,
+  })
+  if (error) throw error
+}
+
+/* Vorab-Mitglied löschen (nur solange nicht übernommen). id = user_id. */
+export async function removePlaceholder(userId) {
+  const { error } = await supabase.rpc('remove_placeholder', { p_user_id: userId })
   if (error) throw error
 }
 

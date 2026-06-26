@@ -32,7 +32,9 @@ export default function SessionNew() {
   useEffect(() => {
     if (mockMode || !activeGroupId) return
     listMembers(activeGroupId)
-      .then((rows) => setMembers(rows.map((m) => ({ id: m.userId, userId: m.userId, name: m.name }))))
+      .then((rows) =>
+        setMembers(rows.map((m) => ({ id: m.userId, userId: m.userId, name: m.name, isPlaceholder: m.isPlaceholder }))),
+      )
       .catch((e) => {
         console.error(e)
         setMembers([])
@@ -142,7 +144,14 @@ export default function SessionNew() {
                   )}
                 >
                   <Avatar name={m.name} size={34} />
-                  <span className="flex-1 text-[14px] font-medium">{m.name}</span>
+                  <span className="flex-1 text-[14px] font-medium">
+                    {m.name}
+                    {m.isPlaceholder && (
+                      <span className="ml-2 rounded-full bg-amber-bg px-2 py-0.5 text-[10px] font-semibold text-amber">
+                        nicht registriert
+                      </span>
+                    )}
+                  </span>
                   <span
                     className={cx(
                       'grid h-6 w-6 place-items-center rounded-full text-[12px] font-bold',
