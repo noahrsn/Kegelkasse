@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useLocation, useParams } from 'react-router-dom'
 import { Card, Button, Avatar, Badge, Input } from '../../components/ui'
 import { Sheet } from '../../components/Modal'
@@ -88,6 +88,19 @@ export default function SessionRecord() {
   const [submitOpen, setSubmitOpen] = useState(false)
   const [saving, setSaving] = useState(false)
 
+  // Auto-Speichern (Verlustschutz): jede Änderung wird debounced als Draft in die
+  // DB geschrieben. savedId ist die persistierte Draft-ID (anfangs die Route-ID,
+  // bei einem Live-Start erst null, bis der erste Autosave sie anlegt).
+  const [savedId, setSavedId] = useState(existingId)
+  const [autosaveState, setAutosaveState] = useState('idle') // 'saving' | 'saved' | 'error'
+  const savedIdRef = useRef(existingId)
+  const skipLoadIdRef = useRef(null) // selbst angelegter Draft → nicht erneut vom Server laden
+  const skipAutosaveRef = useRef(false) // nächste roster-Änderung kam vom Laden, nicht vom Nutzer
+  const inFlightRef = useRef(false)
+  const rerunRef = useRef(false) // während eines Saves kam schon die nächste Änderung
+  const closingRef = useRef(false) // manuelles Speichern/Einreichen läuft → Autosave pausieren
+  const autosaveRef = useRef(null)
+
   // Echtmodus: Katalog + Mitglieder laden.
   useEffect(() => {
     if (mockMode || !activeGroupId) return
@@ -100,6 +113,7 @@ export default function SessionRecord() {
   // Echtmodus: bestehenden Entwurf nachladen (z. B. „fortsetzen").
   useEffect(() => {
     if (mockMode || isLive || !existingId) return
+    if (skipLoadIdRef.current === existingId) return // gerade selbst angelegt → kein Reload
     setLoading(true)
     getSession(existingId)
       .then((s) => {
@@ -117,6 +131,7 @@ export default function SessionRecord() {
             month: 'long',
           }),
         })
+        skipAutosaveRef.current = true // dieser setRoster kommt vom Laden, nicht vom Nutzer
         setRoster(
           (s.participants || []).map((p) => ({
             id: p.id,
@@ -265,6 +280,87 @@ export default function SessionRecord() {
     setRoster((r) => r.filter((_, i) => i !== idx))
   }
 
+  // Roster → save_session-Payload (von Autosave und manuellem Speichern genutzt).
+  const buildParticipants = () =>
+    roster.map((p) => ({
+      user_id: p.isGuest ? null : p.userId,
+      guest_name: p.isGuest ? p.name : null,
+      is_guest: p.isGuest,
+      is_late: !!p.late,
+      is_early_leave: !!p.early,
+      avg_amount: p.late ? p.lateAvg || 0 : p.early ? earlyAvgLive(p) : null,
+      penalties: aggregatePenalties(p.entries),
+    }))
+
+  // Auto-Speichern: schreibt den aktuellen Stand als Draft. Serialisiert sich selbst
+  // (kein paralleler Save), legt beim ersten Mal die Draft-ID an und schwenkt die URL
+  // von /sessions/live auf /sessions/:id, damit ein Reload den Entwurf wiederfindet.
+  autosaveRef.current = async () => {
+    if (mockMode || !ctx.groupId || roster.length === 0 || closingRef.current) return
+    if (inFlightRef.current) {
+      rerunRef.current = true
+      return
+    }
+    inFlightRef.current = true
+    setAutosaveState('saving')
+    try {
+      const id = await saveSession({
+        groupId: ctx.groupId,
+        sessionId: savedIdRef.current,
+        eventId: ctx.eventId,
+        date: ctx.date,
+        status: 'draft',
+        participants: buildParticipants(),
+        absent: absentMembers.map((m) => m.userId),
+        chargeAbsentAvg,
+      })
+      if (!savedIdRef.current && id) {
+        savedIdRef.current = id
+        skipLoadIdRef.current = id
+        setSavedId(id)
+        navigate(`/sessions/${id}`, { replace: true, state: location.state })
+      }
+      setAutosaveState('saved')
+    } catch (e) {
+      console.error('Autosave fehlgeschlagen', e)
+      setAutosaveState('error')
+    } finally {
+      inFlightRef.current = false
+      if (rerunRef.current) {
+        rerunRef.current = false
+        autosaveRef.current()
+      }
+    }
+  }
+
+  // Debounce: 1 s nach der letzten Änderung speichern. Der vom Laden ausgelöste
+  // setRoster wird übersprungen (sonst sofortiger Redundant-Save nach „fortsetzen").
+  useEffect(() => {
+    if (mockMode || loading) return
+    if (skipAutosaveRef.current) {
+      skipAutosaveRef.current = false
+      return
+    }
+    if (roster.length === 0) return
+    const t = setTimeout(() => autosaveRef.current?.(), 1000)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roster, chargeAbsentAvg, mockMode, loading])
+
+  // Geht die App in den Hintergrund (Tab-Wechsel, Handy sperren, Schließen),
+  // sofort flushen — fängt Änderungen ab, die noch im Debounce-Fenster hängen.
+  useEffect(() => {
+    const flush = () => {
+      if (document.visibilityState === 'hidden') autosaveRef.current?.()
+    }
+    document.addEventListener('visibilitychange', flush)
+    window.addEventListener('pagehide', flush)
+    return () => {
+      document.removeEventListener('visibilitychange', flush)
+      window.removeEventListener('pagehide', flush)
+    }
+  }, [])
+
   // Speichern / Einreichen.
   const persist = async (status) => {
     if (mockMode) {
@@ -272,30 +368,23 @@ export default function SessionRecord() {
       return
     }
     if (saving) return
+    closingRef.current = true // Autosave während des manuellen Speicherns pausieren
     setSaving(true)
     try {
-      const participants = roster.map((p) => ({
-        user_id: p.isGuest ? null : p.userId,
-        guest_name: p.isGuest ? p.name : null,
-        is_guest: p.isGuest,
-        is_late: !!p.late,
-        is_early_leave: !!p.early,
-        avg_amount: p.late ? p.lateAvg || 0 : p.early ? earlyAvgLive(p) : null,
-        penalties: aggregatePenalties(p.entries),
-      }))
       await saveSession({
         groupId: ctx.groupId,
-        sessionId: existingId,
+        sessionId: savedIdRef.current,
         eventId: ctx.eventId,
         date: ctx.date,
         status,
-        participants,
+        participants: buildParticipants(),
         absent: absentMembers.map((m) => m.userId),
         chargeAbsentAvg,
       })
       setSubmitOpen(false)
       navigate('/sessions')
     } catch (e) {
+      closingRef.current = false
       alert('Speichern fehlgeschlagen: ' + (e?.message || e))
     } finally {
       setSaving(false)
@@ -317,8 +406,9 @@ export default function SessionRecord() {
       {/* Kopf */}
       <header className="flex flex-wrap items-center justify-between gap-3 animate-rise">
         <div>
-          <div className="text-[11px] uppercase tracking-[0.14em] text-ink-dim">
-            Laufende Erfassung · Entwurf
+          <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-[0.14em] text-ink-dim">
+            <span>Laufende Erfassung · Entwurf</span>
+            {!mockMode && <AutosaveDot state={autosaveState} />}
           </div>
           <h1 className="mt-1 font-display text-3xl font-medium tracking-tight">{ctx.title}</h1>
           {ctx.when && <div className="text-[12px] text-ink-dim">{ctx.when}</div>}
@@ -742,6 +832,17 @@ function ManualEntry({ pen, value, onChange, onConfirm, onCancel }) {
       </div>
     </div>
   )
+}
+
+function AutosaveDot({ state }) {
+  const map = {
+    saving: { t: 'Speichert…', c: 'text-amber' },
+    saved: { t: 'Gespeichert', c: 'text-sage' },
+    error: { t: 'Nicht gespeichert', c: 'text-terra' },
+  }
+  const s = map[state]
+  if (!s) return null
+  return <span className={cx('font-semibold normal-case tracking-normal', s.c)}>· {s.t}</span>
 }
 
 function ModeBtn({ active, onClick, children }) {
