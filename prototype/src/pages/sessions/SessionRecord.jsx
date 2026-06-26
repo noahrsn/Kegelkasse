@@ -4,7 +4,7 @@ import { Card, Button, Avatar, Badge, Input } from '../../components/ui'
 import { Sheet } from '../../components/Modal'
 import { cx, eur, pal } from '../../design/calm'
 import { useAuth } from '../../context/AuthContext.jsx'
-import { listPenalties, listMembers, getSession, saveSession } from '../../lib/api.js'
+import { listPenalties, listMembers, getSession, saveSession, deleteSession } from '../../lib/api.js'
 import { members as mockMembers, penalties as mockPenalties } from '../../mock/data'
 
 let entrySeq = 1
@@ -87,6 +87,8 @@ export default function SessionRecord() {
   const [lateOpen, setLateOpen] = useState(false)
   const [submitOpen, setSubmitOpen] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [discardOpen, setDiscardOpen] = useState(false)
+  const [discarding, setDiscarding] = useState(false)
 
   // Auto-Speichern (Verlustschutz): jede Änderung wird debounced als Draft in die
   // DB geschrieben. savedId ist die persistierte Draft-ID (anfangs die Route-ID,
@@ -391,6 +393,24 @@ export default function SessionRecord() {
     }
   }
 
+  // Entwurf verwerfen: Autosave stoppen, Draft (falls schon angelegt) löschen, zurück.
+  const discard = async () => {
+    if (mockMode) {
+      navigate('/sessions')
+      return
+    }
+    closingRef.current = true
+    setDiscarding(true)
+    try {
+      if (savedIdRef.current) await deleteSession(savedIdRef.current)
+      navigate('/sessions')
+    } catch (e) {
+      closingRef.current = false
+      setDiscarding(false)
+      alert('Verwerfen fehlgeschlagen: ' + (e?.message || e))
+    }
+  }
+
   const current = active != null ? roster[active] : null
 
   if (loading) {
@@ -500,10 +520,24 @@ export default function SessionRecord() {
 
       {/* Sticky-Abschluss */}
       <div className="sticky bottom-24 lg:bottom-4 flex gap-2">
-        <Button variant="soft" size="lg" onClick={() => persist('draft')} disabled={saving}>
+        <Button
+          variant="soft"
+          size="lg"
+          onClick={() => setDiscardOpen(true)}
+          disabled={saving || discarding}
+          aria-label="Entwurf verwerfen"
+        >
+          🗑
+        </Button>
+        <Button variant="soft" size="lg" onClick={() => persist('draft')} disabled={saving || discarding}>
           {saving ? '…' : 'Speichern'}
         </Button>
-        <Button size="lg" className="flex-1 shadow-lg" onClick={() => setSubmitOpen(true)} disabled={saving}>
+        <Button
+          size="lg"
+          className="flex-1 shadow-lg"
+          onClick={() => setSubmitOpen(true)}
+          disabled={saving || discarding}
+        >
           Einreichen · {eur(total)} €
         </Button>
       </div>
@@ -664,6 +698,30 @@ export default function SessionRecord() {
             </Button>
             <Button className="flex-1" onClick={() => persist('submitted')} disabled={saving}>
               {saving ? 'Reicht ein…' : 'Einreichen'}
+            </Button>
+          </div>
+        }
+      >
+        <div className="rounded-2xl bg-bg p-4">
+          <Row label="Teilnehmer" value={`${roster.length} Personen`} />
+          <Row label="Strafen gesamt" value={`${countTotal} Stück`} />
+          <Row label="Summe" value={`${eur(total)} €`} strong />
+        </div>
+      </Sheet>
+
+      {/* Verwerfen-Bestätigung */}
+      <Sheet
+        open={discardOpen}
+        onClose={() => setDiscardOpen(false)}
+        title="Entwurf verwerfen?"
+        subtitle="Der Kegelabend und alle erfassten Strafen werden gelöscht. Das lässt sich nicht rückgängig machen."
+        footer={
+          <div className="flex gap-2">
+            <Button variant="soft" className="flex-1" onClick={() => setDiscardOpen(false)} disabled={discarding}>
+              Abbrechen
+            </Button>
+            <Button variant="danger" className="flex-1" onClick={discard} disabled={discarding}>
+              {discarding ? 'Verwirft…' : 'Verwerfen'}
             </Button>
           </div>
         }

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Card, Badge, Button, PageTitle, Avatar, AvatarStack, Empty } from '../../components/ui'
+import { Sheet } from '../../components/Modal'
 import { eur, pal, creamLight, navyInk } from '../../design/calm'
 import { useAuth } from '../../context/AuthContext.jsx'
-import { listSessions, getNextEvent, listMembers } from '../../lib/api.js'
+import { listSessions, getNextEvent, listMembers, deleteSession } from '../../lib/api.js'
 import {
   sessions as mockSessions,
   events as mockEvents,
@@ -34,6 +35,8 @@ export default function Sessions() {
 
   const [list, setList] = useState(mockMode ? mockSessions : null)
   const [next, setNext] = useState(null) // { id, title, when, presentIds, guests, yesNames }
+  const [delId, setDelId] = useState(null) // Entwurf, dessen Löschung gerade bestätigt wird
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     if (mockMode) {
@@ -91,6 +94,25 @@ export default function Sessions() {
         guests: next.guests,
       },
     })
+  }
+
+  const delTarget = (list || []).find((s) => s.id === delId)
+  const confirmDelete = async () => {
+    if (mockMode) {
+      setList((prev) => (prev || []).filter((s) => s.id !== delId))
+      setDelId(null)
+      return
+    }
+    setDeleting(true)
+    try {
+      await deleteSession(delId)
+      setList((prev) => (prev || []).filter((s) => s.id !== delId))
+      setDelId(null)
+    } catch (e) {
+      alert('Löschen fehlgeschlagen: ' + (e?.message || e))
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const pending = (list || []).find((s) => s.status === 'submitted')
@@ -208,12 +230,50 @@ export default function Sessions() {
                     <div className="font-mono text-lg font-semibold tnum">{eur(s.total)} €</div>
                     <div className="text-[11px] text-ink-dim">Σ Strafen</div>
                   </div>
+                  {s.status === 'draft' && (
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        setDelId(s.id)
+                      }}
+                      className="shrink-0 rounded-full p-2 text-ink-dim transition hover:bg-terra-bg hover:text-terra"
+                      aria-label="Entwurf löschen"
+                    >
+                      🗑
+                    </button>
+                  )}
                 </Card>
               </Link>
             )
           })}
         </div>
       )}
+
+      {/* Entwurf-Löschen-Bestätigung */}
+      <Sheet
+        open={delId != null}
+        onClose={() => setDelId(null)}
+        title="Entwurf löschen?"
+        subtitle="Der Kegelabend und alle erfassten Strafen werden gelöscht. Das lässt sich nicht rückgängig machen."
+        footer={
+          <div className="flex gap-2">
+            <Button variant="soft" className="flex-1" onClick={() => setDelId(null)} disabled={deleting}>
+              Abbrechen
+            </Button>
+            <Button variant="danger" className="flex-1" onClick={confirmDelete} disabled={deleting}>
+              {deleting ? 'Löscht…' : 'Löschen'}
+            </Button>
+          </div>
+        }
+      >
+        {delTarget && (
+          <div className="rounded-2xl bg-bg p-4 text-[13px] text-ink-soft">
+            Entwurf vom <span className="font-semibold text-ink">{fmtDate(delTarget.date)}</span> ·{' '}
+            {delTarget.participants} Teiln. · {delTarget.penalties} Strafen
+          </div>
+        )}
+      </Sheet>
     </div>
   )
 }

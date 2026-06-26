@@ -14,7 +14,7 @@ const roleLabels = {
 /* Primärnavigation (Desktop-Sidebar + Mobile Bottom-Bar) */
 const primary = [
   { to: '/dashboard', label: 'Dashboard', icon: HomeIcon },
-  { to: '/sessions', label: 'Kegelabende', icon: PinIcon, tag: '1' },
+  { to: '/sessions', label: 'Kegelabende', icon: PinIcon },
   { to: '/treasury', label: 'Kasse', icon: WalletIcon },
   { to: '/calendar', label: 'Termine', icon: CalendarIcon },
 ]
