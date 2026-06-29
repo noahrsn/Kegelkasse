@@ -141,6 +141,7 @@ function mockGroupShape() {
   return {
     name: mockClub.name,
     monthly_fee: mockClub.monthlyFee,
+    fee_booking_mode: mockClub.feeBookingMode || 'fixed_day',
     fee_day: mockClub.feeDay,
     payment_iban: mockClub.iban,
     payment_paypal: mockClub.paypal,
@@ -247,6 +248,7 @@ function Finance({ group, onSave }) {
   const ed = useEditor(
     {
       monthly_fee: group.monthly_fee ?? '',
+      fee_booking_mode: group.fee_booking_mode ?? 'fixed_day',
       fee_day: group.fee_day ?? '',
       payment_iban: group.payment_iban ?? '',
       payment_paypal: group.payment_paypal ?? '',
@@ -262,6 +264,7 @@ function Finance({ group, onSave }) {
   )
   const transform = (v) => ({
     monthly_fee: Number(v.monthly_fee) || 0,
+    fee_booking_mode: v.fee_booking_mode || 'fixed_day',
     fee_day: Number(v.fee_day) || 1,
     payment_iban: v.payment_iban || null,
     payment_paypal: v.payment_paypal || null,
@@ -276,10 +279,25 @@ function Finance({ group, onSave }) {
   return (
     <div className="space-y-4">
       <Card className="space-y-4">
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Monatsbeitrag (€)"><Input type="number" step="0.5" value={ed.val.monthly_fee} onChange={ed.field('monthly_fee')} /></Field>
-          <Field label="Buchungstag"><Input type="number" min="1" max="28" value={ed.val.fee_day} onChange={ed.field('fee_day')} /></Field>
-        </div>
+        <Field label="Monatsbeitrag (€)"><Input type="number" step="0.5" value={ed.val.monthly_fee} onChange={ed.field('monthly_fee')} /></Field>
+        <Field label="Wann wird der Beitrag gebucht?">
+          <Select value={ed.val.fee_booking_mode} onChange={ed.field('fee_booking_mode')}>
+            <option value="fixed_day">An einem festen Tag im Monat</option>
+            <option value="day_after_last_event">Am Tag nach dem letzten Kegelabend des Monats</option>
+          </Select>
+        </Field>
+        {ed.val.fee_booking_mode === 'fixed_day' ? (
+          <Field label="Buchungstag (Tag im Monat)" hint="1–28">
+            <Input type="number" min="1" max="28" value={ed.val.fee_day} onChange={ed.field('fee_day')} />
+          </Field>
+        ) : (
+          <p className="rounded-2xl bg-bg p-3 text-[12px] text-ink-soft">
+            Der Beitrag wird automatisch am Tag nach dem letzten Kegeltermin des Monats auf alle
+            Konten gebucht. Die Zahlungsfrist richtet sich nach der Einstellung unten – z. B. „2 Tage
+            vor dem nächsten Kegeltermin". Gibt es in einem Monat keinen Kegeltermin, wird in dem
+            Monat nichts gebucht.
+          </p>
+        )}
         <Field label="IBAN"><Input value={ed.val.payment_iban} onChange={ed.field('payment_iban')} className="font-mono" /></Field>
         <Field label="PayPal-Link"><Input value={ed.val.payment_paypal} onChange={ed.field('payment_paypal')} /></Field>
         <div className="grid grid-cols-2 gap-3">
@@ -289,15 +307,33 @@ function Finance({ group, onSave }) {
       </Card>
       <Card className="space-y-4">
         <div className="text-[12px] font-semibold text-ink-soft">Zahlungsfristen & Verspätung</div>
+        <p className="text-[12px] text-ink-soft">
+          Diese Frist gilt gemeinsam für Monatsbeiträge und Strafen.
+        </p>
         <Field label="Fristberechnung">
           <Select value={ed.val.payment_deadline_type} onChange={ed.field('payment_deadline_type')}>
-            <option value="days_before_next_event">Tage vor dem nächsten Termin</option>
-            <option value="days_after_booking">Tage nach Buchung</option>
+            <option value="days_before_next_event">Tage vor dem nächsten Kegeltermin</option>
+            <option value="days_after_booking">Tage nach der Buchung</option>
             <option value="fixed_day_of_month">Fester Tag im Monat</option>
           </Select>
         </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Frist (Tage)"><Input type="number" value={ed.val.payment_deadline_days} onChange={ed.field('payment_deadline_days')} /></Field>
+          <Field
+            label={
+              ed.val.payment_deadline_type === 'fixed_day_of_month'
+                ? 'Tag im Monat'
+                : 'Frist (Tage)'
+            }
+            hint={
+              ed.val.payment_deadline_type === 'days_before_next_event'
+                ? 'Tage vor dem Kegeln'
+                : ed.val.payment_deadline_type === 'days_after_booking'
+                  ? 'Tage nach der Buchung'
+                  : '1–28'
+            }
+          >
+            <Input type="number" value={ed.val.payment_deadline_days} onChange={ed.field('payment_deadline_days')} />
+          </Field>
           <Field label="Verspätungsstrafe (€)"><Input type="number" step="0.5" value={ed.val.late_payment_fee} onChange={ed.field('late_payment_fee')} /></Field>
         </div>
       </Card>

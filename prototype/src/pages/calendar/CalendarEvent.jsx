@@ -456,6 +456,7 @@ function LiveEvent({ eventId }) {
       type: event.type,
       status: event.status,
       seriesId: event.series_id,
+      isBowling: event.is_bowling !== false,
       start: event.start_date,
       location: event.location,
       deadlineH: event.rsvp_deadline_hours,
@@ -508,7 +509,13 @@ function LiveEvent({ eventId }) {
   }
 
   const startSession = () => {
-    const yes = (event.rsvps || []).filter((r) => r.status === 'yes').map((r) => r.user_id)
+    // Zugesagt = wer effektiv „yes" ist. Bei Opt-out gelten Mitglieder ohne
+    // Antwort als zugesagt (Default 'yes') — sie müssen daher genauso als anwesend
+    // vorausgewählt werden wie explizite Zusagen, nicht nur die mit rsvp-Eintrag.
+    const rsvpByUser = new Map((event.rsvps || []).map((r) => [r.user_id, r.status]))
+    const yes = members
+      .filter((m) => (rsvpByUser.get(m.userId) || (optOut ? 'yes' : 'no_answer')) === 'yes')
+      .map((m) => m.userId)
     const d = new Date(event.start_date)
     navigate('/sessions/new', {
       state: {
@@ -604,7 +611,7 @@ function LiveEvent({ eventId }) {
         }}
         onToggleCancel={canManage ? toggleCancel : null}
         onDeleteSeries={canManage && event.series_id ? onDeleteSeries : null}
-        onStartSession={started && !cancelled ? startSession : null}
+        onStartSession={started && !cancelled && vm.isBowling ? startSession : null}
         busy={busy}
       />
     </>

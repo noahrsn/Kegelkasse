@@ -66,16 +66,21 @@ export default function Sessions() {
     Promise.all([getNextEvent(activeGroupId), listMembers(activeGroupId)])
       .then(([ev, members]) => {
         if (!ev) return setNext(null)
-        const nameOf = (uid) => members.find((m) => m.userId === uid)?.name
-        const yes = (ev.rsvps || []).filter((r) => r.status === 'yes')
+        // Bei Opt-out gelten Mitglieder ohne Antwort als zugesagt (Default 'yes') —
+        // sie müssen daher als anwesend übernommen werden, nicht nur explizite Zusagen.
+        const optOut = ev.rsvp_mode === 'opt_out'
+        const statusByUser = new Map((ev.rsvps || []).map((r) => [r.user_id, r.status]))
+        const yes = members.filter(
+          (m) => (statusByUser.get(m.userId) || (optOut ? 'yes' : 'no_answer')) === 'yes',
+        )
         setNext({
           id: ev.id,
           title: ev.title,
           when: fmtEventWhen(ev.start_date),
           date: ev.start_date.slice(0, 10),
-          presentIds: yes.map((r) => r.user_id),
+          presentIds: yes.map((m) => m.userId),
           guests: (ev.guests || []).map((g) => g.guest_name),
-          yesNames: yes.map((r) => nameOf(r.user_id)).filter(Boolean),
+          yesNames: yes.map((m) => m.name),
         })
       })
       .catch((e) => console.error(e))

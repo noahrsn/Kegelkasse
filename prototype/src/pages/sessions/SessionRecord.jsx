@@ -732,12 +732,16 @@ export default function SessionRecord() {
           <div className="mb-4 rounded-2xl bg-bg p-3">
             <div className="mb-2 flex items-center justify-between">
               <span className="text-[12px] font-semibold text-ink-soft">Anwesenheit</span>
-              <button
-                onClick={() => removeParticipant(active)}
-                className="text-[11px] font-semibold text-terra hover:underline"
-              >
-                Aus Liste entfernen
-              </button>
+              {/* „Aus Liste entfernen" nur im Detailliert-Modus — im Schnell-Modus
+                  soll ein Fehltipp nicht versehentlich jemanden entfernen. */}
+              {mode === 'detailed' && (
+                <button
+                  onClick={() => removeParticipant(active)}
+                  className="text-[11px] font-semibold text-terra hover:underline"
+                >
+                  Aus Liste entfernen
+                </button>
+              )}
             </div>
 
             {current.late && (

@@ -250,11 +250,13 @@ export async function getNextEvent(groupId) {
   const { data, error } = await supabase
     .from('events')
     .select(
-      `id, title, start_date, type,
+      `id, title, start_date, type, rsvp_mode,
        rsvps:rsvp_entries(status, user_id),
        guests:event_guests(guest_name, invited_by)`,
     )
     .eq('group_id', groupId)
+    .eq('is_bowling', true) // nur Kegel-Termine als Kegelabend vorschlagen
+    .neq('status', 'cancelled')
     .gte('start_date', new Date().toISOString())
     .order('start_date', { ascending: true })
     .limit(1)
@@ -362,7 +364,7 @@ export async function getEvent(eventId) {
     .from('events')
     .select(
       `id, group_id, title, description, location, type, status, series_id, start_date, end_date,
-       rsvp_mode, rsvp_note_required, rsvp_deadline_hours,
+       is_bowling, rsvp_mode, rsvp_note_required, rsvp_deadline_hours,
        recurrence_interval, recurrence_mode, recurrence_monthday, recurrence_weekday, recurrence_nth,
        rsvps:rsvp_entries(user_id, status, note, late_response),
        guests:event_guests(id, guest_name, invited_by)`,
@@ -431,6 +433,7 @@ export async function createEventSeries(groupId, row, horizonMonths = 12) {
     p_description: row.description ?? null,
     p_location: row.location ?? null,
     p_start: row.start_date,
+    p_is_bowling: row.is_bowling ?? true,
     p_rsvp_mode: row.rsvp_mode ?? 'opt_in',
     p_rsvp_note_required: row.rsvp_note_required ?? false,
     p_rsvp_deadline_hours: row.rsvp_deadline_hours ?? 0,
@@ -463,6 +466,7 @@ export async function updateEventSeries(seriesId, row, time = null) {
     p_description: row.description ?? null,
     p_location: row.location ?? null,
     p_time: time,
+    p_is_bowling: row.is_bowling ?? true,
     p_rsvp_mode: row.rsvp_mode,
     p_rsvp_note_required: row.rsvp_note_required,
     p_rsvp_deadline_hours: row.rsvp_deadline_hours,

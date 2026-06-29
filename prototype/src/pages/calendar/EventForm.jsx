@@ -74,6 +74,7 @@ function initialState(event) {
       monthMode: 'same_date',
       monthday: '15',
       nth: '4',
+      isBowling: true,
       optOut: false,
       noteRequired: true,
       deadlineH: '48',
@@ -95,6 +96,7 @@ function initialState(event) {
     monthMode: event.recurrence_mode === 'nth_weekday' ? 'nth_weekday' : 'same_date',
     monthday: event.recurrence_monthday != null ? String(event.recurrence_monthday) : '15',
     nth: event.recurrence_nth === -1 ? 'last' : event.recurrence_nth != null ? String(event.recurrence_nth) : '4',
+    isBowling: event.is_bowling !== false,
     optOut: event.rsvp_mode === 'opt_out',
     noteRequired: !!event.rsvp_note_required,
     deadlineH: event.rsvp_deadline_hours != null ? String(event.rsvp_deadline_hours) : '48',
@@ -109,6 +111,7 @@ function buildRow(s) {
     type: s.type,
     location: s.location.trim() || null,
     description: s.description.trim() || null,
+    is_bowling: s.isBowling,
     rsvp_mode: s.optOut ? 'opt_out' : 'opt_in',
     rsvp_note_required: s.noteRequired,
     rsvp_deadline_hours: Number(s.deadlineH) || 0,
@@ -170,6 +173,7 @@ export default function EventForm({ event = null, eventId = null }) {
     title: s.title.trim(),
     location: s.location.trim() || null,
     description: s.description.trim() || null,
+    is_bowling: s.isBowling,
     rsvp_mode: s.optOut ? 'opt_out' : 'opt_in',
     rsvp_note_required: s.noteRequired,
     rsvp_deadline_hours: Number(s.deadlineH) || 0,
@@ -455,6 +459,16 @@ export default function EventForm({ event = null, eventId = null }) {
               placeholder="Optionaler Hinweis für die Mitglieder"
             />
           </Field>
+        </Card>
+
+        {/* Kegelabend-Kopplung: nur „Kegel-Termine" werden als Kegelabend vorgeschlagen */}
+        <Card>
+          <Toggle
+            checked={s.isBowling}
+            onChange={(v) => set({ isBowling: v })}
+            label="An diesem Termin wird gekegelt"
+            hint="Nur Kegel-Termine werden zum Erfassen eines Kegelabends vorgeschlagen. Aus für reine Versammlungen, Feiern o. Ä."
+          />
         </Card>
 
         {/* RSVP */}
