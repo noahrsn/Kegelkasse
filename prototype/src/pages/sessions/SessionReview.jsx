@@ -13,28 +13,42 @@ function fmtDate(d) {
   return new Date(d).toLocaleDateString('de-DE', { day: '2-digit', month: 'long', year: 'numeric' })
 }
 
-/* DB-Session → Review-Form. */
+const round2 = (x) => Math.round(x * 100) / 100
+const fullName = (p) => `${p?.first_name ?? ''} ${p?.last_name ?? ''}`.trim() || '—'
+
+/* DB-Session → Review-Form. Aufrundung + Abwesenden-Schnitt werden erst bei
+   genehmigten Kegelabenden so dargestellt, wie sie auch gebucht wurden. */
 function fromDb(s) {
+  const approved = s.status === 'approved'
+  const roundUp = !!s.group?.round_up_penalties
+  const chargeAbsent = !!s.group?.charge_absent_avg
+  // Aufrundung gilt nur für genehmigte Abende (vorher: Roh-Beträge).
+  const rnd = (x) => (approved && roundUp ? Math.ceil(x) : x)
+
   const participants = (s.participants || []).map((p) => {
     const items = (p.penalties || []).map((sp) => [
       sp.penalties_catalog?.name ?? 'Strafe',
       sp.count,
       Number(sp.amount),
     ])
+    const penaltySum = items.reduce((b, [, , amt]) => b + amt, 0)
     // Fixer Ø-Aufschlag (Nachzügler-Start bzw. Frühgeher-Schnitt) — additiv zu den
     // eigenen Strafen, im Frontend berechnet und in avg_amount gespeichert.
     const avgCharge =
-      !p.is_guest && (p.is_late || p.is_early_leave) ? Number(p.avg_amount) || 0 : null
+      !p.is_guest && (p.is_late || p.is_early_leave) ? Number(p.avg_amount) || 0 : 0
+    // Gebuchter Betrag: eigene Strafen + Ø-Aufschlag werden getrennt aufgerundet.
+    const charge = rnd(penaltySum) + (avgCharge > 0 ? rnd(avgCharge) : 0)
     return {
       id: p.id,
-      name: p.is_guest
-        ? `Gast: ${p.guest_name}`
-        : `${p.profiles?.first_name ?? ''} ${p.profiles?.last_name ?? ''}`.trim() || '—',
+      name: p.is_guest ? `Gast: ${p.guest_name}` : fullName(p.profiles),
       isGuest: p.is_guest,
       paid: p.guest_paid,
       late: p.is_late,
       early: p.is_early_leave,
+      penaltySum,
       avgCharge,
+      charge,
+      roundDiff: charge - (penaltySum + avgCharge),
       avgLabel: p.is_late
         ? 'Nachzügler-Schnitt'
         : p.is_early_leave
@@ -43,17 +57,32 @@ function fromDb(s) {
       items,
     }
   })
-  const total = participants.reduce(
-    (a, p) => a + p.items.reduce((b, [, , amt]) => b + amt, 0) + (p.avgCharge || 0),
-    0,
-  )
+
+  // Abwesenden-Schnitt: Mittel ALLER echten Mitglieder (ohne Gäste), wie in
+  // approve_session. Wird nur bei genehmigten Abenden mit aktivem Flag gezeigt.
+  const realMembers = participants.filter((p) => !p.isGuest)
+  const realTotal = realMembers.reduce((a, p) => a + p.penaltySum, 0)
+  const avgRaw = realMembers.length > 0 ? realTotal / realMembers.length : 0
+  const absentAvg = roundUp ? Math.ceil(avgRaw) : round2(avgRaw)
+  const absentList = (s.absent || []).map((a) => ({
+    userId: a.user_id,
+    name: fullName(a.profiles),
+  }))
+  const showAbsent = approved && chargeAbsent && absentList.length > 0 && absentAvg > 0
+
+  const participantsTotal = participants.reduce((a, p) => a + p.charge, 0)
+  const absentTotal = showAbsent ? absentAvg * absentList.length : 0
+
   return {
     id: s.id,
     date: s.date,
     status: s.status,
-    recordedBy: `${s.recorder?.first_name ?? ''} ${s.recorder?.last_name ?? ''}`.trim() || '—',
+    recordedBy: fullName(s.recorder),
     participants,
-    total,
+    absentList,
+    absentAvg,
+    showAbsent,
+    total: participantsTotal + absentTotal,
   }
 }
 
@@ -177,9 +206,11 @@ export default function SessionReview() {
       {/* Teilnehmer-Aufschlüsselung */}
       <div className="space-y-2">
         {detail.participants.map((p) => {
-          const sum = p.items.reduce((a, [, , amt]) => a + amt, 0)
-          const hasAvg = (p.avgCharge || 0) > 0
-          const shown = sum + (p.avgCharge || 0)
+          const penaltySum = p.penaltySum ?? p.items.reduce((a, [, , amt]) => a + amt, 0)
+          const avgCharge = p.avgCharge || 0
+          const hasAvg = avgCharge > 0
+          const charge = p.charge ?? penaltySum + avgCharge
+          const roundDiff = p.roundDiff || 0
           const isOpen = open.has(p.id)
           return (
             <Card key={p.id} className="p-0 overflow-hidden">
@@ -197,7 +228,7 @@ export default function SessionReview() {
                     {hasAvg && ` · + ${p.avgLabel}`}
                   </div>
                 </div>
-                <span className="font-mono font-semibold tnum text-terra">{eur(shown)} €</span>
+                <span className="font-mono font-semibold tnum text-terra">{eur(charge)} €</span>
                 <span className={cx('text-ink-dim transition', isOpen && 'rotate-180')}>⌄</span>
               </button>
               {isOpen && (
@@ -216,7 +247,13 @@ export default function SessionReview() {
                   {hasAvg && (
                     <div className="flex items-center justify-between py-1.5 text-[13px]">
                       <span className="text-ink-soft">{p.avgLabel}</span>
-                      <span className="font-mono tnum">{eur(p.avgCharge)} €</span>
+                      <span className="font-mono tnum">{eur(avgCharge)} €</span>
+                    </div>
+                  )}
+                  {roundDiff > 0.005 && (
+                    <div className="flex items-center justify-between py-1.5 text-[13px]">
+                      <span className="text-ink-soft">Aufrundung</span>
+                      <span className="font-mono tnum">+ {eur(roundDiff)} €</span>
                     </div>
                   )}
                 </div>
@@ -225,6 +262,35 @@ export default function SessionReview() {
           )
         })}
       </div>
+
+      {/* Abwesende mit Durchschnittsstrafe (nur nach Genehmigung) */}
+      {detail.showAbsent && (
+        <div>
+          <h2 className="mb-2 text-[13px] font-semibold text-ink-soft">
+            Abwesende · Durchschnittsstrafe
+          </h2>
+          <Card className="p-0">
+            {detail.absentList.map((m, i) => (
+              <div
+                key={m.userId}
+                className={cx(
+                  'flex items-center gap-3 p-4',
+                  i < detail.absentList.length - 1 && 'border-b border-card-edge',
+                )}
+              >
+                <Avatar name={m.name} size={36} />
+                <span className="flex-1 font-medium">{m.name}</span>
+                <span className="font-mono font-semibold tnum text-terra">
+                  {eur(detail.absentAvg)} €
+                </span>
+              </div>
+            ))}
+          </Card>
+          <p className="mt-2 text-[11px] text-ink-dim">
+            Schnitt aller echten Mitglieder (ohne Gäste).
+          </p>
+        </div>
+      )}
 
       {/* Aktionen */}
       {isApproved ? (

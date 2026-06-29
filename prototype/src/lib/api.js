@@ -217,12 +217,17 @@ export async function getSession(sessionId) {
     .from('sessions')
     .select(
       `id, group_id, event_id, date, status, recorded_by, submitted_at, approved_at,
+       group:groups(charge_absent_avg, round_up_penalties),
        recorder:recorded_by(first_name, last_name),
        participants:session_participants(
          id, user_id, guest_name, is_guest, is_late, is_early_leave, avg_amount, guest_paid,
          profiles(first_name, last_name),
          penalties:session_penalties(id, catalog_id, count, amount,
            penalties_catalog(name, icon))
+       ),
+       absent:session_absent_members(
+         user_id,
+         profiles(first_name, last_name)
        )`,
     )
     .eq('id', sessionId)

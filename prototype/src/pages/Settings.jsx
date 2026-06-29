@@ -256,6 +256,7 @@ function Finance({ group, onSave }) {
       payment_deadline_days: group.payment_deadline_days ?? '',
       late_payment_fee: group.late_payment_fee ?? '',
       charge_absent_avg: group.charge_absent_avg ?? false,
+      round_up_penalties: group.round_up_penalties ?? false,
     },
     onSave,
   )
@@ -270,6 +271,7 @@ function Finance({ group, onSave }) {
     payment_deadline_days: Number(v.payment_deadline_days) || 0,
     late_payment_fee: Number(v.late_payment_fee) || 0,
     charge_absent_avg: !!v.charge_absent_avg,
+    round_up_penalties: !!v.round_up_penalties,
   })
   return (
     <div className="space-y-4">
@@ -305,8 +307,16 @@ function Finance({ group, onSave }) {
           checked={!!ed.val.charge_absent_avg}
           onChange={ed.field('charge_absent_avg')}
           label="Abwesende mit Durchschnitt belasten"
-          hint="Gilt für alle Kegelabende: Nach der Genehmigung bekommen abwesende Mitglieder automatisch den Schnitt aller Strafen als offenen Beitrag."
+          hint="Gilt für alle Kegelabende: Nach der Genehmigung bekommen abwesende Mitglieder den Schnitt aller echten Mitglieder (ohne Gäste) als offenen Beitrag."
         />
+        <div className="border-t border-card-edge pt-4">
+          <Toggle
+            checked={!!ed.val.round_up_penalties}
+            onChange={ed.field('round_up_penalties')}
+            label="Strafen auf den nächsten Euro aufrunden"
+            hint="Beim Genehmigen werden alle gebuchten Strafen – auch der Durchschnitt – auf den nächsten vollen Euro aufgerundet."
+          />
+        </div>
       </Card>
       <SaveBar onDiscard={ed.discard} onSave={() => ed.save(transform)} saving={ed.saving} saved={ed.saved} />
     </div>
