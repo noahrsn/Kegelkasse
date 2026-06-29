@@ -58,6 +58,9 @@ export const penalties = [
   { id: 'p8', name: 'Runde verloren', amount: 1.0, icon: '🍺', active: true, manual: false },
   { id: 'p10', name: 'Glas umgeworfen', amount: null, icon: '🥃', active: true, manual: true },
   { id: 'p9', name: 'Geburtstagsrunde', amount: 5.0, icon: '🎂', active: false, manual: false },
+  { id: 'g1', name: 'Einzelspiel', amount: null, icon: '🏅', active: true, manual: true, gameKind: 'einzel' },
+  { id: 'g2', name: '2-Teams-Spiel', amount: null, icon: '👥', active: true, manual: true, gameKind: 'teams' },
+  { id: 'g3', name: '3,50 €-Spiel', amount: null, icon: '💰', active: true, manual: true, gameKind: 'progressive' },
 ]
 
 export const sessions = [

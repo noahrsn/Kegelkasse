@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useLocation, useParams } from 'react-router-dom'
-import { Card, Button, Avatar, Badge, Input } from '../../components/ui'
+import { Card, Button, Avatar, Badge, Input, Field } from '../../components/ui'
 import { Sheet } from '../../components/Modal'
 import { cx, eur, pal } from '../../design/calm'
 import { useAuth } from '../../context/AuthContext.jsx'
@@ -9,7 +9,9 @@ import { members as mockMembers, penalties as mockPenalties } from '../../mock/d
 
 let entrySeq = 1
 
-/* Katalog-DB-Zeile → UI-Form. */
+const round2 = (x) => Math.round(x * 100) / 100
+
+/* Katalog-DB-Zeile → UI-Form. (manual/gameKind tolerieren DB- und Mock-Felder.) */
 function normCatalog(rows) {
   return rows
     .filter((p) => p.active)
@@ -18,7 +20,8 @@ function normCatalog(rows) {
       name: p.name,
       icon: p.icon,
       amount: p.amount == null ? null : Number(p.amount),
-      manual: p.manual_amount,
+      manual: p.manual_amount ?? p.manual,
+      gameKind: p.game_kind ?? p.gameKind ?? null,
     }))
 }
 
@@ -88,6 +91,14 @@ export default function SessionRecord() {
   const [saving, setSaving] = useState(false)
   const [discardOpen, setDiscardOpen] = useState(false)
   const [discarding, setDiscarding] = useState(false)
+
+  // Spiele (Schnell-Strafen für verlorene Spiele).
+  const [gamesOpen, setGamesOpen] = useState(false)
+  const [gameForm, setGameForm] = useState(null) // null | 'einzel' | 'teams'
+  const [einzelRanks, setEinzelRanks] = useState([]) // roster-ids in Tap-Reihenfolge
+  const [teamLosers, setTeamLosers] = useState([]) // roster-ids
+  const [teamAmount, setTeamAmount] = useState('')
+  const [progressive, setProgressive] = useState({ active: false, amount: 0.25 })
 
   // Auto-Speichern (Verlustschutz): jede Änderung wird debounced als Draft in die
   // DB geschrieben. savedId ist die persistierte Draft-ID (anfangs die Route-ID,
@@ -194,8 +205,14 @@ export default function SessionRecord() {
   const total = useMemo(() => roster.reduce((acc, p) => acc + effectiveSum(p), 0), [roster])
   const countTotal = useMemo(() => roster.reduce((acc, p) => acc + p.entries.length, 0), [roster])
 
-  const cat = catalog || []
-  const findPen = (penId) => cat.find((p) => p.id === penId)
+  const allCat = catalog || []
+  const cat = allCat.filter((p) => !p.gameKind) // normales Strafen-Raster (ohne Spiele)
+  const games = {
+    einzel: allCat.find((p) => p.gameKind === 'einzel'),
+    teams: allCat.find((p) => p.gameKind === 'teams'),
+    progressive: allCat.find((p) => p.gameKind === 'progressive'),
+  }
+  const findPen = (penId) => allCat.find((p) => p.id === penId)
 
   const addEntry = (idx, penId, amount) =>
     setRoster((r) =>
@@ -280,6 +297,98 @@ export default function SessionRecord() {
     setRoster((r) => r.filter((_, i) => i !== idx))
   }
 
+  /* ── Spiele (Schnell-Strafen) ─────────────────────────────────────────────
+   * Spiel-Strafen sind normale Entries mit dem jeweiligen Spiel-catalog_id und
+   * laufen darum unverändert durch Autosave/Einreichen/Genehmigen. */
+
+  // Einzelspiel: Teilnehmer in Platzierungs-Reihenfolge antippen (Toggle).
+  const einzelTap = (id) =>
+    setEinzelRanks((rk) => (rk.includes(id) ? rk.filter((x) => x !== id) : [...rk, id]))
+
+  // Plätze 1–3 frei, ab Platz 4 in 0,25-€-Schritten. Pro Teilnehmer ein Entry.
+  const applyEinzel = () => {
+    const gid = games.einzel?.id
+    if (!gid || einzelRanks.length === 0) return
+    setRoster((r) =>
+      r.map((p) => {
+        const place = einzelRanks.indexOf(p.id) + 1
+        if (place === 0) return p
+        const amount = place <= 3 ? 0 : round2((place - 3) * 0.25)
+        if (amount <= 0) return p
+        return { ...p, entries: [...p.entries, { id: entrySeq++, penId: gid, amount }] }
+      }),
+    )
+    setGameForm(null)
+    setEinzelRanks([])
+  }
+
+  // 2-Teams-Spiel: fester Betrag je angetipptem Verlierer (ein Entry je Verlierer).
+  const teamTap = (id) =>
+    setTeamLosers((ls) => (ls.includes(id) ? ls.filter((x) => x !== id) : [...ls, id]))
+
+  const applyTeams = () => {
+    const gid = games.teams?.id
+    const amt = parseFloat((teamAmount || '').replace(',', '.'))
+    if (!gid || !(amt > 0) || teamLosers.length === 0) return
+    const amount = round2(amt)
+    setRoster((r) =>
+      r.map((p) =>
+        teamLosers.includes(p.id)
+          ? { ...p, entries: [...p.entries, { id: entrySeq++, penId: gid, amount }] }
+          : p,
+      ),
+    )
+    setGameForm(null)
+    setTeamLosers([])
+    setTeamAmount('')
+  }
+
+  // 3,50-€-Spiel: laufender Betrag. Bekommen/Vergeben rechnen sofort auf das/die
+  // Konto/Konten und erhöhen je Teilnehmer GENAU EINE Position (Akkumulation).
+  const startProgressive = () => {
+    setProgressive({ active: true, amount: 0.25 })
+    setGamesOpen(false)
+  }
+  const endProgressive = () => {
+    setProgressive((g) => ({ ...g, active: false }))
+    setGamesOpen(false)
+  }
+  const applyProgressive = (indices, delta) => {
+    const gid = games.progressive?.id
+    if (!gid) return
+    setRoster((r) =>
+      r.map((p, i) => {
+        if (!indices.includes(i)) return p
+        const existing = p.entries.find((e) => e.penId === gid)
+        if (existing)
+          // id auf den aktuellen Sequenzstand heben, damit die akkumulierende
+          // Position für den Frühgeher-Schnitt (earlyAvgLive nutzt e.id >= cut)
+          // als jüngste Aktivität zählt.
+          return {
+            ...p,
+            entries: p.entries.map((e) =>
+              e === existing ? { ...e, id: entrySeq++, amount: round2(e.amount + delta) } : e,
+            ),
+          }
+        return { ...p, entries: [...p.entries, { id: entrySeq++, penId: gid, amount: round2(delta) }] }
+      }),
+    )
+  }
+  const advanceProgressive = () => setProgressive((g) => ({ ...g, amount: round2(g.amount + 0.25) }))
+  const progBekommen = () => {
+    applyProgressive([active], progressive.amount)
+    advanceProgressive()
+    if (mode === 'fast') setActive(null)
+  }
+  const progVergeben = () => {
+    const recipients = roster
+      .map((_, i) => i)
+      .filter((i) => i !== active && !roster[i].early)
+    applyProgressive(recipients, progressive.amount)
+    advanceProgressive()
+    if (mode === 'fast') setActive(null)
+  }
+
   // Roster → save_session-Payload (von Autosave und manuellem Speichern genutzt).
   const buildParticipants = () =>
     roster.map((p) => ({
@@ -359,6 +468,29 @@ export default function SessionRecord() {
       window.removeEventListener('pagehide', flush)
     }
   }, [])
+
+  // 3,50-€-Spielstand (reiner UI-Fortschritt) lokal sichern, damit ein Reload des
+  // Entwurfs auf demselben Gerät den aktuellen Betrag wiederfindet. Die bereits
+  // verbuchten Beträge stecken ohnehin als Entries im (server-)gespeicherten Roster.
+  const progKey = savedId ? `kegel:progressive:${savedId}` : null
+  useEffect(() => {
+    if (mockMode || !progKey) return
+    try {
+      const raw = localStorage.getItem(progKey)
+      if (raw) setProgressive(JSON.parse(raw))
+    } catch (e) {
+      console.error(e)
+    }
+  }, [mockMode, progKey])
+  useEffect(() => {
+    if (mockMode || !progKey) return
+    try {
+      if (progressive.active) localStorage.setItem(progKey, JSON.stringify(progressive))
+      else localStorage.removeItem(progKey)
+    } catch (e) {
+      console.error(e)
+    }
+  }, [mockMode, progKey, progressive])
 
   // Speichern / Einreichen.
   const persist = async (status) => {
@@ -462,7 +594,36 @@ export default function SessionRecord() {
         </div>
       </Card>
 
-      <p className="text-[13px] text-ink-soft">Tippe auf eine Person, um Strafen zu erfassen.</p>
+      {/* Spiele (Schnell-Strafen) */}
+      <button
+        onClick={() => setGamesOpen(true)}
+        className="flex w-full items-center justify-between gap-2 rounded-2xl border border-card-edge bg-card px-4 py-3 text-left transition hover:border-ink/20 active:scale-[0.99]"
+      >
+        <span className="flex items-center gap-2">
+          <span className="text-xl">🎲</span>
+          <span className="text-[13px] font-semibold text-ink-soft">Spiele · Schnell-Strafen</span>
+        </span>
+        <span className="text-[12px] font-semibold text-sage">Öffnen</span>
+      </button>
+
+      {progressive.active && (
+        <div className="flex items-center justify-between gap-3 rounded-2xl border border-amber bg-amber-bg px-4 py-2.5">
+          <span className="text-[12px] text-ink-soft">
+            💰 <span className="font-semibold">3,50 €-Spiel läuft</span> · aktueller Betrag{' '}
+            <span className="font-mono font-semibold">{eur(progressive.amount)} €</span>
+          </span>
+          <button
+            onClick={endProgressive}
+            className="shrink-0 rounded-full bg-card px-3 py-1.5 text-[11px] font-semibold text-ink-soft"
+          >
+            Beenden
+          </button>
+        </div>
+      )}
+
+      <p className="text-[13px] text-ink-soft">
+        Tippe auf eine Person, um Strafen zu erfassen{progressive.active ? ' oder das 3,50 €-Spiel zu vergeben' : ''}.
+      </p>
 
       {/* Teilnehmerliste */}
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -625,6 +786,27 @@ export default function SessionRecord() {
           </div>
         )}
 
+        {progressive.active && current && !manualFor && (
+          <div className="mb-4 rounded-2xl border border-amber bg-amber-bg p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[12px] font-semibold text-amber">💰 3,50 €-Spiel</span>
+              <span className="font-mono text-base font-semibold tnum text-amber">
+                {eur(progressive.amount)} €
+              </span>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <Button variant="soft" onClick={progBekommen}>
+                Bekommen
+              </Button>
+              <Button onClick={progVergeben}>Vergeben</Button>
+            </div>
+            <p className="mt-1.5 text-[11px] text-ink-dim">
+              „Bekommen": nur {current.name}. „Vergeben": {eur(progressive.amount)} € an alle anderen
+              Anwesenden.
+            </p>
+          </div>
+        )}
+
         {manualFor ? (
           <ManualEntry
             pen={findPen(manualFor)}
@@ -678,6 +860,196 @@ export default function SessionRecord() {
               <span className="text-[12px] font-semibold text-amber">+ Nachzügler</span>
             </button>
           ))}
+        </div>
+      </Sheet>
+
+      {/* Spiele-Menü */}
+      <Sheet
+        open={gamesOpen}
+        onClose={() => setGamesOpen(false)}
+        title="Spiele"
+        subtitle="Schnell-Strafen für verlorene Spiele — Gäste zählen mit."
+      >
+        <div className="space-y-2">
+          <GameOption
+            icon="🏅"
+            title="Einzelspiel"
+            desc="Platzierung antippen · ab Platz 4 in 0,25-€-Schritten"
+            disabled={!games.einzel}
+            onClick={() => {
+              setGamesOpen(false)
+              setEinzelRanks([])
+              setGameForm('einzel')
+            }}
+          />
+          <GameOption
+            icon="👥"
+            title="2-Teams-Spiel"
+            desc="Betrag eingeben · Verliererteam antippen"
+            disabled={!games.teams}
+            onClick={() => {
+              setGamesOpen(false)
+              setTeamLosers([])
+              setTeamAmount('')
+              setGameForm('teams')
+            }}
+          />
+          {progressive.active ? (
+            <div className="rounded-2xl border border-amber bg-amber-bg p-3">
+              <div className="flex items-center gap-3">
+                <span className="grid h-10 w-10 place-items-center rounded-xl bg-card text-lg">💰</span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[14px] font-semibold">3,50 €-Spiel läuft</div>
+                  <div className="text-[12px] text-ink-soft">
+                    Aktueller Betrag <span className="font-mono font-semibold">{eur(progressive.amount)} €</span>
+                  </div>
+                </div>
+                <Button variant="soft" onClick={endProgressive}>
+                  Beenden
+                </Button>
+              </div>
+              <p className="mt-2 text-[11px] text-ink-dim">
+                Vergeben/Bekommen erscheint im Strafen-Fenster, wenn du eine Person antippst.
+              </p>
+            </div>
+          ) : (
+            <GameOption
+              icon="💰"
+              title="3,50 €-Spiel"
+              desc="Starten · Betrag pro Person/Vergabe in 0,25-€-Schritten"
+              disabled={!games.progressive}
+              onClick={startProgressive}
+            />
+          )}
+        </div>
+      </Sheet>
+
+      {/* Einzelspiel */}
+      <Sheet
+        open={gameForm === 'einzel'}
+        onClose={() => {
+          setGameForm(null)
+          setEinzelRanks([])
+        }}
+        title="Einzelspiel"
+        subtitle="Teilnehmer in Reihenfolge der Platzierung antippen."
+        footer={
+          <div className="flex gap-2">
+            <Button
+              variant="soft"
+              className="flex-1"
+              onClick={() => setEinzelRanks([])}
+              disabled={einzelRanks.length === 0}
+            >
+              Zurücksetzen
+            </Button>
+            <Button className="flex-1" onClick={applyEinzel} disabled={einzelRanks.length === 0}>
+              Fertig
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-2">
+          {roster.map((p) => {
+            const place = einzelRanks.indexOf(p.id) + 1
+            const ranked = place > 0
+            const amount = !ranked ? null : place <= 3 ? 0 : round2((place - 3) * 0.25)
+            return (
+              <button
+                key={p.id}
+                onClick={() => einzelTap(p.id)}
+                className={cx(
+                  'flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition',
+                  ranked ? 'border-terra/40 bg-terra-bg/50' : 'border-card-edge hover:border-ink/20',
+                )}
+              >
+                {ranked ? (
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-terra text-[13px] font-bold text-white tnum">
+                    {place}
+                  </span>
+                ) : (
+                  <Avatar name={p.name} size={36} />
+                )}
+                <span className="min-w-0 flex-1 truncate font-medium">
+                  {p.name}
+                  {p.isGuest && <Badge tone="cream">Gast</Badge>}
+                </span>
+                <span className="shrink-0 text-[12px] font-semibold text-ink-soft">
+                  {!ranked
+                    ? 'antippen'
+                    : amount > 0
+                      ? `Platz ${place} · ${eur(amount)} €`
+                      : `Platz ${place} · frei`}
+                </span>
+              </button>
+            )
+          })}
+          <p className="text-[11px] text-ink-dim">
+            Plätze 1–3 zahlen nichts. Nicht angetippte Teilnehmer bekommen keine Strafe.
+          </p>
+        </div>
+      </Sheet>
+
+      {/* 2-Teams-Spiel */}
+      <Sheet
+        open={gameForm === 'teams'}
+        onClose={() => {
+          setGameForm(null)
+          setTeamLosers([])
+          setTeamAmount('')
+        }}
+        title="2-Teams-Spiel"
+        subtitle="Betrag eingeben, dann das Verliererteam antippen."
+        footer={
+          <Button
+            className="w-full"
+            onClick={applyTeams}
+            disabled={!(parseFloat((teamAmount || '').replace(',', '.')) > 0) || teamLosers.length === 0}
+          >
+            Fertig · {teamLosers.length} Verlierer
+          </Button>
+        }
+      >
+        <div className="space-y-3">
+          <Field label="Betrag je Verlierer (€)">
+            <Input
+              type="number"
+              step="0.25"
+              inputMode="decimal"
+              value={teamAmount}
+              onChange={(e) => setTeamAmount(e.target.value)}
+              placeholder="z. B. 1,00"
+            />
+          </Field>
+          <div className="space-y-2">
+            {roster.map((p) => {
+              const sel = teamLosers.includes(p.id)
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => teamTap(p.id)}
+                  className={cx(
+                    'flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition',
+                    sel ? 'border-terra/40 bg-terra-bg/50' : 'border-card-edge hover:border-ink/20',
+                  )}
+                >
+                  <Avatar name={p.name} size={36} />
+                  <span className="min-w-0 flex-1 truncate font-medium">
+                    {p.name}
+                    {p.isGuest && <Badge tone="cream">Gast</Badge>}
+                  </span>
+                  <span
+                    className={cx(
+                      'shrink-0 text-[12px] font-semibold',
+                      sel ? 'text-terra' : 'text-ink-dim',
+                    )}
+                  >
+                    {sel ? 'Verlierer ✓' : 'antippen'}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
         </div>
       </Sheet>
 
@@ -885,6 +1257,23 @@ function ManualEntry({ pen, value, onChange, onConfirm, onCancel }) {
         </Button>
       </div>
     </div>
+  )
+}
+
+function GameOption({ icon, title, desc, disabled, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="flex w-full items-center gap-3 rounded-2xl border border-card-edge p-3 text-left transition hover:border-ink/20 active:scale-[0.99] disabled:opacity-40"
+    >
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-bg text-lg">{icon}</span>
+      <div className="min-w-0 flex-1">
+        <div className="text-[14px] font-semibold">{title}</div>
+        <div className="text-[12px] text-ink-dim">{disabled ? 'Nicht verfügbar' : desc}</div>
+      </div>
+      <span className="shrink-0 text-[12px] font-semibold text-sage">Wählen</span>
+    </button>
   )
 }
 

@@ -6,6 +6,7 @@ import { wizardSteps } from '../mock/data'
 import { useAuth } from '../context/AuthContext.jsx'
 import {
   STARTER_PENALTIES,
+  GAME_PENALTIES,
   getGroup,
   updateGroup,
   listPenalties,
@@ -91,6 +92,9 @@ export default function SetupWizard() {
       // Starter-Strafenkatalog nur anlegen, wenn noch keiner existiert.
       const existing = await listPenalties(activeGroupId)
       if (existing.length === 0) await insertPenalties(activeGroupId, STARTER_PENALTIES)
+      // Feste Spiel-Einträge ergänzen, falls noch keine vorhanden.
+      if (!existing.some((p) => p.game_kind))
+        await insertPenalties(activeGroupId, GAME_PENALTIES)
 
       if (form.createEvent) {
         const [hh, mm] = (form.time || '19:30').split(':')

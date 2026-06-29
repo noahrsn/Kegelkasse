@@ -23,6 +23,7 @@ function fromDb(p) {
     icon: p.icon,
     active: p.active,
     manual: p.manual_amount,
+    gameKind: p.game_kind || null,
   }
 }
 function toDb(draft) {
@@ -39,6 +40,9 @@ export default function Penalties() {
   const canEdit = mockMode || EDIT_ROLES.includes(role)
 
   const [list, setList] = useState(mockMode ? seed : null)
+  // Spiel-Einträge (game_kind) werden über das Kegelabend-„Spiele"-Menü genutzt
+  // und nicht im Katalog verwaltet.
+  const catalog = list == null ? null : list.filter((p) => !p.gameKind)
   const [edit, setEdit] = useState(false)
   const [sheet, setSheet] = useState(null) // null | 'new' | penalty
   const [draft, setDraft] = useState({ name: '', amount: '', icon: '🎳', manual: false })
@@ -117,9 +121,9 @@ export default function Penalties() {
         }
       />
 
-      {list == null ? (
+      {catalog == null ? (
         <Card><div className="py-8 text-center text-sm text-ink-dim">Lädt…</div></Card>
-      ) : list.length === 0 ? (
+      ) : catalog.length === 0 ? (
         <Card>
           <Empty
             icon="🎳"
@@ -129,7 +133,7 @@ export default function Penalties() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {list.map((p) => (
+          {catalog.map((p) => (
             <Card key={p.id} className={cx('flex items-center gap-3', !p.active && 'opacity-55')}>
               <span className="grid h-12 w-12 place-items-center rounded-2xl bg-bg text-2xl">{p.icon}</span>
               <div className="min-w-0 flex-1">

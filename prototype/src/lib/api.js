@@ -14,6 +14,15 @@ export const STARTER_PENALTIES = [
   { name: 'Glas umgeworfen', amount: null, icon: '🥃', manual_amount: true },
 ]
 
+/* Feste Spiel-Katalogeinträge (Schnell-Strafen für verlorene Spiele).
+   Werden als eigene Katalog-Zeilen geführt (game_kind), erscheinen in
+   Statistik/Review als benannte Posten, aber nicht im normalen Strafen-Raster. */
+export const GAME_PENALTIES = [
+  { name: 'Einzelspiel', amount: null, icon: '🏅', manual_amount: true, game_kind: 'einzel' },
+  { name: '2-Teams-Spiel', amount: null, icon: '👥', manual_amount: true, game_kind: 'teams' },
+  { name: '3,50 €-Spiel', amount: null, icon: '💰', manual_amount: true, game_kind: 'progressive' },
+]
+
 export async function getGroup(id) {
   const { data, error } = await supabase.from('groups').select('*').eq('id', id).maybeSingle()
   if (error) throw error
