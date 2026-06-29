@@ -92,6 +92,13 @@ export default function SessionRecord() {
   const [discardOpen, setDiscardOpen] = useState(false)
   const [discarding, setDiscarding] = useState(false)
 
+  // Schreib-/Lese-Modus: Ein frisch gestarteter Abend (oder Mock) öffnet direkt im
+  // Schreibmodus; ein bestehender Entwurf öffnet bewusst nur lesend. Der Wechsel in
+  // den Bearbeiten-Modus erfordert eine bestätigte Geste (kein technischer Lock —
+  // mehrere können erfassen, aber niemand schreibt versehentlich mit).
+  const [isEditor, setIsEditor] = useState(isLive || mockMode)
+  const [editConfirmOpen, setEditConfirmOpen] = useState(false)
+
   // Spiele (Schnell-Strafen für verlorene Spiele).
   const [gamesOpen, setGamesOpen] = useState(false)
   const [gameForm, setGameForm] = useState(null) // null | 'einzel' | 'teams'
@@ -444,7 +451,7 @@ export default function SessionRecord() {
   // Debounce: 1 s nach der letzten Änderung speichern. Der vom Laden ausgelöste
   // setRoster wird übersprungen (sonst sofortiger Redundant-Save nach „fortsetzen").
   useEffect(() => {
-    if (mockMode || loading) return
+    if (mockMode || loading || !isEditor) return
     if (skipAutosaveRef.current) {
       skipAutosaveRef.current = false
       return
@@ -453,11 +460,12 @@ export default function SessionRecord() {
     const t = setTimeout(() => autosaveRef.current?.(), 1000)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roster, mockMode, loading])
+  }, [roster, mockMode, loading, isEditor])
 
   // Geht die App in den Hintergrund (Tab-Wechsel, Handy sperren, Schließen),
   // sofort flushen — fängt Änderungen ab, die noch im Debounce-Fenster hängen.
   useEffect(() => {
+    if (!isEditor) return
     const flush = () => {
       if (document.visibilityState === 'hidden') autosaveRef.current?.()
     }
@@ -467,7 +475,7 @@ export default function SessionRecord() {
       document.removeEventListener('visibilitychange', flush)
       window.removeEventListener('pagehide', flush)
     }
-  }, [])
+  }, [isEditor])
 
   // 3,50-€-Spielstand (reiner UI-Fortschritt) lokal sichern, damit ein Reload des
   // Entwurfs auf demselben Gerät den aktuellen Betrag wiederfindet. Die bereits
@@ -555,8 +563,8 @@ export default function SessionRecord() {
       <header className="flex flex-wrap items-center justify-between gap-3 animate-rise">
         <div>
           <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-[0.14em] text-ink-dim">
-            <span>Laufende Erfassung · Entwurf</span>
-            {!mockMode && <AutosaveDot state={autosaveState} />}
+            <span>{isEditor ? 'Laufende Erfassung · Entwurf' : 'Entwurf · Nur Lesen'}</span>
+            {!mockMode && isEditor && <AutosaveDot state={autosaveState} />}
           </div>
           <h1 className="mt-1 font-display text-3xl font-medium tracking-tight">{ctx.title}</h1>
           {ctx.when && <div className="text-[12px] text-ink-dim">{ctx.when}</div>}
@@ -574,7 +582,21 @@ export default function SessionRecord() {
         </Card>
       </header>
 
+      {/* Nur-Lesen-Hinweis mit bewusster Geste zum Bearbeiten */}
+      {!isEditor && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-card-edge bg-bg px-4 py-3 animate-rise">
+          <span className="text-[13px] text-ink-soft">
+            👀 <span className="font-semibold">Nur Lesen.</span> Du siehst den aktuellen Stand. Zum
+            Erfassen in den Bearbeiten-Modus wechseln.
+          </span>
+          <Button size="sm" onClick={() => setEditConfirmOpen(true)}>
+            ✏️ Bearbeiten
+          </Button>
+        </div>
+      )}
+
       {/* Erfassungsmodus */}
+      {isEditor && (
       <Card className="flex flex-wrap items-center justify-between gap-3 py-3">
         <div className="min-w-0">
           <div className="text-[12px] font-semibold text-ink-soft">Erfassungsmodus</div>
@@ -593,8 +615,10 @@ export default function SessionRecord() {
           </ModeBtn>
         </div>
       </Card>
+      )}
 
       {/* Spiele (Schnell-Strafen) */}
+      {isEditor && (
       <button
         onClick={() => setGamesOpen(true)}
         className="flex w-full items-center justify-between gap-2 rounded-2xl border border-card-edge bg-card px-4 py-3 text-left transition hover:border-ink/20 active:scale-[0.99]"
@@ -605,8 +629,9 @@ export default function SessionRecord() {
         </span>
         <span className="text-[12px] font-semibold text-sage">Öffnen</span>
       </button>
+      )}
 
-      {progressive.active && (
+      {isEditor && progressive.active && (
         <div className="flex items-center justify-between gap-3 rounded-2xl border border-amber bg-amber-bg px-4 py-2.5">
           <span className="text-[12px] text-ink-soft">
             💰 <span className="font-semibold">3,50 €-Spiel läuft</span> · aktueller Betrag{' '}
@@ -621,9 +646,11 @@ export default function SessionRecord() {
         </div>
       )}
 
-      <p className="text-[13px] text-ink-soft">
-        Tippe auf eine Person, um Strafen zu erfassen{progressive.active ? ' oder das 3,50 €-Spiel zu vergeben' : ''}.
-      </p>
+      {isEditor && (
+        <p className="text-[13px] text-ink-soft">
+          Tippe auf eine Person, um Strafen zu erfassen{progressive.active ? ' oder das 3,50 €-Spiel zu vergeben' : ''}.
+        </p>
+      )}
 
       {/* Teilnehmerliste */}
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -633,8 +660,11 @@ export default function SessionRecord() {
           return (
             <button
               key={p.id}
-              onClick={() => setActive(i)}
-              className="flex items-center gap-3 rounded-2xl border border-card-edge bg-card p-3 text-left transition hover:border-ink/20 active:scale-[0.99]"
+              onClick={() => isEditor && setActive(i)}
+              className={cx(
+                'flex items-center gap-3 rounded-2xl border border-card-edge bg-card p-3 text-left transition',
+                isEditor ? 'hover:border-ink/20 active:scale-[0.99]' : 'cursor-default',
+              )}
             >
               <Avatar name={p.name} size={40} />
               <div className="min-w-0 flex-1">
@@ -660,7 +690,7 @@ export default function SessionRecord() {
                 >
                   {eur(s)} €
                 </div>
-                <div className="text-[11px] font-semibold text-sage">+ Strafe</div>
+                {isEditor && <div className="text-[11px] font-semibold text-sage">+ Strafe</div>}
               </div>
             </button>
           )
@@ -668,36 +698,46 @@ export default function SessionRecord() {
       </div>
 
       {/* Nachzügler */}
-      <button
-        onClick={() => setLateOpen(true)}
-        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-card-edge py-3.5 text-[13px] font-semibold text-ink-soft hover:border-ink/30"
-      >
-        + Nachzügler hinzufügen
-      </button>
+      {isEditor && (
+        <button
+          onClick={() => setLateOpen(true)}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-card-edge py-3.5 text-[13px] font-semibold text-ink-soft hover:border-ink/30"
+        >
+          + Nachzügler hinzufügen
+        </button>
+      )}
 
-      {/* Sticky-Abschluss */}
-      <div className="sticky bottom-24 lg:bottom-4 flex gap-2">
-        <Button
-          variant="soft"
-          size="lg"
-          onClick={() => setDiscardOpen(true)}
-          disabled={saving || discarding}
-          aria-label="Entwurf verwerfen"
-        >
-          🗑
-        </Button>
-        <Button variant="soft" size="lg" onClick={() => persist('draft')} disabled={saving || discarding}>
-          {saving ? '…' : 'Speichern'}
-        </Button>
-        <Button
-          size="lg"
-          className="flex-1 shadow-lg"
-          onClick={() => setSubmitOpen(true)}
-          disabled={saving || discarding}
-        >
-          Einreichen · {eur(total)} €
-        </Button>
-      </div>
+      {/* Sticky-Abschluss bzw. Wechsel in den Bearbeiten-Modus */}
+      {isEditor ? (
+        <div className="sticky bottom-24 lg:bottom-4 flex gap-2">
+          <Button
+            variant="soft"
+            size="lg"
+            onClick={() => setDiscardOpen(true)}
+            disabled={saving || discarding}
+            aria-label="Entwurf verwerfen"
+          >
+            🗑
+          </Button>
+          <Button variant="soft" size="lg" onClick={() => persist('draft')} disabled={saving || discarding}>
+            {saving ? '…' : 'Speichern'}
+          </Button>
+          <Button
+            size="lg"
+            className="flex-1 shadow-lg"
+            onClick={() => setSubmitOpen(true)}
+            disabled={saving || discarding}
+          >
+            Einreichen · {eur(total)} €
+          </Button>
+        </div>
+      ) : (
+        <div className="sticky bottom-24 lg:bottom-4">
+          <Button size="lg" className="w-full shadow-lg" onClick={() => setEditConfirmOpen(true)}>
+            ✏️ Bearbeiten
+          </Button>
+        </div>
+      )}
 
       {/* Strafen-Sheet */}
       <Sheet
@@ -1102,6 +1142,35 @@ export default function SessionRecord() {
           <Row label="Teilnehmer" value={`${roster.length} Personen`} />
           <Row label="Strafen gesamt" value={`${countTotal} Stück`} />
           <Row label="Summe" value={`${eur(total)} €`} strong />
+        </div>
+      </Sheet>
+
+      {/* Wechsel Lese- → Bearbeiten-Modus (bewusste Geste) */}
+      <Sheet
+        open={editConfirmOpen}
+        onClose={() => setEditConfirmOpen(false)}
+        title="Erfassung bearbeiten?"
+        subtitle="Stimm dich kurz ab — mehrere können gleichzeitig erfassen und sich dabei überschreiben."
+        footer={
+          <div className="flex gap-2">
+            <Button variant="soft" className="flex-1" onClick={() => setEditConfirmOpen(false)}>
+              Abbrechen
+            </Button>
+            <Button
+              className="flex-1"
+              onClick={() => {
+                setIsEditor(true)
+                setEditConfirmOpen(false)
+              }}
+            >
+              Bearbeiten
+            </Button>
+          </div>
+        }
+      >
+        <div className="rounded-2xl bg-bg p-4 text-[13px] text-ink-soft">
+          Du wechselst vom Lese- in den Bearbeiten-Modus. Änderungen werden ab dann automatisch
+          gespeichert.
         </div>
       </Sheet>
     </div>
