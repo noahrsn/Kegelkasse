@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Card, Button, PageTitle, Field, Input, Select, Tabs, Avatar, Empty } from '../components/ui'
+import { Card, Button, PageTitle, Field, Input, Select, Tabs, Avatar, Empty, Toggle } from '../components/ui'
 import { ROLE_LABEL, cx } from '../design/calm'
 import { club as mockClub, members as mockMembers, penalties as mockPenalties } from '../mock/data'
 import { useAuth } from '../context/AuthContext.jsx'
@@ -255,6 +255,7 @@ function Finance({ group, onSave }) {
       payment_deadline_type: group.payment_deadline_type ?? 'days_before_next_event',
       payment_deadline_days: group.payment_deadline_days ?? '',
       late_payment_fee: group.late_payment_fee ?? '',
+      charge_absent_avg: group.charge_absent_avg ?? false,
     },
     onSave,
   )
@@ -268,6 +269,7 @@ function Finance({ group, onSave }) {
     payment_deadline_type: v.payment_deadline_type,
     payment_deadline_days: Number(v.payment_deadline_days) || 0,
     late_payment_fee: Number(v.late_payment_fee) || 0,
+    charge_absent_avg: !!v.charge_absent_avg,
   })
   return (
     <div className="space-y-4">
@@ -296,6 +298,15 @@ function Finance({ group, onSave }) {
           <Field label="Frist (Tage)"><Input type="number" value={ed.val.payment_deadline_days} onChange={ed.field('payment_deadline_days')} /></Field>
           <Field label="Verspätungsstrafe (€)"><Input type="number" step="0.5" value={ed.val.late_payment_fee} onChange={ed.field('late_payment_fee')} /></Field>
         </div>
+      </Card>
+      <Card className="space-y-4">
+        <div className="text-[12px] font-semibold text-ink-soft">Kegelabend</div>
+        <Toggle
+          checked={!!ed.val.charge_absent_avg}
+          onChange={ed.field('charge_absent_avg')}
+          label="Abwesende mit Durchschnitt belasten"
+          hint="Gilt für alle Kegelabende: Nach der Genehmigung bekommen abwesende Mitglieder automatisch den Schnitt aller Strafen als offenen Beitrag."
+        />
       </Card>
       <SaveBar onDiscard={ed.discard} onSave={() => ed.save(transform)} saving={ed.saving} saved={ed.saved} />
     </div>

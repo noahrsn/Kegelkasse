@@ -79,7 +79,6 @@ export default function SessionRecord() {
   })
   const [loading, setLoading] = useState(!mockMode && !isLive)
 
-  const [chargeAbsentAvg, setChargeAbsentAvg] = useState(!!location.state?.chargeAbsentAvg)
   const [mode, setMode] = useState('fast') // 'fast' (Standard) | 'detailed'
   const [active, setActive] = useState(null)
   const [manualFor, setManualFor] = useState(null)
@@ -121,7 +120,6 @@ export default function SessionRecord() {
       .then((s) => {
         if (!s) return navigate('/sessions')
         if (s.status !== 'draft') return navigate(`/sessions/${existingId}/review`)
-        setChargeAbsentAvg(!!s.charge_absent_avg)
         setCtx({
           groupId: s.group_id,
           eventId: s.event_id,
@@ -314,7 +312,6 @@ export default function SessionRecord() {
         status: 'draft',
         participants: buildParticipants(),
         absent: absentMembers.map((m) => m.userId),
-        chargeAbsentAvg,
       })
       if (!savedIdRef.current && id) {
         savedIdRef.current = id
@@ -347,7 +344,7 @@ export default function SessionRecord() {
     const t = setTimeout(() => autosaveRef.current?.(), 1000)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roster, chargeAbsentAvg, mockMode, loading])
+  }, [roster, mockMode, loading])
 
   // Geht die App in den Hintergrund (Tab-Wechsel, Handy sperren, Schließen),
   // sofort flushen — fängt Änderungen ab, die noch im Debounce-Fenster hängen.
@@ -381,7 +378,6 @@ export default function SessionRecord() {
         status,
         participants: buildParticipants(),
         absent: absentMembers.map((m) => m.userId),
-        chargeAbsentAvg,
       })
       setSubmitOpen(false)
       navigate('/sessions')

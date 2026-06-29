@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Card, Button, PageTitle, Avatar, Field, Input, Toggle } from '../../components/ui'
+import { Card, Button, PageTitle, Avatar, Field, Input } from '../../components/ui'
 import { Sheet } from '../../components/Modal'
 import { cx } from '../../design/calm'
 import { useAuth } from '../../context/AuthContext.jsx'
@@ -26,7 +26,6 @@ export default function SessionNew() {
   )
   const [guestOpen, setGuestOpen] = useState(false)
   const [guestName, setGuestName] = useState('')
-  const [chargeAbsentAvg, setChargeAbsentAvg] = useState(false)
 
   // Mitglieder laden (Echtmodus).
   useEffect(() => {
@@ -79,7 +78,6 @@ export default function SessionNew() {
       state: {
         roster: [...presentMembers, ...guestRoster],
         absent,
-        chargeAbsentAvg,
         groupId: activeGroupId,
         eventId: location.state?.eventId || null,
         date: location.state?.eventDate || null,
@@ -195,16 +193,6 @@ export default function SessionNew() {
           )}
         </div>
       </div>
-
-      {/* Abwesenden-Durchschnittsstrafe */}
-      <Card tone="cream" className="py-3">
-        <Toggle
-          checked={chargeAbsentAvg}
-          onChange={setChargeAbsentAvg}
-          label="Abwesende mit Durchschnitt belasten"
-          hint={`Nach Genehmigung bekommen die ${absentCount} abwesenden Mitglieder den Schnitt aller Strafen als offenen Beitrag.`}
-        />
-      </Card>
 
       {/* Sticky-Start */}
       <div className="sticky bottom-24 lg:bottom-4">

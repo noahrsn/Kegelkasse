@@ -216,7 +216,7 @@ export async function getSession(sessionId) {
   const { data, error } = await supabase
     .from('sessions')
     .select(
-      `id, group_id, event_id, date, status, recorded_by, submitted_at, approved_at, charge_absent_avg,
+      `id, group_id, event_id, date, status, recorded_by, submitted_at, approved_at,
        recorder:recorded_by(first_name, last_name),
        participants:session_participants(
          id, user_id, guest_name, is_guest, is_late, is_early_leave, avg_amount, guest_paid,
@@ -258,7 +258,6 @@ export async function saveSession({
   status,
   participants,
   absent = [],
-  chargeAbsentAvg = false,
 }) {
   const { data, error } = await supabase.rpc('save_session', {
     p_group_id: groupId,
@@ -268,7 +267,6 @@ export async function saveSession({
     p_status: status,
     p_participants: participants,
     p_absent: absent,
-    p_charge_absent_avg: chargeAbsentAvg,
   })
   if (error) throw error
   return data
