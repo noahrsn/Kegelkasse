@@ -230,6 +230,17 @@ export default function Profile() {
         </div>
       </Card>
 
+      {/* Clubs */}
+      <Card className="space-y-3">
+        <div className="text-[12px] font-semibold text-ink-soft">Clubs</div>
+        <p className="text-[13px] text-ink-soft">
+          Du kannst weitere Kegelclubs gründen und jederzeit oben links zwischen deinen Clubs wechseln.
+        </p>
+        <div className="flex justify-end">
+          <Button onClick={() => navigate('/groups/new')}>+ Weiteren Club gründen</Button>
+        </div>
+      </Card>
+
       {/* Benachrichtigungen */}
       <Card className="space-y-3.5">
         <div className="text-[12px] font-semibold text-ink-soft">Benachrichtigungen</div>
