@@ -514,6 +514,7 @@ export async function listMemberDebts(groupId) {
     openCount: Number(m.open_count) || 0,
     penalties: Number(m.open_penalties) || 0,
     fees: Number(m.open_fees) || 0,
+    credit: Number(m.credit) || 0,
     nextDue: m.next_due,
   }))
 }
@@ -611,15 +612,34 @@ export async function cancelDebt(debtId, reason) {
  * Phase 7 (Schritt 2) — CSV-Import, Zahlungsabgleich & Gamification
  * ────────────────────────────────────────────────────────────────────────── */
 
-/* Kontoauszug-Zeilen buchen + Zahlungen abgleichen (RPC). Rückgabe {inserted, skipped}.
-   rows: [{ date, amount, description, csv_row_hash, matched_user_id }] */
+/* Kontoauszug-Zeilen buchen + Zahlungen abgleichen (RPC). Rückgabe {inserted, skipped, late_fees}.
+   rows: [{ date, amount, description, csv_row_hash, matched_user_id, category }]
+   category (nur ohne Mitgliedszuordnung): 'lane' | 'guest' | 'other_income' | 'other_expense' */
 export async function importTransactions(groupId, rows) {
   const { data, error } = await supabase.rpc('import_transactions', {
     p_group_id: groupId,
     p_rows: rows,
   })
   if (error) throw error
-  return data || { inserted: 0, skipped: 0 }
+  return data || { inserted: 0, skipped: 0, late_fees: 0 }
+}
+
+/* Bereits importierte CSV-Zeilen-Hashes der Gruppe (Set) — für Vorab-Dedup im Import. */
+export async function listImportedHashes(groupId) {
+  const { data, error } = await supabase
+    .from('transactions')
+    .select('csv_row_hash')
+    .eq('group_id', groupId)
+    .not('csv_row_hash', 'is', null)
+  if (error) throw error
+  return new Set((data || []).map((r) => r.csv_row_hash))
+}
+
+/* Banner-Zustand für Kassenwart/Admin: Stichtag verstrichen, Import nötig? (RPC) */
+export async function getImportStatus(groupId) {
+  const { data, error } = await supabase.rpc('treasury_import_status', { p_group_id: groupId })
+  if (error) throw error
+  return data || { needs_import: false }
 }
 
 /* Aktuelle Auszeichnungen (RPC, live berechnet). */

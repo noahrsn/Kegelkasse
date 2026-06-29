@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Card, Button, Badge, PageTitle } from '../../components/ui'
 import { cx, eur } from '../../design/calm'
 import { useAuth } from '../../context/AuthContext.jsx'
-import { listMembers, importTransactions } from '../../lib/api.js'
+import { listMembers, importTransactions, listImportedHashes } from '../../lib/api.js'
 import { parseSparkasseCsv, normIban, bestNameMatch } from '../../lib/csv.js'
 import { csvPreview, members as mockMembers } from '../../mock/data'
 
@@ -13,13 +13,38 @@ const MATCH = {
   none: { label: 'Kein Match', tone: 'terra' },
 }
 
+// Nicht-Mitglieds-Zuweisungen (Kategorien). sign begrenzt sie auf Ein-/Ausgaben.
+const CATS = [
+  { value: 'cat:lane', label: 'Kegelbahn-Einnahme', sign: 'pos' },
+  { value: 'cat:guest', label: 'Gastkegler', sign: 'pos' },
+  { value: 'cat:other_income', label: 'Sonstige Einnahme', sign: 'pos' },
+  { value: 'cat:other_expense', label: 'Sonstige Ausgabe', sign: 'neg' },
+]
+
+const FILTERS = [
+  { value: 'all', label: 'Alle' },
+  { value: 'uncertain', label: 'Unsicher' },
+  { value: 'unassigned', label: 'Offen' },
+]
+
 /* Eine geparste Zeile über den Namen matchen (tolerant ggü. Schreibweise). */
 function matchRow(row, members) {
-  if (row.amount <= 0) return { match: 'none', matchedUser: null }
+  if (row.amount <= 0) return { match: 'none', assign: '' }
   const hit = bestNameMatch(row.name, members)
-  if (!hit) return { match: 'none', matchedUser: null }
-  // Hohe Ähnlichkeit gilt als sicher, knappe Treffer als „bitte prüfen".
-  return { match: hit.score >= 0.9 ? 'name' : 'fuzzy', matchedUser: hit.userId }
+  if (!hit) return { match: 'none', assign: '' }
+  // Hohe Ähnlichkeit gilt als sicher (auto-zugewiesen), knappe Treffer als „bitte prüfen".
+  const sure = hit.score >= 0.9
+  return { match: sure ? 'name' : 'fuzzy', assign: sure ? `user:${hit.userId}` : '' }
+}
+
+/* Zuweisung → RPC-Payload-Felder. */
+function assignPayload(assign) {
+  if (assign?.startsWith('user:')) return { matched_user_id: assign.slice(5), category: 'member_payment' }
+  if (assign === 'cat:lane') return { matched_user_id: null, category: 'lane' }
+  if (assign === 'cat:guest') return { matched_user_id: null, category: 'guest' }
+  if (assign === 'cat:other_income') return { matched_user_id: null, category: 'other_income' }
+  if (assign === 'cat:other_expense') return { matched_user_id: null, category: 'other_expense' }
+  return { matched_user_id: null, category: '' }
 }
 
 export default function TreasuryImport() {
@@ -35,7 +60,9 @@ export default function TreasuryImport() {
   const [fileName, setFileName] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
-  const [result, setResult] = useState({ inserted: 0, skipped: 0 })
+  const [dupSkipped, setDupSkipped] = useState(0)
+  const [filter, setFilter] = useState('all')
+  const [result, setResult] = useState({ inserted: 0, skipped: 0, late_fees: 0 })
 
   useEffect(() => {
     if (mockMode || !activeGroupId) return
@@ -55,7 +82,12 @@ export default function TreasuryImport() {
         setBusy(false)
         return
       }
-      setRows(parsed.map((r) => ({ ...r, ...matchRow(r, members) })))
+      // Bereits importierte Zeilen vorab herausfiltern (keine Dopplungen anzeigen).
+      const known = await listImportedHashes(activeGroupId).catch(() => new Set())
+      const fresh = parsed.filter((r) => !known.has(r.hash))
+      setDupSkipped(parsed.length - fresh.length)
+      setRows(fresh.map((r) => ({ ...r, ...matchRow(r, members) })))
+      setFilter('all')
       setStage('preview')
     } catch (err) {
       console.error(err)
@@ -68,33 +100,42 @@ export default function TreasuryImport() {
   /* Mock-Modus: Demo-Vorschau ohne echte Datei. */
   const loadMockPreview = () => {
     setFileName('kontoauszug_mai.CSV')
+    setDupSkipped(0)
     setRows(
-      csvPreview.map((r, i) => ({
-        hash: 'mock-' + i,
-        date: r.date,
-        amount: r.amount,
-        name: r.name,
-        iban: normIban(r.iban),
-        description: r.name,
-        match: r.match,
-        matchedUser: r.matchedMember ? mockMembers.find((m) => m.name === r.matchedMember)?.id : null,
-      })),
+      csvPreview.map((r, i) => {
+        const uid = r.matchedMember ? mockMembers.find((m) => m.name === r.matchedMember)?.id : null
+        return {
+          hash: 'mock-' + i,
+          date: r.date,
+          amount: r.amount,
+          name: r.name,
+          iban: normIban(r.iban),
+          description: r.name,
+          match: r.match,
+          assign: uid && r.match === 'name' ? `user:${uid}` : '',
+        }
+      }),
     )
+    setFilter('all')
     setStage('preview')
   }
 
-  const setRowMatch = (idx, userId) =>
-    setRows((rs) =>
-      rs.map((r, i) =>
-        i === idx ? { ...r, matchedUser: userId || null, match: userId ? 'name' : 'none' } : r,
-      ),
-    )
+  const setRowAssign = (hash, assign) =>
+    setRows((rs) => rs.map((r) => (r.hash === hash ? { ...r, assign } : r)))
 
-  const matchedCount = rows.filter((r) => r.matchedUser).length
+  const assignedCount = rows.filter((r) => r.assign).length
+  const allAssigned = rows.length > 0 && assignedCount === rows.length
+
+  const visibleRows = rows.filter((r) => {
+    if (filter === 'unassigned') return !r.assign
+    if (filter === 'uncertain') return r.match !== 'name' // fuzzy + none = nicht sicher erkannt
+    return true
+  })
 
   const doImport = async () => {
+    if (!allAssigned) return
     if (mockMode) {
-      setResult({ inserted: rows.length, skipped: 0 })
+      setResult({ inserted: rows.length, skipped: 0, late_fees: 0 })
       setStage('done')
       return
     }
@@ -106,7 +147,7 @@ export default function TreasuryImport() {
         amount: r.amount,
         description: r.description,
         csv_row_hash: r.hash,
-        matched_user_id: r.matchedUser || null,
+        ...assignPayload(r.assign),
       }))
       const res = await importTransactions(activeGroupId, payload)
       setResult(res)
@@ -147,7 +188,7 @@ export default function TreasuryImport() {
             <span className="rounded-full bg-ink px-4 py-2 text-[12px] font-semibold text-bg">Datei wählen</span>
           </button>
           <p className="mt-4 text-center text-[12px] text-ink-dim">
-            Bereits importierte Zeilen werden automatisch übersprungen (Deduplizierung).
+            Bereits importierte Zeilen werden automatisch herausgefiltert (Deduplizierung).
           </p>
         </Card>
       )}
@@ -158,25 +199,64 @@ export default function TreasuryImport() {
             <span className="text-2xl">📊</span>
             <div className="flex-1">
               <div className="text-[13px] font-semibold">{fileName}</div>
-              <div className="text-[12px] text-white/70">{rows.length} Zeilen erkannt</div>
+              <div className="text-[12px] text-white/70">
+                {rows.length} neue Zeilen
+                {dupSkipped > 0 ? ` · ${dupSkipped} Duplikate übersprungen` : ''}
+              </div>
             </div>
             <div className="text-right">
-              <div className="font-mono text-lg font-semibold">
-                {matchedCount}/{rows.length}
+              <div className={cx('font-mono text-lg font-semibold', allAssigned && 'text-sage')}>
+                {assignedCount}/{rows.length}
               </div>
-              <div className="text-[11px] text-white/70">zugeordnet</div>
+              <div className="text-[11px] text-white/70">zugewiesen</div>
             </div>
           </Card>
 
-          <div className="space-y-2">
-            {rows.map((r, idx) => {
-              const m = MATCH[r.match] ?? MATCH.none
+          {!allAssigned && (
+            <div className="rounded-2xl bg-amber-bg px-4 py-3 text-[13px] text-amber">
+              Jede Zeile muss zugewiesen sein (Mitglied oder Kategorie), bevor der Import abgeschlossen
+              werden kann.
+            </div>
+          )}
+
+          {/* Filter: alles / nur unsicher erkannte / noch offene Zeilen isolieren */}
+          <div className="flex gap-2">
+            {FILTERS.map((f) => {
+              const n =
+                f.value === 'unassigned'
+                  ? rows.filter((r) => !r.assign).length
+                  : f.value === 'uncertain'
+                    ? rows.filter((r) => r.match !== 'name').length
+                    : rows.length
               return (
-                <Card key={idx} className="flex flex-wrap items-center gap-3">
+                <button
+                  key={f.value}
+                  onClick={() => setFilter(f.value)}
+                  className={cx(
+                    'rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition',
+                    filter === f.value ? 'bg-ink text-bg' : 'bg-card text-ink-dim hover:text-ink',
+                  )}
+                >
+                  {f.label} · {n}
+                </button>
+              )
+            })}
+          </div>
+
+          <div className="space-y-2">
+            {visibleRows.length === 0 && (
+              <Card className="py-8 text-center text-[13px] text-ink-dim">Keine Zeilen in diesem Filter.</Card>
+            )}
+            {visibleRows.map((r) => {
+              const m = MATCH[r.match] ?? MATCH.none
+              const cats = CATS.filter((c) => (r.amount >= 0 ? c.sign === 'pos' : c.sign === 'neg'))
+              return (
+                <Card key={r.hash} className="flex flex-wrap items-center gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="truncate text-[14px] font-semibold">{r.name || '—'}</span>
-                      <Badge tone={m.tone}>{m.label}</Badge>
+                      {r.amount > 0 && <Badge tone={m.tone}>{m.label}</Badge>}
+                      {!r.assign && <Badge tone="terra">offen</Badge>}
                     </div>
                     <div className="mt-0.5 truncate font-mono text-[11px] text-ink-dim">
                       {new Date(r.date).toLocaleDateString('de-DE')} · {r.iban || r.description}
@@ -185,21 +265,32 @@ export default function TreasuryImport() {
                   <span className={cx('font-mono font-semibold tnum', r.amount > 0 ? 'text-sage' : 'text-terra')}>
                     {r.amount > 0 ? '+' : '−'} {eur(Math.abs(r.amount))} €
                   </span>
-                  <div className="w-full sm:w-56">
+                  <div className="w-full sm:w-64">
                     <select
-                      value={r.matchedUser || ''}
-                      onChange={(e) => setRowMatch(idx, e.target.value || null)}
+                      value={r.assign || ''}
+                      onChange={(e) => setRowAssign(r.hash, e.target.value)}
                       className={cx(
                         'w-full appearance-none rounded-xl border bg-card px-3 py-2 text-[13px] outline-none',
-                        r.matchedUser ? 'border-sage/50' : 'border-card-edge',
+                        r.assign ? 'border-sage/50' : 'border-terra/50',
                       )}
                     >
-                      <option value="">— Nicht zuordnen —</option>
-                      {members.map((mem) => (
-                        <option key={mem.userId} value={mem.userId}>
-                          {mem.name}
-                        </option>
-                      ))}
+                      <option value="">— Zuweisen —</option>
+                      {r.amount > 0 && (
+                        <optgroup label="Mitglied (Zahlung)">
+                          {members.map((mem) => (
+                            <option key={mem.userId} value={`user:${mem.userId}`}>
+                              {mem.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      <optgroup label="Kategorie">
+                        {cats.map((c) => (
+                          <option key={c.value} value={c.value}>
+                            {c.label}
+                          </option>
+                        ))}
+                      </optgroup>
                     </select>
                   </div>
                 </Card>
@@ -211,8 +302,17 @@ export default function TreasuryImport() {
             <Button variant="soft" size="lg" onClick={() => navigate('/treasury')}>
               Abbrechen
             </Button>
-            <Button size="lg" className="flex-1 shadow-lg" disabled={busy} onClick={doImport}>
-              {busy ? 'Importiert…' : `${rows.length} Buchungen importieren`}
+            <Button
+              size="lg"
+              className="flex-1 shadow-lg"
+              disabled={busy || !allAssigned}
+              onClick={doImport}
+            >
+              {busy
+                ? 'Importiert…'
+                : allAssigned
+                  ? `${rows.length} Buchungen importieren`
+                  : `Noch ${rows.length - assignedCount} offen`}
             </Button>
           </div>
         </>
@@ -225,7 +325,11 @@ export default function TreasuryImport() {
           <p className="max-w-sm text-[13px] text-ink-soft">
             {result.inserted} Buchungen gebucht
             {result.skipped > 0 ? ` · ${result.skipped} Duplikate übersprungen` : ''}. Zugeordnete
-            Zahlungen wurden mit offenen Schulden abgeglichen (älteste zuerst).
+            Zahlungen wurden mit offenen Schulden verrechnet (älteste zuerst), Überzahlung als Guthaben
+            gutgeschrieben.
+            {result.late_fees > 0
+              ? ` ${result.late_fees} Verspätungsstrafe(n) für noch offene Fristen gebucht.`
+              : ''}
           </p>
           <Button onClick={() => navigate('/treasury')}>Zum Kassenbuch</Button>
         </Card>

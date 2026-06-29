@@ -11,6 +11,7 @@ import {
   getTreasury,
   listActivity,
   listSessions,
+  getImportStatus,
 } from '../lib/api.js'
 import { activity, members, club, events, topPudler, currentUser } from '../mock/data'
 
@@ -70,6 +71,21 @@ export default function Dashboard() {
   const { mockMode, activeGroupId, role, user, profile } = useAuth()
   const canManage = role === 'admin' || role === 'kassenwart'
   const [vm, setVm] = useState(() => (mockMode ? buildMock() : null))
+  const [importStatus, setImportStatus] = useState(null)
+
+  useEffect(() => {
+    if (mockMode || !activeGroupId || !canManage) {
+      setImportStatus(null)
+      return
+    }
+    let alive = true
+    getImportStatus(activeGroupId)
+      .then((s) => alive && setImportStatus(s))
+      .catch((e) => console.error(e))
+    return () => {
+      alive = false
+    }
+  }, [mockMode, activeGroupId, canManage])
 
   useEffect(() => {
     if (mockMode || !activeGroupId) return
@@ -97,11 +113,18 @@ export default function Dashboard() {
           myDebt: myDebt && myDebt.open > 0
             ? {
                 amount: myDebt.open,
+                credit: 0,
                 sub: `${myDebt.penalties} Strafen · ${myDebt.fees} Beiträge offen`,
                 iban: group?.payment_iban || '—',
                 due: myDebt.nextDue ? `Frist ${new Date(myDebt.nextDue).toLocaleDateString('de-DE')}` : null,
               }
-            : { amount: 0, sub: 'Keine offenen Posten', iban: group?.payment_iban || '—', due: null },
+            : {
+                amount: 0,
+                credit: myDebt && myDebt.open < 0 ? -myDebt.open : 0,
+                sub: myDebt && myDebt.open < 0 ? 'Guthaben' : 'Keine offenen Posten',
+                iban: group?.payment_iban || '—',
+                due: null,
+              },
           nextEvent: ev
             ? {
                 id: ev.id,
@@ -172,6 +195,32 @@ export default function Dashboard() {
         </div>
       </header>
 
+      {/* Stichtag erreicht — Kontoauszug-Import nötig (nur Kassenwart/Admin) */}
+      {importStatus?.needs_import && (
+        <Card
+          tone="amber"
+          onClick={() => navigate('/treasury/import')}
+          className="flex cursor-pointer items-center gap-4 animate-rise transition hover:brightness-[0.99]"
+        >
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-bg/70 text-xl">📄</span>
+          <div className="min-w-0 flex-1">
+            <div className="text-[13px] font-semibold" style={{ color: pal.amber }}>
+              Zahlungsfrist erreicht — Kontoauszug importieren
+            </div>
+            <div className="mt-0.5 text-[12px] text-ink-soft">
+              {importStatus.overdue_members} Mitglied(er) mit offener Frist
+              {importStatus.overdue_due
+                ? ` seit ${new Date(importStatus.overdue_due).toLocaleDateString('de-DE')}`
+                : ''}
+              . Erst importieren — Verspätungsstrafen folgen daraus.
+            </div>
+          </div>
+          <Badge tone="amber" className="bg-bg/70">
+            Import →
+          </Badge>
+        </Card>
+      )}
+
       {/* Bento-Grid */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {/* Schulden → Mitglieder */}
@@ -192,7 +241,7 @@ export default function Dashboard() {
             )}
           </div>
           <div className="mt-3 font-display text-6xl font-medium leading-[0.9] tracking-tight tnum text-ink">
-            {eur(vm.myDebt.amount)}{' '}
+            {vm.myDebt.credit > 0 ? `+ ${eur(vm.myDebt.credit)}` : eur(vm.myDebt.amount)}{' '}
             <span className="text-3xl font-normal" style={{ color: vm.myDebt.amount > 0 ? pal.terra : pal.sage }}>
               €
             </span>
