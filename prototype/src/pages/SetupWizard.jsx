@@ -1,16 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Button, Field, Input, Select, Toggle, Card } from '../components/ui'
-import { cx, eur } from '../design/calm'
+import { cx } from '../design/calm'
 import { wizardSteps } from '../mock/data'
 import { useAuth } from '../context/AuthContext.jsx'
 import {
-  STARTER_PENALTIES,
-  GAME_PENALTIES,
   getGroup,
   updateGroup,
-  listPenalties,
-  insertPenalties,
   createEventSeries,
   recurrenceFromPreset,
 } from '../lib/api.js'
@@ -88,13 +84,6 @@ export default function SetupWizard() {
         rulebook_content: form.rulebook || '',
         wizard_step: 6,
       })
-
-      // Starter-Strafenkatalog nur anlegen, wenn noch keiner existiert.
-      const existing = await listPenalties(activeGroupId)
-      if (existing.length === 0) await insertPenalties(activeGroupId, STARTER_PENALTIES)
-      // Feste Spiel-Einträge ergänzen, falls noch keine vorhanden.
-      if (!existing.some((p) => p.game_kind))
-        await insertPenalties(activeGroupId, GAME_PENALTIES)
 
       if (form.createEvent) {
         const [hh, mm] = (form.time || '19:30').split(':')
@@ -224,21 +213,20 @@ function StepFinance({ form, set }) {
 function StepPenalties() {
   return (
     <div>
-      <Intro>Wir haben gängige Strafen vorbereitet. Du kannst sie später jederzeit anpassen.</Intro>
-      <div className="space-y-2">
-        {STARTER_PENALTIES.map((p) => (
-          <Card key={p.name} className="flex items-center gap-3 py-3">
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-bg text-xl">{p.icon}</span>
-            <span className="flex-1 font-medium">{p.name}</span>
-            <span className="font-mono font-semibold tnum">
-              {p.manual_amount ? 'manuell' : `${eur(p.amount)} €`}
-            </span>
-          </Card>
-        ))}
-      </div>
-      <p className="mt-3 text-center text-[12px] text-ink-dim">
-        Wird beim Abschluss in deinen Strafenkatalog übernommen.
-      </p>
+      <Intro>
+        Euer Strafenkatalog startet leer – jeder Club hat eigene Regeln. Du legst die Strafen
+        nach der Einrichtung selbst an.
+      </Intro>
+      <Card className="flex items-center gap-4 py-5">
+        <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-terra-bg text-2xl">🎳</div>
+        <div className="min-w-0">
+          <div className="font-semibold">Strafen später anlegen</div>
+          <div className="text-[13px] text-ink-soft">
+            Im Menü <span className="font-medium">„Strafen"</span> legst du jede Strafe mit Betrag und
+            Symbol an – feste, manuelle und Rundenstrafen.
+          </div>
+        </div>
+      </Card>
     </div>
   )
 }

@@ -3,26 +3,6 @@
 // Mock-Modus werden sie nicht aufgerufen (Komponenten prüfen mockMode).
 import { supabase } from './supabase.js'
 
-/* Starter-Strafenkatalog für neu gegründete Clubs. */
-export const STARTER_PENALTIES = [
-  { name: 'Rinnenwurf', amount: 0.5, icon: '🌊', manual_amount: false },
-  { name: 'Fehlwurf (0 Holz)', amount: 0.3, icon: '🎯', manual_amount: false },
-  { name: 'Verspätung', amount: 2.0, icon: '⏰', manual_amount: false },
-  { name: 'Handy am Tisch', amount: 1.0, icon: '📱', manual_amount: false },
-  { name: 'Falsche Bahn', amount: 0.5, icon: '↔️', manual_amount: false },
-  { name: 'Fluchen', amount: 0.5, icon: '🤬', manual_amount: false },
-  { name: 'Glas umgeworfen', amount: null, icon: '🥃', manual_amount: true },
-]
-
-/* Feste Spiel-Katalogeinträge (Schnell-Strafen für verlorene Spiele).
-   Werden als eigene Katalog-Zeilen geführt (game_kind), erscheinen in
-   Statistik/Review als benannte Posten, aber nicht im normalen Strafen-Raster. */
-export const GAME_PENALTIES = [
-  { name: 'Einzelspiel', amount: null, icon: '🏅', manual_amount: true, game_kind: 'einzel' },
-  { name: '2-Teams-Spiel', amount: null, icon: '👥', manual_amount: true, game_kind: 'teams' },
-  { name: '3,50 €-Spiel', amount: null, icon: '💰', manual_amount: true, game_kind: 'progressive' },
-]
-
 export async function getGroup(id) {
   const { data, error } = await supabase.from('groups').select('*').eq('id', id).maybeSingle()
   if (error) throw error
@@ -42,13 +22,6 @@ export async function listPenalties(groupId) {
     .order('name')
   if (error) throw error
   return data ?? []
-}
-
-export async function insertPenalties(groupId, rows) {
-  if (!rows.length) return
-  const payload = rows.map((r) => ({ ...r, group_id: groupId }))
-  const { error } = await supabase.from('penalties_catalog').insert(payload)
-  if (error) throw error
 }
 
 /* Einzelne Strafe anlegen und mit DB-Werten (inkl. id) zurückgeben. */

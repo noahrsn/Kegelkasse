@@ -11,6 +11,7 @@ const ICONS = ['🎳', '🌊', '🎯', '⏰', '📱', '↔️', '🤬', '👟', 
 const EDIT_ROLES = ['admin', 'kassenwart']
 
 function priceLabel(p) {
+  if (p.chargeOthers) return `${eur(p.amount)} € · an alle anderen`
   return p.manual ? 'Betrag manuell' : `${eur(p.amount)} €`
 }
 
@@ -23,15 +24,19 @@ function fromDb(p) {
     icon: p.icon,
     active: p.active,
     manual: p.manual_amount,
+    chargeOthers: p.charge_others ?? false,
     gameKind: p.game_kind || null,
   }
 }
 function toDb(draft) {
+  // Rundenstrafe (charge_others) setzt einen festen Betrag voraus.
+  const manual = draft.chargeOthers ? false : draft.manual
   return {
     name: draft.name.trim(),
     icon: draft.icon,
-    manual_amount: draft.manual,
-    amount: draft.manual ? null : parseFloat(draft.amount) || 0,
+    manual_amount: manual,
+    charge_others: !!draft.chargeOthers,
+    amount: manual ? null : parseFloat(draft.amount) || 0,
   }
 }
 
@@ -45,7 +50,7 @@ export default function Penalties() {
   const catalog = list == null ? null : list.filter((p) => !p.gameKind)
   const [edit, setEdit] = useState(false)
   const [sheet, setSheet] = useState(null) // null | 'new' | penalty
-  const [draft, setDraft] = useState({ name: '', amount: '', icon: '🎳', manual: false })
+  const [draft, setDraft] = useState({ name: '', amount: '', icon: '🎳', manual: false, chargeOthers: false })
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -55,14 +60,15 @@ export default function Penalties() {
   }, [mockMode, activeGroupId])
 
   const openNew = () => {
-    setDraft({ name: '', amount: '', icon: '🎳', manual: false })
+    setDraft({ name: '', amount: '', icon: '🎳', manual: false, chargeOthers: false })
     setSheet('new')
   }
   const openEdit = (p) => {
     setDraft({ ...p, amount: p.amount == null ? '' : String(p.amount) })
     setSheet(p)
   }
-  const valid = draft.name.trim() && (draft.manual || draft.amount)
+  const valid =
+    draft.name.trim() && (draft.chargeOthers ? !!draft.amount : draft.manual || draft.amount)
 
   const save = async () => {
     if (!valid || saving) return
@@ -70,7 +76,13 @@ export default function Penalties() {
     try {
       if (mockMode) {
         const db = toDb(draft)
-        const payload = { name: db.name, icon: db.icon, manual: db.manual_amount, amount: db.amount }
+        const payload = {
+          name: db.name,
+          icon: db.icon,
+          manual: db.manual_amount,
+          chargeOthers: db.charge_others,
+          amount: db.amount,
+        }
         if (sheet === 'new') {
           setList((l) => [...l, { ...payload, id: 'p' + Date.now(), active: true }])
         } else {
@@ -139,7 +151,8 @@ export default function Penalties() {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="font-semibold">{p.name}</span>
-                  {p.manual && <Badge tone="amber">manuell</Badge>}
+                  {p.chargeOthers && <Badge tone="sage">an alle anderen</Badge>}
+                  {p.manual && !p.chargeOthers && <Badge tone="amber">manuell</Badge>}
                   {!p.active && <Badge tone="neutral">inaktiv</Badge>}
                 </div>
                 <div className="font-mono text-[13px] text-ink-soft">{priceLabel(p)}</div>
@@ -213,36 +226,64 @@ export default function Penalties() {
             />
           </Field>
 
-          {/* Betragsart */}
-          <Field label="Betrag">
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setDraft((d) => ({ ...d, manual: false }))}
-                className={cx(
-                  'rounded-2xl border p-3 text-left transition',
-                  !draft.manual ? 'border-ink bg-card' : 'border-card-edge bg-card/50',
-                )}
-              >
-                <div className="text-[13px] font-semibold">Fester Betrag</div>
-                <div className="text-[11px] text-ink-dim">Immer gleich</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => setDraft((d) => ({ ...d, manual: true }))}
-                className={cx(
-                  'rounded-2xl border p-3 text-left transition',
-                  draft.manual ? 'border-ink bg-card' : 'border-card-edge bg-card/50',
-                )}
-              >
-                <div className="text-[13px] font-semibold">Manueller Betrag</div>
-                <div className="text-[11px] text-ink-dim">Bei Erfassung eingeben</div>
-              </button>
-            </div>
-          </Field>
+          {/* Rundenstrafe: belastet beim Erfassen alle anderen Anwesenden. */}
+          <button
+            type="button"
+            onClick={() => setDraft((d) => ({ ...d, chargeOthers: !d.chargeOthers }))}
+            className={cx(
+              'flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition',
+              draft.chargeOthers ? 'border-sage bg-sage-bg' : 'border-card-edge bg-card/50',
+            )}
+          >
+            <span
+              className={cx(
+                'grid h-6 w-6 shrink-0 place-items-center rounded-md border text-[13px] font-bold',
+                draft.chargeOthers ? 'border-sage bg-sage text-white' : 'border-card-edge text-transparent',
+              )}
+            >
+              ✓
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13px] font-semibold">An alle anderen vergeben</span>
+              <span className="block text-[11px] text-ink-dim">
+                Beim Erfassen die Person antippen — der Betrag geht an alle anderen Anwesenden
+                (Gäste mit, Frühgeher ohne).
+              </span>
+            </span>
+          </button>
 
-          {!draft.manual && (
-            <Field label="Betrag (€)">
+          {/* Betragsart — bei „an alle anderen" immer fester Betrag. */}
+          {!draft.chargeOthers && (
+            <Field label="Betrag">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDraft((d) => ({ ...d, manual: false }))}
+                  className={cx(
+                    'rounded-2xl border p-3 text-left transition',
+                    !draft.manual ? 'border-ink bg-card' : 'border-card-edge bg-card/50',
+                  )}
+                >
+                  <div className="text-[13px] font-semibold">Fester Betrag</div>
+                  <div className="text-[11px] text-ink-dim">Immer gleich</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDraft((d) => ({ ...d, manual: true }))}
+                  className={cx(
+                    'rounded-2xl border p-3 text-left transition',
+                    draft.manual ? 'border-ink bg-card' : 'border-card-edge bg-card/50',
+                  )}
+                >
+                  <div className="text-[13px] font-semibold">Manueller Betrag</div>
+                  <div className="text-[11px] text-ink-dim">Bei Erfassung eingeben</div>
+                </button>
+              </div>
+            </Field>
+          )}
+
+          {(!draft.manual || draft.chargeOthers) && (
+            <Field label={draft.chargeOthers ? 'Betrag je Person (€)' : 'Betrag (€)'}>
               <Input
                 type="number"
                 step="0.1"
@@ -253,7 +294,7 @@ export default function Penalties() {
               />
             </Field>
           )}
-          {draft.manual && (
+          {draft.manual && !draft.chargeOthers && (
             <div className="rounded-2xl bg-amber-bg p-3 text-[12px] text-ink-soft">
               Beim Erfassen am Kegelabend wird der Betrag für diese Strafe jedes Mal einzeln
               eingegeben — z. B. „Glas umgeworfen".

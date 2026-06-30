@@ -21,6 +21,7 @@ function normCatalog(rows) {
       icon: p.icon,
       amount: p.amount == null ? null : Number(p.amount),
       manual: p.manual_amount ?? p.manual,
+      chargeOthers: p.charge_others ?? p.chargeOthers ?? false,
       gameKind: p.game_kind ?? p.gameKind ?? null,
     }))
 }
@@ -213,7 +214,10 @@ export default function SessionRecord() {
   const countTotal = useMemo(() => roster.reduce((acc, p) => acc + p.entries.length, 0), [roster])
 
   const allCat = catalog || []
-  const cat = allCat.filter((p) => !p.gameKind) // normales Strafen-Raster (ohne Spiele)
+  // Normales Strafen-Raster: ohne Spiele und ohne Rundenstrafen (die haben einen
+  // eigenen „an alle anderen"-Block im Strafen-Sheet).
+  const cat = allCat.filter((p) => !p.gameKind && !p.chargeOthers)
+  const roundPenalties = allCat.filter((p) => p.chargeOthers && !p.gameKind)
   const games = {
     einzel: allCat.find((p) => p.gameKind === 'einzel'),
     teams: allCat.find((p) => p.gameKind === 'teams'),
@@ -251,6 +255,26 @@ export default function SessionRecord() {
     addEntry(active, penId, pen.amount)
     if (mode === 'fast') setActive(null)
   }
+  // Rundenstrafe: die angetippte Person löst aus, der feste Betrag wird allen
+  // anderen Anwesenden belastet (Gäste mit, Frühgeher ausgeschlossen). Jeder
+  // Empfänger bekommt einen normalen Entry mit dieser catalog_id.
+  const chargeOthers = (penId) => {
+    const pen = findPen(penId)
+    if (!pen || active == null) return
+    const recipients = roster
+      .map((_, i) => i)
+      .filter((i) => i !== active && !roster[i].early)
+    if (recipients.length === 0) return
+    setRoster((r) =>
+      r.map((p, i) =>
+        recipients.includes(i)
+          ? { ...p, entries: [...p.entries, { id: entrySeq++, penId, amount: pen.amount }] }
+          : p,
+      ),
+    )
+    if (mode === 'fast') setActive(null)
+  }
+
   const confirmManual = () => {
     const amount = parseFloat((manualVal || '').replace(',', '.'))
     if (!(amount > 0)) return
@@ -848,6 +872,34 @@ export default function SessionRecord() {
               „Bekommen": nur {current.name}. „Vergeben": {eur(progressive.amount)} € an alle anderen
               Anwesenden.
             </p>
+          </div>
+        )}
+
+        {!manualFor && current && roundPenalties.length > 0 && (
+          <div className="mb-4 space-y-2 rounded-2xl border border-sage/40 bg-sage-bg/40 p-3">
+            <div className="text-[12px] font-semibold text-sage">🍻 An alle anderen vergeben</div>
+            {roundPenalties.map((pen) => {
+              const recipients = roster.filter((q, i) => i !== active && !q.early).length
+              return (
+                <button
+                  key={pen.id}
+                  onClick={() => chargeOthers(pen.id)}
+                  disabled={recipients === 0}
+                  className="flex w-full items-center gap-3 rounded-xl border border-card-edge bg-card p-2.5 text-left transition hover:border-ink/20 active:scale-[0.99] disabled:opacity-40"
+                >
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-bg text-lg">
+                    {pen.icon}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[14px] font-semibold">{pen.name}</div>
+                    <div className="font-mono text-[12px] text-ink-dim">
+                      {eur(pen.amount)} € · {recipients} {recipients === 1 ? 'Person' : 'Personen'}
+                    </div>
+                  </div>
+                  <span className="shrink-0 text-[12px] font-semibold text-sage">Vergeben</span>
+                </button>
+              )
+            })}
           </div>
         )}
 
