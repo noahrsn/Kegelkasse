@@ -519,6 +519,16 @@ export async function getTreasury(groupId) {
   return data // jsonb: balance, opening_balance, opening_date, income_*, expense_*, last_csv_import
 }
 
+/* Monats-Bilanz (Beiträge + Strafen + Kegelabend-Ausgaben) fürs Dashboard-Diagramm. */
+export async function getMonthlyBilanz(groupId, months = 6) {
+  const { data, error } = await supabase.rpc('treasury_monthly_bilanz', {
+    p_group_id: groupId,
+    p_months: months,
+  })
+  if (error) throw error
+  return data ?? [] // [{ month, fees, penalties, expenses, bilanz }]
+}
+
 /* Kassenbuch-Liste (View transactions_view; nur Kassenwart/Admin). */
 export async function listTransactions(groupId) {
   const { data, error } = await supabase

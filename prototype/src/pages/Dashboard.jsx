@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Card, Badge, Button, AvatarStack, Avatar, Bar } from '../components/ui'
-import { pal, eur, creamLight, navyInk } from '../design/calm'
+import { Card, Badge, Button, Avatar } from '../components/ui'
+import { pal, eur, creamLight, cx } from '../design/calm'
 import { useAuth } from '../context/AuthContext.jsx'
 import {
   getGroup,
@@ -9,11 +9,12 @@ import {
   listMemberDebts,
   getNextEvent,
   getTreasury,
+  getMonthlyBilanz,
   listActivity,
   listSessions,
   getImportStatus,
 } from '../lib/api.js'
-import { activity, members, club, events, topPudler, currentUser } from '../mock/data'
+import { activity, members, club, events, currentUser } from '../mock/data'
 
 const ACTION_VERB = {
   session_approved: 'gab einen Kegelabend frei',
@@ -42,27 +43,44 @@ function relTime(iso) {
   return new Date(iso).toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })
 }
 
+// „16 Uhr" bei vollen Stunden, sonst „19:30 Uhr".
+function niceTime(d) {
+  if (d.getMinutes() === 0) return `${d.getHours()} Uhr`
+  return d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) + ' Uhr'
+}
+
+// Monatskürzel fürs Bilanz-Diagramm (z. B. „Jul").
+function monthLabel(iso) {
+  return new Date(iso).toLocaleDateString('de-DE', { month: 'short' }).replace('.', '')
+}
+
 function buildMock() {
   const next = events.find((e) => !e.past)
   const me = members.find((m) => m.id === currentUser.id)
+  const mockBilanz = [
+    { month: '2026-01-01', bilanz: 142.5 },
+    { month: '2026-02-01', bilanz: 168.0 },
+    { month: '2026-03-01', bilanz: -34.2 },
+    { month: '2026-04-01', bilanz: 96.4 },
+    { month: '2026-05-01', bilanz: 121.8 },
+    { month: '2026-06-01', bilanz: 88.6 },
+  ]
   return {
     name: currentUser.firstName,
-    myDebt: { amount: me.debt, sub: '14 Strafen · 2 Beiträge offen', iban: club.iban, due: 'Frist 21.06.' },
+    myDebt: { amount: me.debt, sub: null, iban: club.iban, due: 'Frist 21.06.' },
     nextEvent: {
       id: next.id,
-      day: 27,
-      sub: 'Sa, Juni',
-      time: '19:30 Uhr · ' + next.lane,
-      names: members.slice(0, 4).map((m) => m.name),
-      yesText: '8 zugesagt · 2 keine Antwort',
-      ringColor: pal.navySurface,
+      dateNice: '25. Juli',
+      timeNice: '16 Uhr',
+      names: members.slice(0, 8).map((m) => m.name),
     },
-    treasury: { balance: club.treasuryBalance, in30: 312.4, out30: 84.2 },
+    treasury: { balance: club.treasuryBalance, bilanz: mockBilanz },
     activity: activity.slice(0, 5).map((a) => ({ who: a.who, what: a.what, when: a.when, tag: a.tag, tone: a.tone })),
     pending: { sessionId: 's1', text: '09.05. · H. Meier · 12 Teilnehmer · Σ 14,80 €' },
-    members: { count: members.length, names: members.slice(0, 7).map((m) => m.name.split(' ')[0]) },
-    topHeading: 'Top Pudler · Mai →',
-    topList: topPudler.slice(0, 3).map(([n, e, p]) => ({ name: n, value: `${eur(e)} €`, pct: p })),
+    members: {
+      count: members.length,
+      list: members.slice(0, 7).map((m) => ({ name: m.name.split(' ')[0], open: m.debt })),
+    },
   }
 }
 
@@ -96,17 +114,18 @@ export default function Dashboard() {
       listMemberDebts(activeGroupId),
       getNextEvent(activeGroupId).catch(() => null),
       getTreasury(activeGroupId).catch(() => null),
+      getMonthlyBilanz(activeGroupId, 6).catch(() => []),
       listActivity(activeGroupId, 5).catch(() => []),
       listSessions(activeGroupId).catch(() => []),
     ])
-      .then(([group, mem, debts, ev, treasury, acts, sessions]) => {
+      .then(([group, mem, debts, ev, treasury, bilanz, acts, sessions]) => {
         if (!alive) return
         const myDebt = debts.find((d) => d.userId === user?.id)
         const nameOf = (uid) => mem.find((m) => m.userId === uid)?.name
         const yes = (ev?.rsvps || []).filter((r) => r.status === 'yes')
         const start = ev ? new Date(ev.start_date) : null
         const pendingSession = (sessions || []).find((s) => s.status === 'submitted')
-        const debtors = [...debts].filter((d) => d.open > 0).sort((a, b) => b.open - a.open).slice(0, 3)
+        const openOf = (uid) => debts.find((d) => d.userId === uid)?.open ?? 0
 
         setVm({
           name: profile?.name?.split(' ')[0] || 'willkommen',
@@ -114,7 +133,7 @@ export default function Dashboard() {
             ? {
                 amount: myDebt.open,
                 credit: 0,
-                sub: `${myDebt.penalties} Strafen · ${myDebt.fees} Beiträge offen`,
+                sub: null,
                 iban: group?.payment_iban || '—',
                 due: myDebt.nextDue ? `Frist ${new Date(myDebt.nextDue).toLocaleDateString('de-DE')}` : null,
               }
@@ -128,17 +147,12 @@ export default function Dashboard() {
           nextEvent: ev
             ? {
                 id: ev.id,
-                day: start.getDate(),
-                sub: start.toLocaleDateString('de-DE', { weekday: 'short', month: 'long' }),
-                time: start.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) + ' Uhr',
-                names: yes.map((r) => nameOf(r.user_id)).filter(Boolean).slice(0, 4),
-                yesText: `${yes.length} zugesagt`,
-                ringColor: pal.navySurface,
+                dateNice: start.toLocaleDateString('de-DE', { day: 'numeric', month: 'long' }),
+                timeNice: niceTime(start),
+                names: yes.map((r) => nameOf(r.user_id)).filter(Boolean),
               }
             : null,
-          treasury: treasury
-            ? { balance: treasury.balance, in30: treasury.income_30d, out30: Math.abs(treasury.expense_30d) }
-            : null,
+          treasury: treasury ? { balance: treasury.balance, bilanz: bilanz || [] } : null,
           activity: (acts || []).map((l) => ({
             who: l.actorName,
             what: ACTION_VERB[l.action] || 'Aktivität',
@@ -152,11 +166,10 @@ export default function Dashboard() {
                 text: `${new Date(pendingSession.date).toLocaleDateString('de-DE')} · ${pendingSession.recordedBy} · ${pendingSession.participants} Teilnehmer`,
               }
             : null,
-          members: { count: mem.length, names: mem.slice(0, 7).map((m) => m.name.split(' ')[0]) },
-          topHeading: canManage ? 'Höchste Schulden →' : 'Mitglieder →',
-          topList: canManage
-            ? debtors.map((d) => ({ name: d.name, value: `${eur(d.open)} €`, pct: 1 }))
-            : [],
+          members: {
+            count: mem.length,
+            list: mem.slice(0, 7).map((m) => ({ name: m.name.split(' ')[0], open: openOf(m.userId) })),
+          },
         })
       })
       .catch((e) => console.error(e))
@@ -246,9 +259,11 @@ export default function Dashboard() {
               €
             </span>
           </div>
-          <div className="mt-1.5 text-[12px]" style={{ color: vm.myDebt.amount > 0 ? pal.terra : pal.sage }}>
-            {vm.myDebt.sub}
-          </div>
+          {vm.myDebt.sub && (
+            <div className="mt-1.5 text-[12px]" style={{ color: vm.myDebt.amount > 0 ? pal.terra : pal.sage }}>
+              {vm.myDebt.sub}
+            </div>
+          )}
           <div className="flex-1" />
           <div className="mt-5 flex items-center gap-3 rounded-2xl bg-bg/60 p-3">
             <div className="min-w-0 flex-1">
@@ -267,37 +282,28 @@ export default function Dashboard() {
         >
           <div className="flex items-center justify-between">
             <div className="text-[12px] font-semibold" style={{ color: creamLight }}>
-              Nächster Abend
+              Nächster Termin
             </div>
           </div>
           {vm.nextEvent ? (
             <>
-              <div className="mt-4 flex items-end gap-3.5">
-                <div className="font-display text-7xl font-medium leading-[0.8] tracking-tight" style={{ color: creamLight }}>
-                  {vm.nextEvent.day}
+              <div className="mt-4">
+                <div className="font-display text-3xl font-medium tracking-tight" style={{ color: creamLight }}>
+                  {vm.nextEvent.dateNice}
                 </div>
-                <div className="pb-1.5">
-                  <div className="text-sm font-semibold">{vm.nextEvent.sub}</div>
-                  <div className="mt-0.5 text-[11px] text-white/70">{vm.nextEvent.time}</div>
-                </div>
+                <div className="mt-1 text-sm text-white/75">{vm.nextEvent.timeNice}</div>
               </div>
               <div className="flex-1" />
-              <div className="mt-4 flex items-center gap-2.5">
-                <AvatarStack names={vm.nextEvent.names} ringColor={vm.nextEvent.ringColor} />
-                <div className="text-[11px] text-white/75">{vm.nextEvent.yesText}</div>
-              </div>
-              <div className="mt-3.5 flex gap-2">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    navigate(`/calendar/${vm.nextEvent.id}`)
-                  }}
-                  className="flex-1 rounded-full py-2.5 text-[12px] font-semibold"
-                  style={{ background: creamLight, color: navyInk }}
-                >
-                  Rückmeldung
-                </button>
-              </div>
+              {vm.nextEvent.names.length > 0 && (
+                <div className="mt-4 flex flex-wrap gap-1.5">
+                  {vm.nextEvent.names.map((n, i) => (
+                    <div key={i} className="flex items-center gap-1.5 rounded-full bg-white/10 py-1 pl-1 pr-2.5">
+                      <Avatar name={n} size={20} />
+                      <span className="text-[11px] font-medium text-white/90">{n.split(' ')[0]}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </>
           ) : (
             <div className="mt-6 flex flex-1 flex-col items-center justify-center gap-2 py-6 text-center">
@@ -314,27 +320,47 @@ export default function Dashboard() {
           style={{ animationDelay: '120ms' }}
         >
           <div className="flex items-center justify-between">
-            <div className="text-[12px] font-semibold text-ink-soft">Vereinskasse</div>
+            <div className="text-[12px] font-semibold text-ink-soft">Kegelkasse</div>
           </div>
           <div className="mt-2.5 font-display text-5xl font-medium leading-none tracking-tight tnum">
             {eur(vm.treasury?.balance ?? 0)} <span className="text-2xl font-normal text-ink-dim">€</span>
           </div>
-          <Sparkline />
           <div className="flex-1" />
-          <div className="mt-4 grid grid-cols-2 gap-3 border-t border-card-edge pt-4">
-            <div>
-              <div className="text-[10px] uppercase tracking-wide text-ink-dim">Ein · 30 Tage</div>
-              <div className="mt-0.5 font-mono text-sm font-semibold text-sage">+ {eur(vm.treasury?.in30 ?? 0)} €</div>
-            </div>
-            <div>
-              <div className="text-[10px] uppercase tracking-wide text-ink-dim">Aus · 30 Tage</div>
-              <div className="mt-0.5 font-mono text-sm font-semibold text-terra">− {eur(vm.treasury?.out30 ?? 0)} €</div>
-            </div>
+          <div className="mt-5 border-t border-card-edge pt-4">
+            <div className="text-[10px] uppercase tracking-wide text-ink-dim">Bilanz · 6 Monate</div>
+            <BilanzChart data={vm.treasury?.bilanz ?? []} />
           </div>
         </Card>
 
-        {/* Aktivität */}
-        <Card className="flex flex-col sm:col-span-2 animate-rise" style={{ animationDelay: '160ms' }}>
+        {/* Mitglieder → Mitglieder (auf Mobile über der Aktivität) */}
+        <Card
+          tone="cream"
+          onClick={() => navigate('/members')}
+          className="flex cursor-pointer flex-col animate-rise transition hover:brightness-[0.99]"
+          style={{ animationDelay: '160ms' }}
+        >
+          <div className="flex items-center justify-between">
+            <div className="text-[12px] font-semibold text-ink">Mitglieder</div>
+            <span className="text-[11px] font-semibold text-amber">{vm.members.count} aktiv →</span>
+          </div>
+          <div className="mt-3.5 flex flex-wrap gap-1.5">
+            {vm.members.list.map((m, i) => (
+              <div key={i} className="flex items-center gap-1.5 rounded-full bg-bg/70 py-1 pl-1 pr-2.5">
+                <Avatar name={m.name} size={20} />
+                <span className="text-[11px] font-medium">{m.name}</span>
+                <span
+                  className="font-mono text-[11px] font-semibold"
+                  style={{ color: m.open > 0 ? pal.terra : pal.sage }}
+                >
+                  {m.open > 0 ? `${eur(m.open)} €` : m.open < 0 ? `+${eur(-m.open)} €` : '0 €'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        {/* Aktivität (auf Mobile ganz unten) */}
+        <Card className="flex flex-col sm:col-span-2 animate-rise" style={{ animationDelay: '200ms' }}>
           <div className="flex items-center justify-between">
             <div className="text-[12px] font-semibold text-ink-soft">Aktivität</div>
             <Link to="/log" className="text-[11px] text-ink-dim hover:text-ink">
@@ -379,76 +405,41 @@ export default function Dashboard() {
             )}
           </div>
         </Card>
-
-        {/* Mitglieder → Mitglieder */}
-        <Card
-          tone="cream"
-          onClick={() => navigate('/members')}
-          className="flex cursor-pointer flex-col animate-rise transition hover:brightness-[0.99]"
-          style={{ animationDelay: '200ms' }}
-        >
-          <div className="flex items-center justify-between">
-            <div className="text-[12px] font-semibold text-ink">Mitglieder</div>
-            <span className="text-[11px] font-semibold text-amber">{vm.members.count} aktiv →</span>
-          </div>
-          <div className="mt-3.5 flex flex-wrap gap-1.5">
-            {vm.members.names.map((n, i) => (
-              <div key={i} className="flex items-center gap-1.5 rounded-full bg-bg/70 py-1 pl-1 pr-2.5">
-                <Avatar name={n} size={20} />
-                <span className="text-[11px] font-medium">{n}</span>
-              </div>
-            ))}
-          </div>
-          <div className="flex-1" />
-          {vm.topList.length > 0 && (
-            <div className="mt-4 border-t border-ink/10 pt-4">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  navigate('/members')
-                }}
-                className="mb-2 text-[11px] font-semibold text-ink-soft hover:text-ink"
-              >
-                {vm.topHeading}
-              </button>
-              {vm.topList.map((t, i) => (
-                <div key={i} className="mt-1.5 flex items-center gap-2.5">
-                  <span className="w-20 truncate text-[11px] font-medium">{t.name}</span>
-                  <div className="flex-1">
-                    <Bar value={t.pct} color={pal.amber} />
-                  </div>
-                  <span className="font-mono text-[11px] font-semibold text-amber">{t.value}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
       </div>
     </div>
   )
 }
 
-function Sparkline() {
+// Säulendiagramm der Monats-Bilanz. Höhe ∝ Betrag, Farbe nach Vorzeichen
+// (Überschuss sage, Defizit terra). Aktueller Monat hervorgehoben.
+function BilanzChart({ data }) {
+  if (!data || data.length === 0) {
+    return <div className="mt-3 py-4 text-center text-[11px] text-ink-dim">Noch keine Daten.</div>
+  }
+  const max = Math.max(1, ...data.map((d) => Math.abs(Number(d.bilanz) || 0)))
   return (
-    <svg viewBox="0 0 280 50" className="mt-3.5 w-full text-sage">
-      <defs>
-        <linearGradient id="spark" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor="currentColor" stopOpacity="0.25" />
-          <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path
-        d="M0,40 L20,36 L40,38 L60,32 L80,28 L100,30 L120,22 L140,24 L160,18 L180,14 L200,16 L220,10 L240,8 L260,6 L280,5 L280,50 L0,50 Z"
-        fill="url(#spark)"
-      />
-      <path
-        d="M0,40 L20,36 L40,38 L60,32 L80,28 L100,30 L120,22 L140,24 L160,18 L180,14 L200,16 L220,10 L240,8 L260,6 L280,5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <circle cx="280" cy="5" r="3.5" fill="currentColor" />
-    </svg>
+    <div className="mt-3 flex items-end gap-1.5" style={{ height: 88 }}>
+      {data.map((d, i) => {
+        const val = Number(d.bilanz) || 0
+        const h = Math.round((Math.abs(val) / max) * 100)
+        const pos = val >= 0
+        const last = i === data.length - 1
+        return (
+          <div key={i} className="flex flex-1 flex-col items-center justify-end gap-1.5" title={`${eur(val)} €`}>
+            <div
+              className="w-full rounded-md transition-all"
+              style={{
+                height: `${Math.max(h, 4)}%`,
+                background: pos ? pal.sage : pal.terra,
+                opacity: last ? 1 : 0.6,
+              }}
+            />
+            <span className={cx('text-[9px]', last ? 'font-semibold text-ink-soft' : 'text-ink-dim')}>
+              {monthLabel(d.month)}
+            </span>
+          </div>
+        )
+      })}
+    </div>
   )
 }
