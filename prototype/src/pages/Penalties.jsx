@@ -10,6 +10,15 @@ const ICONS = ['🎳', '🌊', '🎯', '⏰', '📱', '↔️', '🤬', '👟', 
 
 const EDIT_ROLES = ['admin', 'kassenwart']
 
+// Feste Spielvarianten (Schnell-Strafen). Je Club genau eine Katalog-Zeile pro
+// Variante (game_kind); Betrag wird im Kegelabend berechnet/eingegeben, darum
+// fest manual. Hier nur aktivieren/deaktivieren, nicht frei bearbeiten.
+const GAMES = [
+  { kind: 'einzel', name: 'Einzelspiel', icon: '🏅', desc: 'Platzierung antippen · ab Platz 4 in 0,25-€-Schritten' },
+  { kind: 'teams', name: '2-Teams-Spiel', icon: '👥', desc: 'Fester Betrag je Verlierer' },
+  { kind: 'progressive', name: '3,50 €-Spiel', icon: '💰', desc: 'Laufender Betrag · bekommen/vergeben' },
+]
+
 function priceLabel(p) {
   if (p.chargeOthers) return `${eur(p.amount)} € · an alle anderen`
   return p.manual ? 'Betrag manuell' : `${eur(p.amount)} €`
@@ -116,6 +125,36 @@ export default function Penalties() {
     }
   }
 
+  // Spielvariante als Katalog-Zeile anlegen (game_kind, fester manueller Betrag).
+  const createGame = async (g) => {
+    if (saving) return
+    setSaving(true)
+    try {
+      if (mockMode) {
+        setList((l) => [
+          ...l,
+          { id: 'g' + Date.now(), name: g.name, icon: g.icon, amount: null, manual: true, chargeOthers: false, gameKind: g.kind, active: true },
+        ])
+      } else {
+        const row = fromDb(
+          await insertPenalty(activeGroupId, {
+            name: g.name,
+            icon: g.icon,
+            manual_amount: true,
+            amount: null,
+            game_kind: g.kind,
+            active: true,
+          }),
+        )
+        setList((l) => [...(l || []), row])
+      }
+    } catch (err) {
+      alert('Konnte Spiel nicht aktivieren: ' + (err?.message || err))
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div className="space-y-5">
       <PageTitle
@@ -183,6 +222,65 @@ export default function Penalties() {
             </Card>
           ))}
         </div>
+      )}
+
+      {/* Spiele · Schnell-Strafen — feste Varianten, einzeln aktivierbar. */}
+      {list != null && (
+        <section className="space-y-2">
+          <div>
+            <h2 className="text-[14px] font-semibold">Spiele · Schnell-Strafen</h2>
+            <p className="text-[12px] text-ink-dim">
+              Erscheinen im Kegelabend unter „Spiele", nicht im normalen Strafen-Raster.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {GAMES.map((g) => {
+              const existing = list.find((p) => p.gameKind === g.kind)
+              const isActive = existing?.active
+              return (
+                <Card
+                  key={g.kind}
+                  className={cx('flex items-center gap-3', existing && !isActive && 'opacity-55')}
+                >
+                  <span className="grid h-12 w-12 place-items-center rounded-2xl bg-bg text-2xl">{g.icon}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">{g.name}</span>
+                      {!existing ? (
+                        <Badge tone="neutral">nicht aktiviert</Badge>
+                      ) : isActive ? (
+                        <Badge tone="sage">aktiv</Badge>
+                      ) : (
+                        <Badge tone="neutral">inaktiv</Badge>
+                      )}
+                    </div>
+                    <div className="text-[12px] text-ink-dim">{g.desc}</div>
+                  </div>
+                  {canEdit &&
+                    (existing ? (
+                      <button
+                        onClick={() => toggleActive(existing)}
+                        className={cx(
+                          'rounded-full px-3 py-1.5 text-[12px] font-semibold',
+                          isActive ? 'bg-terra-bg text-terra' : 'bg-sage-bg text-sage',
+                        )}
+                      >
+                        {isActive ? 'Deaktivieren' : 'Aktivieren'}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => createGame(g)}
+                        disabled={saving}
+                        className="rounded-full bg-ink px-3 py-1.5 text-[12px] font-semibold text-bg disabled:opacity-50"
+                      >
+                        Aktivieren
+                      </button>
+                    ))}
+                </Card>
+              )
+            })}
+          </div>
+        </section>
       )}
 
       {canEdit && (
