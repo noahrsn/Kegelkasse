@@ -67,19 +67,15 @@ function buildMock() {
   ]
   return {
     name: currentUser.firstName,
+    meName: currentUser.name,
     myDebt: { amount: me.debt, sub: null, iban: club.iban, due: 'Frist 21.06.' },
-    nextEvent: {
-      id: next.id,
-      dateNice: '25. Juli',
-      timeNice: '16 Uhr',
-      names: members.slice(0, 8).map((m) => m.name),
-    },
+    nextEvent: { id: next.id, dateNice: '25. Juli', timeNice: '16 Uhr' },
     treasury: { balance: club.treasuryBalance, bilanz: mockBilanz },
     activity: activity.slice(0, 5).map((a) => ({ who: a.who, what: a.what, when: a.when, tag: a.tag, tone: a.tone })),
     pending: { sessionId: 's1', text: '09.05. · H. Meier · 12 Teilnehmer · Σ 14,80 €' },
     members: {
       count: members.length,
-      list: members.slice(0, 7).map((m) => ({ name: m.name.split(' ')[0], open: m.debt })),
+      list: members.map((m) => ({ name: m.name.split(' ')[0], open: m.debt })),
     },
   }
 }
@@ -121,14 +117,13 @@ export default function Dashboard() {
       .then(([group, mem, debts, ev, treasury, bilanz, acts, sessions]) => {
         if (!alive) return
         const myDebt = debts.find((d) => d.userId === user?.id)
-        const nameOf = (uid) => mem.find((m) => m.userId === uid)?.name
-        const yes = (ev?.rsvps || []).filter((r) => r.status === 'yes')
         const start = ev ? new Date(ev.start_date) : null
         const pendingSession = (sessions || []).find((s) => s.status === 'submitted')
         const openOf = (uid) => debts.find((d) => d.userId === uid)?.open ?? 0
 
         setVm({
           name: profile?.name?.split(' ')[0] || 'willkommen',
+          meName: profile?.name || 'Ich',
           myDebt: myDebt && myDebt.open > 0
             ? {
                 amount: myDebt.open,
@@ -149,7 +144,6 @@ export default function Dashboard() {
                 id: ev.id,
                 dateNice: start.toLocaleDateString('de-DE', { day: 'numeric', month: 'long' }),
                 timeNice: niceTime(start),
-                names: yes.map((r) => nameOf(r.user_id)).filter(Boolean),
               }
             : null,
           treasury: treasury ? { balance: treasury.balance, bilanz: bilanz || [] } : null,
@@ -277,36 +271,46 @@ export default function Dashboard() {
         <Card
           tone="navy"
           onClick={() => navigate('/calendar')}
-          className="flex cursor-pointer flex-col animate-rise transition hover:brightness-[1.03]"
+          className="relative flex cursor-pointer flex-col overflow-hidden animate-rise transition hover:brightness-[1.03]"
           style={{ animationDelay: '80ms' }}
         >
-          <div className="flex items-center justify-between">
+          {/* Dekoratives Kegel-Motiv (rein schmückend, keine Info) */}
+          <span
+            aria-hidden
+            className="pointer-events-none absolute -right-5 -top-7 select-none text-[130px] leading-none opacity-[0.07]"
+          >
+            🎳
+          </span>
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -bottom-16 -left-16 h-44 w-44 rounded-full"
+            style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.08), transparent 70%)' }}
+          />
+
+          <div className="relative flex items-center justify-between">
             <div className="text-[12px] font-semibold" style={{ color: creamLight }}>
               Nächster Termin
             </div>
           </div>
           {vm.nextEvent ? (
-            <>
-              <div className="mt-4">
-                <div className="font-display text-3xl font-medium tracking-tight" style={{ color: creamLight }}>
+            <div className="relative flex flex-1 flex-col">
+              <div className="mt-5">
+                <div className="font-display text-4xl font-medium leading-none tracking-tight" style={{ color: creamLight }}>
                   {vm.nextEvent.dateNice}
                 </div>
-                <div className="mt-1 text-sm text-white/75">{vm.nextEvent.timeNice}</div>
+                <div className="mt-2 flex items-center gap-1.5 text-sm text-white/75">
+                  <span className="opacity-80">🕒</span>
+                  {vm.nextEvent.timeNice}
+                </div>
               </div>
               <div className="flex-1" />
-              {vm.nextEvent.names.length > 0 && (
-                <div className="mt-4 flex flex-wrap gap-1.5">
-                  {vm.nextEvent.names.map((n, i) => (
-                    <div key={i} className="flex items-center gap-1.5 rounded-full bg-white/10 py-1 pl-1 pr-2.5">
-                      <Avatar name={n} size={20} />
-                      <span className="text-[11px] font-medium text-white/90">{n.split(' ')[0]}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </>
+              <div className="mt-5 flex items-center gap-2 border-t border-white/10 pt-4">
+                <Avatar name={vm.meName} size={26} ring="rgba(255,255,255,0.25)" />
+                <span className="text-[12px] font-medium text-white/85">{vm.name}</span>
+              </div>
+            </div>
           ) : (
-            <div className="mt-6 flex flex-1 flex-col items-center justify-center gap-2 py-6 text-center">
+            <div className="relative mt-6 flex flex-1 flex-col items-center justify-center gap-2 py-6 text-center">
               <span className="text-3xl">📅</span>
               <div className="text-[12px] text-white/70">Kein anstehender Termin</div>
             </div>
