@@ -10,6 +10,9 @@ const CAT = {
   member_payment: { label: 'Mitgliedszahlung', tone: 'sage' },
   event_expense: { label: 'Event-Ausgabe', tone: 'terra' },
   equipment_expense: { label: 'Ausrüstung', tone: 'terra' },
+  lane_expense: { label: 'Kegelabend', tone: 'terra' },
+  lane_income: { label: 'Kegelabend', tone: 'terra' }, // Altbestand (früher als Einnahme verbucht)
+  guest_income: { label: 'Gastkegler', tone: 'sage' },
   other_income: { label: 'Sonst. Einnahme', tone: 'sage' },
   other_expense: { label: 'Sonst. Ausgabe', tone: 'terra' },
 }

@@ -15,7 +15,7 @@ const MATCH = {
 
 // Nicht-Mitglieds-Zuweisungen (Kategorien). sign begrenzt sie auf Ein-/Ausgaben.
 const CATS = [
-  { value: 'cat:lane', label: 'Kegelbahn-Einnahme', sign: 'pos' },
+  { value: 'cat:lane', label: 'Kegelabend', sign: 'neg' },
   { value: 'cat:guest', label: 'Gastkegler', sign: 'pos' },
   { value: 'cat:other_income', label: 'Sonstige Einnahme', sign: 'pos' },
   { value: 'cat:other_expense', label: 'Sonstige Ausgabe', sign: 'neg' },
@@ -40,7 +40,7 @@ function matchRow(row, members) {
 /* Zuweisung → RPC-Payload-Felder. */
 function assignPayload(assign) {
   if (assign?.startsWith('user:')) return { matched_user_id: assign.slice(5), category: 'member_payment' }
-  if (assign === 'cat:lane') return { matched_user_id: null, category: 'lane' }
+  if (assign === 'cat:lane') return { matched_user_id: null, category: 'lane' } // Kegelabend (Ausgabe)
   if (assign === 'cat:guest') return { matched_user_id: null, category: 'guest' }
   if (assign === 'cat:other_income') return { matched_user_id: null, category: 'other_income' }
   if (assign === 'cat:other_expense') return { matched_user_id: null, category: 'other_expense' }
