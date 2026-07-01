@@ -211,7 +211,6 @@ export default function SessionRecord() {
   const effectiveSum = (p) => entriesSum(p) + (p.lateAvg || 0) + earlyAvgLive(p)
 
   const total = useMemo(() => roster.reduce((acc, p) => acc + effectiveSum(p), 0), [roster])
-  const countTotal = useMemo(() => roster.reduce((acc, p) => acc + p.entries.length, 0), [roster])
 
   const allCat = catalog || []
   // Normales Strafen-Raster: ohne Spiele und ohne Rundenstrafen (die haben einen
@@ -593,17 +592,6 @@ export default function SessionRecord() {
           <h1 className="mt-1 font-display text-3xl font-medium tracking-tight">{ctx.title}</h1>
           {ctx.when && <div className="text-[12px] text-ink-dim">{ctx.when}</div>}
         </div>
-        <Card className="flex items-center gap-4 py-2.5">
-          <div>
-            <div className="text-[10px] uppercase text-ink-dim">Summe</div>
-            <div className="font-mono text-lg font-semibold tnum">{eur(total)} €</div>
-          </div>
-          <div className="h-8 w-px bg-card-edge" />
-          <div>
-            <div className="text-[10px] uppercase text-ink-dim">Strafen</div>
-            <div className="font-mono text-lg font-semibold tnum">{countTotal}</div>
-          </div>
-        </Card>
       </header>
 
       {/* Nur-Lesen-Hinweis mit bewusster Geste zum Bearbeiten */}
@@ -621,15 +609,7 @@ export default function SessionRecord() {
 
       {/* Erfassungsmodus */}
       {isEditor && (
-      <Card className="flex flex-wrap items-center justify-between gap-3 py-3">
-        <div className="min-w-0">
-          <div className="text-[12px] font-semibold text-ink-soft">Erfassungsmodus</div>
-          <div className="text-[12px] text-ink-dim">
-            {mode === 'fast'
-              ? 'Schnell: Person → Strafe = fertig. Nur 2 Klicks pro Strafe.'
-              : 'Detailliert: Person → Strafen mit Anzahl exakt einstellen.'}
-          </div>
-        </div>
+      <Card className="flex items-center justify-center py-3">
         <div className="flex shrink-0 rounded-full bg-bg p-1">
           <ModeBtn active={mode === 'fast'} onClick={() => setMode('fast')}>
             ⚡ Schnell
@@ -681,6 +661,13 @@ export default function SessionRecord() {
         {roster.map((p, i) => {
           const s = effectiveSum(p)
           const n = p.entries.length
+          const sub = p.late
+            ? `Start-Schnitt ${eur(p.lateAvg || 0)} €`
+            : p.early
+              ? `Abwesend · + Schnitt ${eur(earlyAvgLive(p))} €`
+              : n === 0
+                ? 'Noch nichts erfasst'
+                : ''
           return (
             <button
               key={p.id}
@@ -698,15 +685,7 @@ export default function SessionRecord() {
                   {p.early && <Badge tone="amber">Geht früher</Badge>}
                   {p.isGuest && <Badge tone="cream">Gast</Badge>}
                 </div>
-                <div className="mt-0.5 text-[12px] text-ink-dim">
-                  {p.late
-                    ? `Start-Schnitt ${eur(p.lateAvg || 0)} €${n > 0 ? ` · ${n} Strafen` : ''}`
-                    : p.early
-                      ? `Abwesend · + Schnitt ${eur(earlyAvgLive(p))} €${n > 0 ? ` · ${n} Strafen` : ''}`
-                      : n > 0
-                        ? `${n} Strafen erfasst`
-                        : 'Noch nichts erfasst'}
-                </div>
+                {sub && <div className="mt-0.5 text-[12px] text-ink-dim">{sub}</div>}
               </div>
               <div className="text-right">
                 <div
@@ -771,13 +750,7 @@ export default function SessionRecord() {
           setManualFor(null)
         }}
         title={current?.name}
-        subtitle={
-          current
-            ? mode === 'fast' && !manualFor
-              ? 'Strafe antippen — wird sofort übernommen'
-              : `Aktuell ${eur(effectiveSum(current))} € · ${current.entries.length} Strafen`
-            : ''
-        }
+        subtitle={current ? `Aktuell ${eur(effectiveSum(current))} €` : ''}
         footer={
           mode === 'detailed' && !manualFor ? (
             <Button
@@ -792,20 +765,16 @@ export default function SessionRecord() {
           ) : undefined
         }
       >
-        {!manualFor && current && !current.isGuest && (
+        {!manualFor && current && !current.isGuest && mode === 'detailed' && (
           <div className="mb-4 rounded-2xl bg-bg p-3">
             <div className="mb-2 flex items-center justify-between">
               <span className="text-[12px] font-semibold text-ink-soft">Anwesenheit</span>
-              {/* „Aus Liste entfernen" nur im Detailliert-Modus — im Schnell-Modus
-                  soll ein Fehltipp nicht versehentlich jemanden entfernen. */}
-              {mode === 'detailed' && (
-                <button
-                  onClick={() => removeParticipant(active)}
-                  className="text-[11px] font-semibold text-terra hover:underline"
-                >
-                  Aus Liste entfernen
-                </button>
-              )}
+              <button
+                onClick={() => removeParticipant(active)}
+                className="text-[11px] font-semibold text-terra hover:underline"
+              >
+                Mitglied komplett entfernen
+              </button>
             </div>
 
             {current.late && (
@@ -831,25 +800,13 @@ export default function SessionRecord() {
               </div>
             )}
 
-            {!current.late && !current.early && mode === 'detailed' && (
-              <>
-                <button
-                  onClick={() => markEarly(active)}
-                  className="w-full rounded-xl border border-amber bg-amber-bg px-3 py-2 text-[12px] font-semibold text-amber"
-                >
-                  🚪 Ab jetzt abwesend
-                </button>
-                <p className="mt-2 text-[11px] text-ink-dim">
-                  Ab dem Klick zählen alle weiteren Strafen; am Ende bekommt die Person den
-                  Durchschnitt dieser Strafen seit dem Weggang.
-                </p>
-              </>
-            )}
-
-            {!current.late && !current.early && mode !== 'detailed' && (
-              <p className="text-[11px] text-ink-dim">
-                Frühgeher („Ab jetzt abwesend") wird im Detailliert-Modus gesetzt.
-              </p>
+            {!current.late && !current.early && (
+              <button
+                onClick={() => markEarly(active)}
+                className="w-full rounded-xl border border-amber bg-amber-bg px-3 py-2 text-[12px] font-semibold text-amber"
+              >
+                🚪 Ab jetzt abwesend
+              </button>
             )}
           </div>
         )}
@@ -964,7 +921,6 @@ export default function SessionRecord() {
         open={gamesOpen}
         onClose={() => setGamesOpen(false)}
         title="Spiele"
-        subtitle="Schnell-Strafen für verlorene Spiele — Gäste zählen mit."
       >
         <div className="space-y-2">
           <GameOption
@@ -1167,8 +1123,6 @@ export default function SessionRecord() {
         }
       >
         <div className="rounded-2xl bg-bg p-4">
-          <Row label="Teilnehmer" value={`${roster.length} Personen`} />
-          <Row label="Strafen gesamt" value={`${countTotal} Stück`} />
           <Row label="Summe" value={`${eur(total)} €`} strong />
         </div>
       </Sheet>
@@ -1191,8 +1145,6 @@ export default function SessionRecord() {
         }
       >
         <div className="rounded-2xl bg-bg p-4">
-          <Row label="Teilnehmer" value={`${roster.length} Personen`} />
-          <Row label="Strafen gesamt" value={`${countTotal} Stück`} />
           <Row label="Summe" value={`${eur(total)} €`} strong />
         </div>
       </Sheet>

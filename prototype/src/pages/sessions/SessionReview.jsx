@@ -101,17 +101,13 @@ export default function SessionReview() {
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
-    if (mockMode) {
-      setOpen(new Set([mockDetail.participants[0].id]))
-      return
-    }
+    if (mockMode) return
     setDetail(null)
     getSession(id)
       .then((s) => {
         if (!s) return navigate('/sessions')
         const d = fromDb(s)
         setDetail(d)
-        if (d.participants[0]) setOpen(new Set([d.participants[0].id]))
       })
       .catch((e) => {
         console.error(e)
@@ -192,10 +188,6 @@ export default function SessionReview() {
           <div className="text-[13px] font-semibold text-ink">
             Eingereicht von {detail.recordedBy}
           </div>
-          <div className="text-[12px] text-ink-soft">
-            {detail.participants.length} Teilnehmer
-            {isApproved ? ' · genehmigt & gebucht' : ''}
-          </div>
         </div>
         <div className="text-right">
           <div className="font-display text-3xl font-medium tnum">{eur(detail.total)} €</div>
@@ -223,10 +215,9 @@ export default function SessionReview() {
                     {p.early && <Badge tone="amber">Geht früher</Badge>}
                     {p.isGuest && <Badge tone="sage">{p.paid ? 'bar bezahlt' : 'Gast'}</Badge>}
                   </div>
-                  <div className="text-[12px] text-ink-dim">
-                    {`${p.items.length} Posten`}
-                    {hasAvg && ` · + ${p.avgLabel}`}
-                  </div>
+                  {hasAvg && (
+                    <div className="text-[12px] text-ink-dim">+ {p.avgLabel}</div>
+                  )}
                 </div>
                 <span className="font-mono font-semibold tnum text-terra">{eur(charge)} €</span>
                 <span className={cx('text-ink-dim transition', isOpen && 'rotate-180')}>⌄</span>
@@ -286,9 +277,6 @@ export default function SessionReview() {
               </div>
             ))}
           </Card>
-          <p className="mt-2 text-[11px] text-ink-dim">
-            Schnitt aller echten Mitglieder (ohne Gäste).
-          </p>
         </div>
       )}
 
@@ -296,7 +284,7 @@ export default function SessionReview() {
       {isApproved ? (
         <div className="space-y-2">
           <Card tone="sage" className="text-center text-[13px] font-semibold text-ink">
-            ✓ Genehmigt — Schulden wurden gebucht.
+            Genehmigt
           </Card>
           {canApprove && (
             <Button

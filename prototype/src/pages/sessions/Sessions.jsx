@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Card, Badge, Button, PageTitle, Avatar, AvatarStack, Empty } from '../../components/ui'
+import { Card, Badge, Button, PageTitle, Avatar, Empty } from '../../components/ui'
 import { Sheet } from '../../components/Modal'
 import { eur, pal, creamLight, navyInk } from '../../design/calm'
 import { useAuth } from '../../context/AuthContext.jsx'
@@ -121,7 +121,6 @@ export default function Sessions() {
   }
 
   const pending = (list || []).find((s) => s.status === 'submitted')
-  const guestCount = next?.guests?.length || 0
 
   return (
     <div className="space-y-5">
@@ -146,12 +145,6 @@ export default function Sessions() {
               <div className="text-[12px] text-white/70">{next.when}</div>
             </div>
           </div>
-          <div className="flex items-center gap-2.5">
-            <AvatarStack names={next.yesNames} ringColor={pal.navySurface} max={5} />
-            <span className="text-[12px] text-white/75">
-              {next.yesNames.length} zugesagt{guestCount > 0 ? ` · ${guestCount} Gäste` : ''}
-            </span>
-          </div>
           <button
             onClick={startFromEvent}
             className="w-full rounded-full py-3 text-[14px] font-semibold"
@@ -159,10 +152,6 @@ export default function Sessions() {
           >
             Kegelabend starten
           </button>
-          <p className="text-[11px] text-white/60">
-            Zusagen und mitgebrachte Gäste werden übernommen — vor dem Start kannst du alles noch
-            anpassen.
-          </p>
         </Card>
       )}
 
@@ -175,8 +164,7 @@ export default function Sessions() {
               Eine Einreichung wartet auf deine Freigabe
             </div>
             <div className="text-[12px] text-ink-soft">
-              Kegelabend {fmtDate(pending.date)} · {pending.recordedBy} · {pending.participants}{' '}
-              Teilnehmer
+              Kegelabend {fmtDate(pending.date)} · {pending.recordedBy}
             </div>
           </div>
           <Button variant="primary" size="sm" onClick={() => navigate(`/sessions/${pending.id}/review`)}>
@@ -225,15 +213,10 @@ export default function Sessions() {
                     <div className="mt-1 flex items-center gap-2 text-[12px] text-ink-soft">
                       <Avatar name={s.recordedBy} size={18} />
                       <span>{s.recordedBy}</span>
-                      <span className="text-ink-dim">·</span>
-                      <span>{s.participants} Teiln.</span>
-                      <span className="text-ink-dim">·</span>
-                      <span>{s.penalties} Strafen</span>
                     </div>
                   </div>
                   <div className="text-right">
                     <div className="font-mono text-lg font-semibold tnum">{eur(s.total)} €</div>
-                    <div className="text-[11px] text-ink-dim">Σ Strafen</div>
                   </div>
                   {s.status === 'draft' && (
                     <button
@@ -274,8 +257,7 @@ export default function Sessions() {
       >
         {delTarget && (
           <div className="rounded-2xl bg-bg p-4 text-[13px] text-ink-soft">
-            Entwurf vom <span className="font-semibold text-ink">{fmtDate(delTarget.date)}</span> ·{' '}
-            {delTarget.participants} Teiln. · {delTarget.penalties} Strafen
+            Entwurf vom <span className="font-semibold text-ink">{fmtDate(delTarget.date)}</span>
           </div>
         )}
       </Sheet>
