@@ -72,9 +72,10 @@ function buildMock() {
     nextEvent: {
       id: next.id,
       dateNice: '25. Juli',
+      weekday: 'Samstag',
       timeNice: '16 Uhr',
       attendees: members.slice(0, 5).map((m) => ({ name: m.name.split(' ')[0], full: m.name })),
-      guestCount: 1,
+      decliners: members.slice(5, 7).map((m) => ({ name: m.name.split(' ')[0], full: m.name })),
     },
     treasury: { balance: club.treasuryBalance, bilanz: mockBilanz },
     activity: activity.slice(0, 5).map((a) => ({ who: a.who, what: a.what, when: a.when, tag: a.tag, tone: a.tone })),
@@ -127,9 +128,10 @@ export default function Dashboard() {
         const pendingSession = (sessions || []).find((s) => s.status === 'submitted')
         const openOf = (uid) => debts.find((d) => d.userId === uid)?.open ?? 0
 
-        // Zusagen zum nächsten Termin. Im opt_out-Modus gelten Nicht-Antwortende
+        // Zu-/Absagen zum nächsten Termin. Im opt_out-Modus gelten Nicht-Antwortende
         // als zugesagt (analog listEvents), im opt_in-Modus nur echte „yes".
         let attendees = []
+        let decliners = []
         if (ev) {
           const byUser = new Map((ev.rsvps || []).map((r) => [r.user_id, r.status]))
           const yesMembers =
@@ -140,8 +142,10 @@ export default function Dashboard() {
                 })
               : mem.filter((m) => byUser.get(m.userId) === 'yes')
           attendees = yesMembers.map((m) => ({ name: m.name.split(' ')[0], full: m.name }))
+          decliners = mem
+            .filter((m) => byUser.get(m.userId) === 'no')
+            .map((m) => ({ name: m.name.split(' ')[0], full: m.name }))
         }
-        const guestCount = ev ? (ev.guests || []).length : 0
 
         setVm({
           name: profile?.name?.split(' ')[0] || 'willkommen',
@@ -165,9 +169,10 @@ export default function Dashboard() {
             ? {
                 id: ev.id,
                 dateNice: start.toLocaleDateString('de-DE', { day: 'numeric', month: 'long' }),
+                weekday: start.toLocaleDateString('de-DE', { weekday: 'long' }),
                 timeNice: niceTime(start),
                 attendees,
-                guestCount,
+                decliners,
               }
             : null,
           treasury: treasury ? { balance: treasury.balance, bilanz: bilanz || [] } : null,
@@ -298,52 +303,43 @@ export default function Dashboard() {
           className="relative flex cursor-pointer flex-col overflow-hidden animate-rise transition hover:brightness-[1.03]"
           style={{ animationDelay: '80ms' }}
         >
-          {/* Dekoratives Kegel-Motiv (rein schmückend, keine Info) */}
-          <span
-            aria-hidden
-            className="pointer-events-none absolute -right-5 -top-7 select-none text-[130px] leading-none opacity-[0.07]"
-          >
-            🎳
-          </span>
           <div
             aria-hidden
             className="pointer-events-none absolute -bottom-16 -left-16 h-44 w-44 rounded-full"
             style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.08), transparent 70%)' }}
           />
 
-          <div className="relative flex items-center justify-between">
-            <div className="text-[12px] font-semibold" style={{ color: creamLight }}>
-              Nächster Termin
-            </div>
+          <div className="relative text-[12px] font-semibold" style={{ color: creamLight }}>
+            Nächster Termin
           </div>
+
           {vm.nextEvent ? (
-            <div className="relative flex flex-1 flex-col">
-              <div className="mt-5">
-                <div className="font-display text-4xl font-medium leading-none tracking-tight" style={{ color: creamLight }}>
+            <div className="relative mt-4 flex flex-1 flex-col">
+              {/* Datum & Zeit */}
+              <div className="flex items-baseline gap-2.5">
+                <span className="font-display text-4xl font-medium leading-none tracking-tight" style={{ color: creamLight }}>
                   {vm.nextEvent.dateNice}
-                </div>
-                <div className="mt-2 flex items-center gap-1.5 text-sm text-white/75">
-                  <span className="opacity-80">🕒</span>
-                  {vm.nextEvent.timeNice}
-                </div>
+                </span>
+                <span className="text-sm font-medium text-white/85">{vm.nextEvent.timeNice}</span>
               </div>
+              <div className="mt-1.5 text-[12px] capitalize text-white/55">{vm.nextEvent.weekday}</div>
+
               <div className="flex-1" />
-              <div className="mt-5 border-t border-white/10 pt-4">
-                {vm.nextEvent.attendees.length > 0 ? (
-                  <div className="flex items-center gap-2">
-                    <div className="flex -space-x-2">
-                      {vm.nextEvent.attendees.slice(0, 6).map((a, i) => (
-                        <Avatar key={i} name={a.full} size={26} ring="rgba(255,255,255,0.25)" />
-                      ))}
-                    </div>
-                    <span className="text-[12px] font-medium text-white/85">
-                      {vm.nextEvent.attendees.length} Zusage{vm.nextEvent.attendees.length === 1 ? '' : 'n'}
-                      {vm.nextEvent.guestCount > 0 ? ` · ${vm.nextEvent.guestCount} Gast${vm.nextEvent.guestCount === 1 ? '' : 'e'}` : ''}
-                    </span>
-                  </div>
-                ) : (
-                  <span className="text-[12px] text-white/60">Noch keine Zusagen</span>
-                )}
+
+              {/* Zu- & Absagen mit Mitglieder-Icons */}
+              <div className="mt-5 space-y-3">
+                <RsvpRow
+                  dotColor={pal.sage}
+                  label="Zusagen"
+                  people={vm.nextEvent.attendees}
+                  empty="Noch keine Zusagen"
+                />
+                <RsvpRow
+                  dotColor={pal.terra}
+                  label="Absagen"
+                  people={vm.nextEvent.decliners}
+                  empty="Keine Absagen"
+                />
               </div>
             </div>
           ) : (
@@ -447,6 +443,36 @@ export default function Dashboard() {
           </div>
         </Card>
       </div>
+    </div>
+  )
+}
+
+// Eine Zeile im Termin-Container: farbiger Punkt + Anzahl + Avatare der
+// Mitglieder, die zu- bzw. abgesagt haben. Ohne Antwort → dezenter Hinweis.
+function RsvpRow({ dotColor, label, people, empty }) {
+  const count = people.length
+  return (
+    <div className="flex items-center gap-3">
+      <div className="flex w-[92px] shrink-0 items-center gap-2">
+        <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: dotColor }} />
+        <span className="text-[12px] font-semibold text-white/85">
+          {count} {label}
+        </span>
+      </div>
+      {count > 0 ? (
+        <div className="flex flex-1 items-center">
+          <div className="flex -space-x-2">
+            {people.slice(0, 7).map((p, i) => (
+              <Avatar key={i} name={p.full} size={26} ring={pal.navySurface} />
+            ))}
+          </div>
+          {count > 7 && (
+            <span className="ml-2 text-[11px] font-medium text-white/60">+{count - 7}</span>
+          )}
+        </div>
+      ) : (
+        <span className="flex-1 text-[11px] text-white/40">{empty}</span>
+      )}
     </div>
   )
 }
