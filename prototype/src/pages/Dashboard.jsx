@@ -69,7 +69,13 @@ function buildMock() {
     name: currentUser.firstName,
     meName: currentUser.name,
     myDebt: { amount: me.debt, sub: null, iban: club.iban, due: 'Frist 21.06.' },
-    nextEvent: { id: next.id, dateNice: '25. Juli', timeNice: '16 Uhr' },
+    nextEvent: {
+      id: next.id,
+      dateNice: '25. Juli',
+      timeNice: '16 Uhr',
+      attendees: members.slice(0, 5).map((m) => ({ name: m.name.split(' ')[0], full: m.name })),
+      guestCount: 1,
+    },
     treasury: { balance: club.treasuryBalance, bilanz: mockBilanz },
     activity: activity.slice(0, 5).map((a) => ({ who: a.who, what: a.what, when: a.when, tag: a.tag, tone: a.tone })),
     pending: { sessionId: 's1', text: '09.05. · H. Meier · 12 Teilnehmer · Σ 14,80 €' },
@@ -121,6 +127,22 @@ export default function Dashboard() {
         const pendingSession = (sessions || []).find((s) => s.status === 'submitted')
         const openOf = (uid) => debts.find((d) => d.userId === uid)?.open ?? 0
 
+        // Zusagen zum nächsten Termin. Im opt_out-Modus gelten Nicht-Antwortende
+        // als zugesagt (analog listEvents), im opt_in-Modus nur echte „yes".
+        let attendees = []
+        if (ev) {
+          const byUser = new Map((ev.rsvps || []).map((r) => [r.user_id, r.status]))
+          const yesMembers =
+            ev.rsvp_mode === 'opt_out'
+              ? mem.filter((m) => {
+                  const st = byUser.get(m.userId)
+                  return st !== 'no' && st !== 'maybe'
+                })
+              : mem.filter((m) => byUser.get(m.userId) === 'yes')
+          attendees = yesMembers.map((m) => ({ name: m.name.split(' ')[0], full: m.name }))
+        }
+        const guestCount = ev ? (ev.guests || []).length : 0
+
         setVm({
           name: profile?.name?.split(' ')[0] || 'willkommen',
           meName: profile?.name || 'Ich',
@@ -144,6 +166,8 @@ export default function Dashboard() {
                 id: ev.id,
                 dateNice: start.toLocaleDateString('de-DE', { day: 'numeric', month: 'long' }),
                 timeNice: niceTime(start),
+                attendees,
+                guestCount,
               }
             : null,
           treasury: treasury ? { balance: treasury.balance, bilanz: bilanz || [] } : null,
@@ -162,7 +186,7 @@ export default function Dashboard() {
             : null,
           members: {
             count: mem.length,
-            list: mem.slice(0, 7).map((m) => ({ name: m.name.split(' ')[0], open: openOf(m.userId) })),
+            list: mem.map((m) => ({ name: m.name.split(' ')[0], open: openOf(m.userId) })),
           },
         })
       })
@@ -304,9 +328,22 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="flex-1" />
-              <div className="mt-5 flex items-center gap-2 border-t border-white/10 pt-4">
-                <Avatar name={vm.meName} size={26} ring="rgba(255,255,255,0.25)" />
-                <span className="text-[12px] font-medium text-white/85">{vm.name}</span>
+              <div className="mt-5 border-t border-white/10 pt-4">
+                {vm.nextEvent.attendees.length > 0 ? (
+                  <div className="flex items-center gap-2">
+                    <div className="flex -space-x-2">
+                      {vm.nextEvent.attendees.slice(0, 6).map((a, i) => (
+                        <Avatar key={i} name={a.full} size={26} ring="rgba(255,255,255,0.25)" />
+                      ))}
+                    </div>
+                    <span className="text-[12px] font-medium text-white/85">
+                      {vm.nextEvent.attendees.length} Zusage{vm.nextEvent.attendees.length === 1 ? '' : 'n'}
+                      {vm.nextEvent.guestCount > 0 ? ` · ${vm.nextEvent.guestCount} Gast${vm.nextEvent.guestCount === 1 ? '' : 'e'}` : ''}
+                    </span>
+                  </div>
+                ) : (
+                  <span className="text-[12px] text-white/60">Noch keine Zusagen</span>
+                )}
               </div>
             </div>
           ) : (
