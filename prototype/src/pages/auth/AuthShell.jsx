@@ -7,8 +7,8 @@ export default function AuthShell({ title, subtitle, children }) {
       {/* Schaufenster — nur Desktop */}
       <div className="relative hidden overflow-hidden p-10 lg:flex lg:flex-col lg:justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="grid h-9 w-9 place-items-center rounded-xl bg-ink font-bold text-bg">K</div>
-          <span className="font-display text-lg font-medium">Kegelkasse</span>
+          <img src="/pudl-icon.svg" alt="Pudl" width={36} height={36} className="h-9 w-9 rounded-xl" />
+          <span className="font-display text-lg font-medium">Pudl</span>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -28,8 +28,8 @@ export default function AuthShell({ title, subtitle, children }) {
       <div className="flex min-h-dvh flex-col justify-center px-5 py-10 sm:px-12">
         <div className="mx-auto w-full max-w-sm">
           <div className="mb-8 flex items-center gap-2.5 lg:hidden">
-            <div className="grid h-9 w-9 place-items-center rounded-xl bg-ink font-bold text-bg">K</div>
-            <span className="font-display text-lg font-medium">Kegelkasse</span>
+            <img src="/pudl-icon.svg" alt="Pudl" width={36} height={36} className="h-9 w-9 rounded-xl" />
+            <span className="font-display text-lg font-medium">Pudl</span>
           </div>
           <h1 className="font-display text-3xl font-medium tracking-tight">{title}</h1>
           {subtitle && <p className="mt-2 text-[14px] text-ink-soft">{subtitle}</p>}

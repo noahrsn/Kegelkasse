@@ -70,7 +70,7 @@ export default function Layout({ children }) {
           </button>
           <div className="flex items-center gap-2">
             <Logo />
-            <span className="font-display text-lg font-medium">Kegelkasse</span>
+            <span className="font-display text-lg font-medium">Pudl</span>
           </div>
           <div className="flex-1" />
           <Link to="/profile">
@@ -108,12 +108,13 @@ export default function Layout({ children }) {
 /* ── Bausteine ────────────────────────────────────────────────────────── */
 function Logo() {
   return (
-    <div
-      className="grid h-8 w-8 place-items-center rounded-[10px] bg-ink font-bold text-bg"
-      style={{ fontSize: 15 }}
-    >
-      K
-    </div>
+    <img
+      src="/pudl-icon.svg"
+      alt="Pudl"
+      width={32}
+      height={32}
+      className="h-8 w-8 rounded-[10px]"
+    />
   )
 }
 
@@ -122,7 +123,7 @@ function Brand() {
     <div className="flex items-center gap-2.5 px-1">
       <Logo />
       <div>
-        <div className="font-display text-[15px] font-medium tracking-tight">Kegelkasse</div>
+        <div className="font-display text-[15px] font-medium tracking-tight">Pudl</div>
         <div className="text-[10px] text-ink-dim">ruhig & übersichtlich</div>
       </div>
     </div>

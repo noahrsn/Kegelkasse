@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Pudl">
+  <defs>
+    
+  </defs>
+  <rect width="512" height="512" rx="115" fill="#2b3a55"></rect>
+  <text class="p" x="244" y="256" fill="#fbfaf6" font-size="340" text-anchor="middle" dominant-baseline="central">P</text>
+  <circle cx="426" cy="426" r="24" fill="#93a6cb"></circle>
+</svg>

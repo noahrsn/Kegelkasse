@@ -27,13 +27,13 @@ function layout(opts: { club?: string; heading: string; body: string; accent?: s
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${COLORS.bg};padding:28px 16px">
     <tr><td align="center">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:${COLORS.card};border-radius:20px;overflow:hidden;border:1px solid #e7e3d9">
-        <tr><td style="background:${accent};padding:18px 24px;color:#fff;font-size:13px;font-weight:600;letter-spacing:.04em">🎳 ${opts.club ?? "Kegelkasse"}</td></tr>
+        <tr><td style="background:${accent};padding:18px 24px;color:#fff;font-size:13px;font-weight:600;letter-spacing:.04em">🎳 ${opts.club ?? "Pudl"}</td></tr>
         <tr><td style="padding:26px 24px 8px">
           <h1 style="margin:0 0 12px;font-size:22px;font-weight:600;color:${COLORS.ink}">${opts.heading}</h1>
           <div style="font-size:15px;line-height:1.6;color:${COLORS.soft}">${opts.body}</div>
         </td></tr>
         <tr><td style="padding:4px 24px 26px"><table role="presentation" cellpadding="0" cellspacing="0">${cta}</table></td></tr>
-        <tr><td style="padding:16px 24px;border-top:1px solid #eee;color:#a8a69d;font-size:12px">Diese E-Mail kam von deiner Kegelkasse. Benachrichtigungen verwaltest du in deinem Profil.</td></tr>
+        <tr><td style="padding:16px 24px;border-top:1px solid #eee;color:#a8a69d;font-size:12px">Diese E-Mail kam von Pudl. Benachrichtigungen verwaltest du in deinem Profil.</td></tr>
       </table>
     </td></tr>
   </table></body></html>`;
