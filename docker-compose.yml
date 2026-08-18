@@ -1,0 +1,13 @@
+services:
+  web:
+    build:
+      context: .
+      args:
+        # Werden aus der .env im Repo-Root gelesen (siehe .env.example).
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+    container_name: kegelkasse-web
+    ports:
+      # 8081 statt 8080, damit es nie mit der Liminal-V-App kollidiert.
+      - "8081:80"
+    restart: unless-stopped

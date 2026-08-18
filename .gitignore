@@ -42,8 +42,7 @@ htmlcov/
 Thumbs.db
 desktop.ini
 
-# Docker
-*.dockerignore
+# Docker (Dockerfile/.dockerignore/compose gehören ins Repo)
 
 # Logs
 *.log

@@ -13,8 +13,10 @@ import {
   listActivity,
   listSessions,
   getImportStatus,
+  getPolls,
+  castVote,
 } from '../lib/api.js'
-import { activity, members, club, events, currentUser } from '../mock/data'
+import { activity, members, club, events, currentUser, polls as pollSeed } from '../mock/data'
 
 const ACTION_VERB = {
   session_approved: 'gab einen Kegelabend frei',
@@ -33,6 +35,36 @@ const ACTION_TONE = {
   debt_cancelled: 'amber',
   rsvp_response: 'navy',
   rsvp_late: 'terra',
+}
+
+/* Mock-Poll in die Form von get_polls bringen (analog Polls-Seite). */
+function normalizeMockPoll(p) {
+  return {
+    ...p,
+    max_choices: 1,
+    show_results: p.closed || p.voted,
+    my_options: [],
+    total: p.options.reduce((a, o) => a + o.votes, 0),
+  }
+}
+
+// Die eine Abstimmung, die aufs Dashboard gehört: nur laufende, bei denen ich
+// noch nicht abgestimmt habe — die mit der nächsten Frist zuerst. `keepId` hält
+// die gerade abgestimmte Karte noch für die Bestätigung sichtbar.
+function pickTopPoll(list, keepId) {
+  const todo = (list || []).filter(
+    (p) => !p.closed && (p.options?.length ?? 0) > 0 && (!p.voted || p.id === keepId),
+  )
+  if (todo.length === 0) return null
+  const sorted = [...todo].sort((a, b) => {
+    if (!!a.voted !== !!b.voted) return a.voted ? 1 : -1
+    const da = a.deadline ? new Date(a.deadline).getTime() : Infinity
+    const db = b.deadline ? new Date(b.deadline).getTime() : Infinity
+    if (da !== db) return da - db
+    return new Date(a.created_at || 0) - new Date(b.created_at || 0)
+  })
+  const openTodo = todo.filter((p) => !p.voted && p.id !== sorted[0].id).length
+  return { poll: sorted[0], moreCount: openTodo }
 }
 
 function relTime(iso) {
@@ -93,6 +125,48 @@ export default function Dashboard() {
   const canManage = role === 'admin' || role === 'kassenwart'
   const [vm, setVm] = useState(() => (mockMode ? buildMock() : null))
   const [importStatus, setImportStatus] = useState(null)
+  const [polls, setPolls] = useState(() => (mockMode ? pollSeed.map(normalizeMockPoll) : []))
+  const [justVotedId, setJustVotedId] = useState(null)
+
+  useEffect(() => {
+    if (mockMode || !activeGroupId) return
+    let alive = true
+    getPolls(activeGroupId)
+      .then((p) => alive && setPolls(p || []))
+      .catch((e) => console.error(e))
+    return () => {
+      alive = false
+    }
+  }, [mockMode, activeGroupId])
+
+  // Stimme direkt vom Dashboard aus abgeben; danach frisch nachladen.
+  const handleVote = async (pollId, optionIds) => {
+    setJustVotedId(pollId)
+    if (mockMode) {
+      setPolls((ps) =>
+        ps.map((p) =>
+          p.id === pollId
+            ? {
+                ...p,
+                voted: true,
+                show_results: true,
+                my_options: optionIds,
+                options: p.options.map((o) => {
+                  const was = (p.my_options || []).includes(o.id)
+                  const now = optionIds.includes(o.id)
+                  if (was === now) return o
+                  return { ...o, votes: (o.votes || 0) + (now ? 1 : -1) }
+                }),
+              }
+            : p,
+        ),
+      )
+      return
+    }
+    await castVote(pollId, optionIds)
+    const fresh = await getPolls(activeGroupId)
+    setPolls(fresh || [])
+  }
 
   useEffect(() => {
     if (mockMode || !activeGroupId || !canManage) {
@@ -209,6 +283,8 @@ export default function Dashboard() {
     )
   }
 
+  const topPoll = pickTopPoll(polls, justVotedId)
+
   const dateStr = new Date().toLocaleDateString('de-DE', {
     weekday: 'long',
     day: '2-digit',
@@ -259,6 +335,16 @@ export default function Dashboard() {
 
       {/* Bento-Grid */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {/* Offene Abstimmung — ganz oben, auf Desktop über die volle Zeile */}
+        {topPoll && (
+          <PollTile
+            poll={topPoll.poll}
+            moreCount={topPoll.moreCount}
+            onVote={handleVote}
+            className="sm:col-span-2 lg:col-span-3"
+          />
+        )}
+
         {/* Schulden → Mitglieder */}
         <Card
           tone={vm.myDebt.amount > 0 ? 'terra' : 'sage'}
@@ -444,6 +530,178 @@ export default function Dashboard() {
         </Card>
       </div>
     </div>
+  )
+}
+
+// Offene Abstimmung als oberste Dashboard-Kachel: direkt hier auswählen und
+// abgeben. Nach der Stimme bleibt die Karte kurz als Bestätigung stehen.
+function PollTile({ poll, moreCount = 0, onVote, className = '' }) {
+  const multi = poll.type === 'multiple_choice'
+  const maxPicks = multi ? poll.max_choices || 1 : 1
+  const [picks, setPicks] = useState([])
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    setPicks([])
+    setError(null)
+  }, [poll.id])
+
+  const toggle = (optId) => {
+    setPicks((cur) => {
+      if (!multi) return [optId]
+      if (cur.includes(optId)) return cur.filter((x) => x !== optId)
+      if (cur.length >= maxPicks) return cur
+      return [...cur, optId]
+    })
+  }
+
+  const submit = async () => {
+    if (!picks.length || busy) return
+    setBusy(true)
+    setError(null)
+    try {
+      await onVote(poll.id, picks)
+    } catch (e) {
+      console.error(e)
+      setError(e.message || 'Abstimmen fehlgeschlagen.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const total = poll.total != null ? poll.total : null
+  const leader = poll.options.reduce((a, o) => Math.max(a, o.votes || 0), 0)
+
+  return (
+    <Card className={cx('flex flex-col animate-rise', className)}>
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:gap-8">
+        {/* Kopf */}
+        <div className="min-w-0 lg:w-[34%] lg:shrink-0">
+          <div className="flex items-center gap-2">
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-bg text-[15px]">🗳️</span>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-dim">
+              {poll.voted ? 'Abstimmung · erledigt' : 'Deine Stimme fehlt'}
+            </span>
+          </div>
+          <h2 className="mt-2.5 font-display text-2xl font-medium leading-tight tracking-tight">
+            {poll.title}
+          </h2>
+          {poll.description && (
+            <p className="mt-1.5 text-[12px] leading-snug text-ink-soft">{poll.description}</p>
+          )}
+          <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+            {poll.anonymous && <Badge tone="navy">Anonym</Badge>}
+            {multi && <Badge>bis zu {maxPicks} Optionen</Badge>}
+            {poll.deadline && (
+              <Badge tone="amber">bis {new Date(poll.deadline).toLocaleDateString('de-DE')}</Badge>
+            )}
+          </div>
+        </div>
+
+        {/* Optionen bzw. Bestätigung */}
+        <div className="min-w-0 flex-1">
+          {poll.voted ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 rounded-2xl bg-sage-bg px-3.5 py-3">
+                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-sage text-[12px] text-white">
+                  ✓
+                </span>
+                <span className="text-[13px] font-semibold" style={{ color: pal.sage }}>
+                  Stimme gespeichert
+                </span>
+              </div>
+              {poll.show_results ? (
+                <div className="space-y-2.5">
+                  {poll.options.map((o) => {
+                    const v = o.votes || 0
+                    const pct = total ? Math.round((v / total) * 100) : 0
+                    const win = v === leader && v > 0
+                    const mine = (poll.my_options || []).includes(o.id)
+                    return (
+                      <div key={o.id}>
+                        <div className="mb-1 flex items-center justify-between gap-3 text-[13px]">
+                          <span className="truncate font-medium">
+                            {o.label}
+                            {mine && <span className="text-sage"> · deine Stimme</span>}
+                          </span>
+                          <span className="shrink-0 font-mono tnum text-ink-soft">
+                            {v} · {pct}%
+                          </span>
+                        </div>
+                        <div className="h-2.5 overflow-hidden rounded-full bg-ink/10">
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{ width: `${pct}%`, background: win ? pal.sage : pal.navy }}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <p className="rounded-xl bg-bg p-3 text-center text-[12px] text-ink-dim">
+                  Ergebnisse sind erst nach Abschluss der Abstimmung sichtbar.
+                </p>
+              )}
+            </div>
+          ) : (
+            <>
+              {error && (
+                <div className="mb-3 rounded-xl bg-terra-bg px-3 py-2 text-[12px] text-terra">{error}</div>
+              )}
+              <div className="grid gap-2 sm:grid-cols-2">
+                {poll.options.map((o) => {
+                  const active = picks.includes(o.id)
+                  return (
+                    <button
+                      key={o.id}
+                      onClick={() => toggle(o.id)}
+                      className={cx(
+                        'flex w-full items-center gap-3 rounded-2xl border p-3.5 text-left transition',
+                        active ? 'border-sage bg-sage-bg' : 'border-card-edge hover:border-ink/20',
+                      )}
+                    >
+                      <span
+                        className={cx(
+                          'grid h-5 w-5 shrink-0 place-items-center border-2 text-[11px]',
+                          multi ? 'rounded-md' : 'rounded-full',
+                          active ? 'border-sage bg-sage text-white' : 'border-card-edge',
+                        )}
+                      >
+                        {active && '✓'}
+                      </span>
+                      <span className="min-w-0 text-[14px] font-medium">{o.label}</span>
+                    </button>
+                  )
+                })}
+              </div>
+
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                <Link to="/polls" className="text-[11px] text-ink-dim hover:text-ink">
+                  {moreCount > 0 ? `${moreCount} weitere offen · alle ansehen →` : 'Alle Abstimmungen →'}
+                </Link>
+                <Button
+                  className="w-full sm:w-auto"
+                  disabled={!picks.length || busy}
+                  onClick={submit}
+                >
+                  {busy ? 'Speichert…' : 'Stimme abgeben'}
+                </Button>
+              </div>
+            </>
+          )}
+
+          {poll.voted && (
+            <div className="mt-4 text-right">
+              <Link to="/polls" className="text-[11px] text-ink-dim hover:text-ink">
+                {moreCount > 0 ? `${moreCount} weitere offen →` : 'Alle Abstimmungen →'}
+              </Link>
+            </div>
+          )}
+        </div>
+      </div>
+    </Card>
   )
 }
 

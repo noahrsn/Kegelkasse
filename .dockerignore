@@ -1,0 +1,33 @@
+# Build-Kontext klein halten: nur prototype/ (ohne node_modules) wird gebraucht.
+.git
+.github
+.idea
+.claude
+.vscode
+
+# Secrets — Werte kommen ausschließlich über Build-Args
+.env
+.env.*
+!.env.example
+
+# Abhängigkeiten/Artefakte werden im Image selbst erzeugt
+node_modules
+prototype/node_modules
+prototype/dist
+dist
+
+# Backend & Doku gehören nicht ins Frontend-Image
+supabase/
+docs/
+design_system/
+.venv
+venv
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.log
+*.CSV
+PROJEKTPLAN.md
+DEPLOY.md
+render.yaml
