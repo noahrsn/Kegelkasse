@@ -19,6 +19,14 @@ const primary = [
   { to: '/calendar', label: 'Termine', icon: CalendarIcon },
 ]
 
+/* Mobile Bottom-Bar: statt „Kasse" führt „Mitglieder" (im Alltag häufiger gebraucht) */
+const bottom = [
+  { to: '/dashboard', label: 'Dashboard', icon: HomeIcon },
+  { to: '/sessions', label: 'Kegelabende', icon: PinIcon },
+  { to: '/members', label: 'Mitglieder', icon: UsersIcon },
+  { to: '/calendar', label: 'Termine', icon: CalendarIcon },
+]
+
 /* Vollständiges Menü (Mobile-Drawer + Desktop-User-Menü) */
 const more = [
   { to: '/members', label: 'Mitglieder', icon: UsersIcon },
@@ -85,7 +93,7 @@ export default function Layout({ children }) {
         {/* Mobile Bottom-Nav */}
         <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-card-edge/70 bg-card/95 backdrop-blur lg:hidden pb-[env(safe-area-inset-bottom)]">
           <div className="flex items-stretch justify-around px-2">
-            {primary.map((it) => (
+            {bottom.map((it) => (
               <BottomLink key={it.to} {...it} />
             ))}
             <button

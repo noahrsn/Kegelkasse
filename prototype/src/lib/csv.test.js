@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { parseAmount, parseDate, normIban, nameSimilarity, bestNameMatch, parseSparkasseCsv } from './csv.js'
+import {
+  parseAmount,
+  parseDate,
+  normIban,
+  nameSimilarity,
+  bestNameMatch,
+  parseSparkasseCsv,
+  cleanDescription,
+} from './csv.js'
 import { recurrenceFromPreset } from './api.js'
 
 describe('parseAmount (Sparkasse-Beträge)', () => {
@@ -127,5 +135,24 @@ describe('recurrenceFromPreset (Wiederholungsmuster)', () => {
       recurrence_weekday: 6,
       recurrence_nth: 4,
     })
+  })
+})
+
+describe('cleanDescription (Bank-Buchungstext ausblenden)', () => {
+  it('entfernt den Buchungstext vor dem Verwendungszweck', () => {
+    expect(cleanDescription('ECHTZEIT-GUTSCHRIFT · Mitgliedsbeitrag Juni')).toBe('Mitgliedsbeitrag Juni')
+    expect(cleanDescription('UEBERTRAG (UEBERWEISUNG) · Bahnmiete')).toBe('Bahnmiete')
+    expect(cleanDescription('FOLGELASTSCHRIFT · Versicherung')).toBe('Versicherung')
+  })
+
+  it('lässt echte Verwendungszwecke unangetastet', () => {
+    expect(cleanDescription('UEBERWEISUNG MITGLIEDSBEITRAG')).toBe('UEBERWEISUNG MITGLIEDSBEITRAG')
+    expect(cleanDescription('Bahnmiete Mai')).toBe('Bahnmiete Mai')
+  })
+
+  it('liefert leer, wenn nur Bankfloskeln übrig bleiben', () => {
+    expect(cleanDescription('ECHTZEIT-GUTSCHRIFT')).toBe('')
+    expect(cleanDescription('')).toBe('')
+    expect(cleanDescription(null)).toBe('')
   })
 })

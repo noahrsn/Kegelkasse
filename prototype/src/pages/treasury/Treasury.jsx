@@ -4,17 +4,19 @@ import { Card, Button, Badge, PageTitle, Avatar, Tabs, Empty } from '../../compo
 import { eur, pal, cx } from '../../design/calm'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { getTreasury, listTransactions } from '../../lib/api.js'
+import { cleanDescription } from '../../lib/csv.js'
 import { club, transactions as mockTx } from '../../mock/data'
 
+// `short` wird auf schmalen Screens statt `label` angezeigt.
 const CAT = {
-  member_payment: { label: 'Mitgliedszahlung', tone: 'sage' },
-  event_expense: { label: 'Event-Ausgabe', tone: 'terra' },
-  equipment_expense: { label: 'Ausrüstung', tone: 'terra' },
-  lane_expense: { label: 'Kegelabend', tone: 'terra' },
-  lane_income: { label: 'Kegelabend', tone: 'terra' }, // Altbestand (früher als Einnahme verbucht)
-  guest_income: { label: 'Gastkegler', tone: 'sage' },
-  other_income: { label: 'Sonst. Einnahme', tone: 'sage' },
-  other_expense: { label: 'Sonst. Ausgabe', tone: 'terra' },
+  member_payment: { label: 'Mitgliedszahlung', short: 'Mitglied', tone: 'sage' },
+  event_expense: { label: 'Event-Ausgabe', short: 'Event', tone: 'terra' },
+  equipment_expense: { label: 'Ausrüstung', short: 'Ausrüst.', tone: 'terra' },
+  lane_expense: { label: 'Kegelabend', short: 'Kegeln', tone: 'terra' },
+  lane_income: { label: 'Kegelabend', short: 'Kegeln', tone: 'terra' }, // Altbestand (früher als Einnahme verbucht)
+  guest_income: { label: 'Gastkegler', short: 'Gast', tone: 'sage' },
+  other_income: { label: 'Sonst. Einnahme', short: 'Sonst.', tone: 'sage' },
+  other_expense: { label: 'Sonst. Ausgabe', short: 'Sonst.', tone: 'terra' },
 }
 
 function sameMonth(dateStr) {
@@ -90,28 +92,24 @@ export default function Treasury() {
       {/* Saldo-Karte */}
       <Card className="overflow-hidden">
         <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
+          <div className="min-w-0">
             <div className="text-[12px] font-semibold text-ink-soft">Aktueller Kassenstand</div>
-            <div className="mt-1 font-display text-5xl font-medium tracking-tight tnum sm:text-6xl">
-              {eur(summary?.balance ?? 0)} <span className="text-3xl font-normal text-ink-dim">€</span>
+            {/* Mobil bewusst kleiner — vierstellige Beträge sprengen sonst die Karte. */}
+            <div className="mt-1 font-display text-[2rem] font-medium leading-tight tracking-tight tnum sm:text-5xl lg:text-6xl">
+              {eur(summary?.balance ?? 0)}{' '}
+              <span className="text-xl font-normal text-ink-dim sm:text-3xl">€</span>
             </div>
-            {summary && (
-              <div className="mt-1 text-[12px] text-ink-dim">
-                Eröffnungssaldo {eur(summary.opening_balance)} €
-                {summary.opening_date
-                  ? ` · seit ${new Date(summary.opening_date).toLocaleDateString('de-DE')}`
-                  : ''}
-              </div>
-            )}
           </div>
-          <div className="flex gap-3">
-            <div className="rounded-2xl bg-sage-bg px-4 py-3">
+          <div className="flex w-full gap-2 sm:w-auto sm:gap-3">
+            <div className="min-w-0 flex-1 rounded-2xl bg-sage-bg px-3 py-2.5 sm:flex-none sm:px-4 sm:py-3">
               <div className="text-[10px] uppercase text-sage">Ein · 30 Tage</div>
-              <div className="font-mono text-lg font-semibold text-sage">+ {eur(summary?.income_30d ?? 0)} €</div>
+              <div className="font-mono text-base font-semibold text-sage sm:text-lg">
+                + {eur(summary?.income_30d ?? 0)} €
+              </div>
             </div>
-            <div className="rounded-2xl bg-terra-bg px-4 py-3">
+            <div className="min-w-0 flex-1 rounded-2xl bg-terra-bg px-3 py-2.5 sm:flex-none sm:px-4 sm:py-3">
               <div className="text-[10px] uppercase text-terra">Aus · 30 Tage</div>
-              <div className="font-mono text-lg font-semibold text-terra">
+              <div className="font-mono text-base font-semibold text-terra sm:text-lg">
                 − {eur(Math.abs(summary?.expense_30d ?? 0))} €
               </div>
             </div>
@@ -164,25 +162,40 @@ export default function Treasury() {
           <Card className="p-0">
             {shown.map((t, i) => {
               const cat = CAT[t.category] ?? { label: t.category, tone: 'neutral' }
+              // Bank-Buchungstext („ECHTZEIT-GUTSCHRIFT" …) fliegt raus, Name steht vorn.
+              const desc = cleanDescription(t.description)
               return (
                 <div
                   key={t.id}
-                  className={cx('flex items-center gap-3 p-4', i < shown.length - 1 && 'border-b border-card-edge')}
+                  className={cx(
+                    'flex items-center gap-2.5 p-3 sm:gap-3 sm:p-4',
+                    i < shown.length - 1 && 'border-b border-card-edge',
+                  )}
                 >
                   <span
                     className={cx(
-                      'grid h-10 w-10 place-items-center rounded-full text-base',
+                      'grid h-9 w-9 shrink-0 place-items-center rounded-full text-base sm:h-10 sm:w-10',
                       t.amount > 0 ? 'bg-sage-bg text-sage' : 'bg-terra-bg text-terra',
                     )}
                   >
                     {t.amount > 0 ? '↓' : '↑'}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-[14px] font-medium">{t.description || cat.label}</div>
+                    <div className="truncate text-[14px]">
+                      {t.member && <span className="font-medium">{t.member}</span>}
+                      {t.member && desc && <span className="text-ink-dim"> · </span>}
+                      {desc ? (
+                        <span className={cx(t.member ? 'text-ink-soft' : 'font-medium')}>{desc}</span>
+                      ) : (
+                        !t.member && <span className="font-medium">{cat.label}</span>
+                      )}
+                    </div>
                     <div className="mt-0.5 flex items-center gap-2 text-[11px] text-ink-dim">
-                      <span>{new Date(t.date).toLocaleDateString('de-DE')}</span>
-                      <Badge tone={cat.tone}>{cat.label}</Badge>
-                      {t.source === 'csv' && <span className="text-ink-dim">CSV</span>}
+                      <span className="shrink-0">{new Date(t.date).toLocaleDateString('de-DE')}</span>
+                      <Badge tone={cat.tone} className="shrink-0">
+                        <span className="sm:hidden">{cat.short || cat.label}</span>
+                        <span className="hidden sm:inline">{cat.label}</span>
+                      </Badge>
                     </div>
                   </div>
                   {t.member && (
@@ -190,7 +203,12 @@ export default function Treasury() {
                       <Avatar name={t.member} size={26} />
                     </div>
                   )}
-                  <span className={cx('font-mono font-semibold tnum', t.amount > 0 ? 'text-sage' : 'text-terra')}>
+                  <span
+                    className={cx(
+                      'shrink-0 whitespace-nowrap font-mono text-[13px] font-semibold tnum sm:text-[14px]',
+                      t.amount > 0 ? 'text-sage' : 'text-terra',
+                    )}
+                  >
                     {t.amount > 0 ? '+' : '−'} {eur(Math.abs(t.amount))} €
                   </span>
                 </div>

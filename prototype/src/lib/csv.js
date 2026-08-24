@@ -142,6 +142,32 @@ export function bestNameMatch(csvName, members, threshold = 0.6) {
   return null
 }
 
+/* ── Buchungstext entrauschen ────────────────────────────────────────────────
+ * Die Sparkasse liefert vor dem Verwendungszweck einen Buchungstext
+ * („ECHTZEIT-GUTSCHRIFT", „UEBERTRAG (UEBERWEISUNG)"). Der sagt niemandem
+ * etwas — er fliegt raus, sobald ein Segment ausschließlich aus solchen
+ * Bankfloskeln besteht. Segmente mit echtem Inhalt bleiben unangetastet.
+ * ──────────────────────────────────────────────────────────────────────────── */
+const NOISE_WORDS = new Set([
+  'echtzeit', 'gutschrift', 'gutschr', 'uebertrag', 'übertrag', 'ueberweisung', 'überweisung',
+  'lastschrift', 'folgelastschrift', 'basislastschrift', 'dauerauftrag', 'kartenzahlung',
+  'entgeltabschluss', 'abschluss', 'buchung', 'sepa', 'onlinebanking', 'online', 'banking',
+])
+
+function isNoiseSegment(seg) {
+  const words = seg.toLowerCase().split(/[^a-zäöüß]+/).filter(Boolean)
+  return words.length > 0 && words.every((w) => NOISE_WORDS.has(w))
+}
+
+/* Beschreibung fürs UI säubern (auch für Altbestand in der DB). */
+export function cleanDescription(desc) {
+  return (desc || '')
+    .split(' · ')
+    .map((s) => s.trim())
+    .filter((s) => s && !isNoiseSegment(s))
+    .join(' · ')
+}
+
 async function sha256Hex(str) {
   const bytes = new TextEncoder().encode(str)
   const digest = await crypto.subtle.digest('SHA-256', bytes)
@@ -204,7 +230,7 @@ export async function parseSparkasseCsv(file) {
       amount,
       name: f[ci.name] || '',
       iban: normIban(f[ci.iban]),
-      description: [text, purpose].filter(Boolean).join(' · ').slice(0, 200) || 'Buchung',
+      description: cleanDescription([text, purpose].filter(Boolean).join(' · ')).slice(0, 200) || 'Buchung',
     })
   }
   if (rows.length === 0) return { rows: [], error: 'Keine gültigen Buchungszeilen erkannt.' }

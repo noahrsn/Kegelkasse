@@ -25,6 +25,22 @@ export const RSVP = {
 
 const TYPE_LABEL = { single: 'Einzeltermin', recurring: 'Regeltermin', multi_day: 'Mehrtägig' }
 
+/* Absagefrist als Restzeit „TT:HH:MM". Minutengenau reicht — die Anzeige wird
+ * beim Laden der Seite berechnet und tickt bewusst nicht mit. */
+function deadlineCountdown(start, deadlineH) {
+  if (!start || deadlineH == null) return null
+  const deadline = new Date(start).getTime() - Number(deadlineH) * 3600_000
+  const left = deadline - Date.now()
+  if (!Number.isFinite(left)) return null
+  if (left <= 0) return { expired: true }
+  const mins = Math.floor(left / 60_000)
+  const pad = (n) => String(n).padStart(2, '0')
+  return {
+    expired: false,
+    text: `${pad(Math.floor(mins / 1440))}:${pad(Math.floor((mins % 1440) / 60))}:${pad(mins % 60)}`,
+  }
+}
+
 export default function CalendarEvent() {
   const { id } = useParams()
   const { mockMode } = useAuth()
@@ -82,6 +98,7 @@ function EventView({
 
   const d = new Date(vm.start)
   const timeStr = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+  const countdown = deadlineCountdown(vm.start, vm.deadlineH)
 
   return (
     <div className="space-y-5 pb-4">
@@ -138,10 +155,13 @@ function EventView({
         <div className="flex flex-wrap gap-x-6 gap-y-1 text-[13px] text-white/80">
           <span>🕢 {timeStr} Uhr</span>
           {vm.location && <span>📍 {vm.location}</span>}
-          <span>⏳ Frist: {vm.deadlineH} h vorher</span>
-          <span>
-            {vm.rsvpMode === 'opt_out' ? '✅ Opt-out (Standard: zugesagt)' : '✋ Opt-in (aktiv zusagen)'}
-          </span>
+          {countdown && (
+            <span>
+              {countdown.expired
+                ? '⏳ Absagefrist abgelaufen'
+                : `⏳ Noch ${countdown.text} zum Absagen`}
+            </span>
+          )}
         </div>
         {vm.description && <p className="text-[13px] leading-relaxed text-white/75">{vm.description}</p>}
       </Card>
@@ -179,7 +199,7 @@ function EventView({
             <strong>Deine Notiz:</strong> {note}
           </div>
         )}
-        <div className="mt-3 flex items-center justify-between">
+        <div className="mt-3">
           <button
             onClick={() => {
               setDraftNote(note)
@@ -189,9 +209,6 @@ function EventView({
           >
             {note ? 'Notiz bearbeiten' : '+ Notiz hinzufügen'}
           </button>
-          {noteRequired && (
-            <span className="text-[11px] text-ink-dim">Notiz bei Vielleicht & Absage Pflicht</span>
-          )}
         </div>
       </Card>
 
@@ -203,12 +220,7 @@ function EventView({
             + Eigenen Gast
           </button>
         </div>
-        {allGuests.length === 0 ? (
-          <p className="mt-2 text-[12px] text-ink-dim">
-            Noch keine Gäste. Jedes Mitglied kann eigene Gastkegler mitbringen — sie werden beim Start
-            des Kegelabends übernommen.
-          </p>
-        ) : (
+        {allGuests.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">
             {allGuests.map((g, i) => (
               <div key={g.id || i} className="flex items-center gap-2 rounded-full bg-cream px-3 py-1.5">
