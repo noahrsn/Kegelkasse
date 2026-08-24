@@ -19,10 +19,15 @@ export function useSession() {
   useEffect(() => {
     if (!supabase) return
 
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session)
-      setLoading(false)
-    })
+    supabase.auth
+      .getSession()
+      .then(({ data }) => setSession(data.session))
+      .catch((err) => {
+        // Nie hängen bleiben: lieber „keine Session“ als ein Dauer-Spinner.
+        console.error('[auth] getSession fehlgeschlagen:', err)
+        setSession(null)
+      })
+      .finally(() => setLoading(false))
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s)

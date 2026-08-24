@@ -2,13 +2,41 @@
 // Echtmodus (Supabase konfiguriert): Session, Profil, Mitgliedschaften, aktive
 // Gruppe + Rolle kommen aus Supabase. Mock-Modus (keine .env): Werte aus den
 // Mock-Daten, damit der Prototyp ohne Backend sofort browsebar bleibt.
-import { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { supabase, hasSupabase } from '../lib/supabase.js'
 import { currentUser, clubs as mockClubs } from '../mock/data.js'
 
 const AuthContext = createContext(null)
 
 const ACTIVE_KEY = 'kk.activeGroupId'
+
+// Obergrenze für den Start-Handshake. fetch() kennt im Browser kein Timeout —
+// ohne diese Grenze bleibt die App bei einem hängenden Request ewig im Spinner.
+const BOOTSTRAP_TIMEOUT_MS = 8000
+
+class AuthTimeoutError extends Error {
+  constructor() {
+    super('Zeitüberschreitung beim Verbinden mit dem Server.')
+    this.name = 'AuthTimeoutError'
+  }
+}
+
+/** Verliert die Geduld, wenn `promise` nicht rechtzeitig auflöst. */
+function withTimeout(promise, ms = BOOTSTRAP_TIMEOUT_MS) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new AuthTimeoutError()), ms)
+    promise.then(
+      (value) => {
+        clearTimeout(timer)
+        resolve(value)
+      },
+      (err) => {
+        clearTimeout(timer)
+        reject(err)
+      },
+    )
+  })
+}
 
 /* ── Mock-Fallback (Prototyp ohne Supabase) ───────────────────────────── */
 const mockMemberships = mockClubs.map((c) => ({
@@ -20,6 +48,7 @@ const mockMemberships = mockClubs.map((c) => ({
 const mockValue = {
   mockMode: true,
   loading: false,
+  authError: null,
   session: { mock: true },
   user: { id: currentUser.id, email: currentUser.email },
   profile: {
@@ -51,6 +80,7 @@ function MockProvider({ children }) {
     setActiveGroup: setActive,
     signOut: async () => {},
     refresh: async () => {},
+    retryAuth: async () => {},
     createGroup: async () => null,
     joinGroup: async () => null,
   }
@@ -65,20 +95,46 @@ function SupabaseProvider({ children }) {
     () => localStorage.getItem(ACTIVE_KEY) || null,
   )
   const [loading, setLoading] = useState(true)
+  const [authError, setAuthError] = useState(null)
+
+  // Laufende Nummer je loadUserData-Aufruf: ein älterer Lauf, der später
+  // zurückkommt, darf das Ergebnis eines neueren nicht überschreiben.
+  const loadSeq = useRef(0)
+  // User-ID, deren Stammdaten zuletzt erfolgreich geladen wurden. Damit lösen
+  // reine Token-Refreshs (gleiche ID) kein überflüssiges Nachladen aus.
+  const loadedUid = useRef(undefined)
 
   const user = session?.user ?? null
 
   // Profil + Mitgliedschaften für den eingeloggten User laden.
   const loadUserData = useCallback(async (uid) => {
+    const seq = ++loadSeq.current
+    const stale = () => seq !== loadSeq.current
+
     if (!uid) {
-      setProfile(null)
-      setMemberships([])
-      return
+      if (!stale()) {
+        setProfile(null)
+        setMemberships([])
+        loadedUid.current = null
+      }
+      return []
     }
-    const [{ data: prof }, { data: mems }] = await Promise.all([
+
+    const [{ data: prof, error: profErr }, { data: mems, error: memErr }] = await Promise.all([
       supabase.from('profiles').select('id, first_name, last_name').eq('id', uid).maybeSingle(),
       supabase.from('group_members').select('role, groups(id, name)').eq('user_id', uid),
     ])
+
+    // Fehler nicht schlucken: sonst landet ein eingeloggter User mit leeren
+    // Mitgliedschaften im Onboarding, obwohl nur der Request schiefging.
+    if (profErr) throw profErr
+    if (memErr) throw memErr
+
+    const list = (mems ?? [])
+      .filter((m) => m.groups)
+      .map((m) => ({ id: m.groups.id, name: m.groups.name, role: m.role }))
+
+    if (stale()) return list
 
     if (prof) {
       setProfile({
@@ -89,11 +145,8 @@ function SupabaseProvider({ children }) {
         email: undefined,
       })
     }
-
-    const list = (mems ?? [])
-      .filter((m) => m.groups)
-      .map((m) => ({ id: m.groups.id, name: m.groups.name, role: m.role }))
     setMemberships(list)
+    loadedUid.current = uid
     return list
   }, [])
 
@@ -109,35 +162,70 @@ function SupabaseProvider({ children }) {
     if (activeGroupId) localStorage.setItem(ACTIVE_KEY, activeGroupId)
   }, [activeGroupId])
 
-  // Session beobachten.
-  useEffect(() => {
-    let mounted = true
-    supabase.auth.getSession().then(async ({ data }) => {
-      if (!mounted) return
+  // Start-Handshake. Einziger Ort, an dem `loading` endet — und zwar im
+  // finally, damit ein Fehler oder Timeout nie im Endlos-Spinner endet.
+  const bootstrap = useCallback(async () => {
+    setLoading(true)
+    setAuthError(null)
+    try {
+      const { data, error } = await withTimeout(supabase.auth.getSession())
+      if (error) throw error
       setSession(data.session)
-      await loadUserData(data.session?.user?.id)
+      await withTimeout(loadUserData(data.session?.user?.id))
+    } catch (err) {
+      console.error('[auth] Start fehlgeschlagen:', err)
+      setAuthError(err)
+    } finally {
       setLoading(false)
-    })
-
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, s) => {
-      setSession(s)
-      await loadUserData(s?.user?.id)
-    })
-    return () => {
-      mounted = false
-      sub.subscription.unsubscribe()
     }
   }, [loadUserData])
 
-  const refresh = useCallback(() => loadUserData(user?.id), [loadUserData, user])
+  // Session beobachten.
+  useEffect(() => {
+    bootstrap()
+
+    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
+      // INITIAL_SESSION liefert die (womöglich abgelaufene) Session aus dem
+      // Storage — dafür ist bootstrap() zuständig. Hier würde sie nur Requests
+      // mit totem JWT auslösen (401) und dem Bootstrap ins Ergebnis grätschen.
+      if (event === 'INITIAL_SESSION') return
+
+      setSession(s)
+
+      const uid = s?.user?.id ?? null
+      // Token-Refresh ohne User-Wechsel: Stammdaten sind unverändert.
+      if (uid === loadedUid.current && event !== 'USER_UPDATED') return
+
+      // Callback synchron halten: Supabase rät davon ab, im Handler auf weitere
+      // Supabase-Aufrufe zu warten (kollidiert mit der Auth-Initialisierung).
+      setTimeout(() => {
+        loadUserData(uid).catch((err) => {
+          console.error('[auth] Nachladen nach', event, 'fehlgeschlagen:', err)
+        })
+      }, 0)
+    })
+
+    return () => sub.subscription.unsubscribe()
+  }, [bootstrap, loadUserData])
+
+  // Nachladen auf Zuruf (z. B. nach Änderungen in den Einstellungen). Bewusst
+  // fehlertolerant: die Aufrufer behandeln das Ergebnis als Bonus, nicht als
+  // Voraussetzung.
+  const refresh = useCallback(
+    () =>
+      loadUserData(user?.id).catch((err) => {
+        console.error('[auth] Aktualisieren fehlgeschlagen:', err)
+        return []
+      }),
+    [loadUserData, user],
+  )
 
   const createGroup = useCallback(
     async (name) => {
       const { data, error } = await supabase.rpc('create_group', { p_name: name })
       if (error) throw error
-      const list = await loadUserData(user?.id)
+      await loadUserData(user?.id)
       setActiveGroupId(data)
-      void list
       return data
     },
     [loadUserData, user],
@@ -160,9 +248,12 @@ function SupabaseProvider({ children }) {
   const signOut = useCallback(async () => {
     await supabase.auth.signOut()
     localStorage.removeItem(ACTIVE_KEY)
+    loadSeq.current += 1 // laufende Ladevorgänge entwerten
+    loadedUid.current = null
     setMemberships([])
     setProfile(null)
     setActiveGroupId(null)
+    setAuthError(null)
   }, [])
 
   const activeGroup = memberships.find((m) => m.id === activeGroupId) ?? null
@@ -170,6 +261,7 @@ function SupabaseProvider({ children }) {
   const value = {
     mockMode: false,
     loading,
+    authError,
     session,
     user,
     profile: profile ?? (user ? { id: user.id, name: user.email, email: user.email } : null),
@@ -180,6 +272,7 @@ function SupabaseProvider({ children }) {
     setActiveGroup: setActiveGroupId,
     signOut,
     refresh,
+    retryAuth: bootstrap,
     createGroup,
     joinGroup,
   }
