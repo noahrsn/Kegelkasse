@@ -145,6 +145,13 @@ describe('cleanDescription (Bank-Buchungstext ausblenden)', () => {
     expect(cleanDescription('FOLGELASTSCHRIFT · Versicherung')).toBe('Versicherung')
   })
 
+  it('erkennt auch die abgekürzten Sparkassen-Formen', () => {
+    expect(cleanDescription('GUTSCHR. UEBERW. DAUERAUFTR · Monatsbeitrag')).toBe('Monatsbeitrag')
+    expect(cleanDescription('GUTSCHR. UEBERWEISUNG · Kegeln')).toBe('Kegeln')
+    expect(cleanDescription('ECHTZEIT-UEBERWEISUNG · Kegeln Juni 2026')).toBe('Kegeln Juni 2026')
+    expect(cleanDescription('ABSCHLUSS · Abrechnung 30.06.2026')).toBe('Abrechnung 30.06.2026')
+  })
+
   it('lässt echte Verwendungszwecke unangetastet', () => {
     expect(cleanDescription('UEBERWEISUNG MITGLIEDSBEITRAG')).toBe('UEBERWEISUNG MITGLIEDSBEITRAG')
     expect(cleanDescription('Bahnmiete Mai')).toBe('Bahnmiete Mai')

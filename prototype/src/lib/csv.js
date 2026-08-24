@@ -148,15 +148,17 @@ export function bestNameMatch(csvName, members, threshold = 0.6) {
  * etwas — er fliegt raus, sobald ein Segment ausschließlich aus solchen
  * Bankfloskeln besteht. Segmente mit echtem Inhalt bleiben unangetastet.
  * ──────────────────────────────────────────────────────────────────────────── */
-const NOISE_WORDS = new Set([
-  'echtzeit', 'gutschrift', 'gutschr', 'uebertrag', 'übertrag', 'ueberweisung', 'überweisung',
-  'lastschrift', 'folgelastschrift', 'basislastschrift', 'dauerauftrag', 'kartenzahlung',
-  'entgeltabschluss', 'abschluss', 'buchung', 'sepa', 'onlinebanking', 'online', 'banking',
-])
+// Wortstämme statt ganzer Wörter: die Sparkasse kürzt munter ab
+// („UEBERW.", „DAUERAUFTR", „GUTSCHR.") und die Endungen sind nicht vorhersagbar.
+const NOISE_STEMS = [
+  'echtzeit', 'gutschr', 'ueberw', 'überw', 'uebertr', 'übertr',
+  'lastschr', 'folgelastschr', 'basislastschr', 'dauerauftr', 'kartenzahl',
+  'entgeltabschl', 'abschl', 'buchung', 'sepa', 'onlinebanking', 'online', 'banking',
+]
 
 function isNoiseSegment(seg) {
   const words = seg.toLowerCase().split(/[^a-zäöüß]+/).filter(Boolean)
-  return words.length > 0 && words.every((w) => NOISE_WORDS.has(w))
+  return words.length > 0 && words.every((w) => NOISE_STEMS.some((stem) => w.startsWith(stem)))
 }
 
 /* Beschreibung fürs UI säubern (auch für Altbestand in der DB). */
