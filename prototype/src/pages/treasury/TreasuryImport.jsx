@@ -146,6 +146,9 @@ export default function TreasuryImport() {
         date: r.date,
         amount: r.amount,
         description: r.description,
+        // Zahlungspartner mitschreiben — sonst stünde bei Gastkegler- und
+        // Sonstigen-Buchungen später kein Name im Kassenbuch.
+        counterparty: r.name,
         csv_row_hash: r.hash,
         ...assignPayload(r.assign),
       }))

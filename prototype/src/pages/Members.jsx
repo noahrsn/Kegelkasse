@@ -103,21 +103,16 @@ export default function Members() {
         action={<Button onClick={() => setInviteOpen(true)}>+ Einladen</Button>}
       />
 
-      {/* Übersicht */}
+      {/* Übersicht — „schuldenfrei" ist raus, damit die Schuldensumme
+          auch vierstellig noch in ihre Kachel passt. */}
       <div className="grid grid-cols-3 gap-3">
         <Card className="text-center">
           <div className="font-display text-3xl font-medium tnum">{data.length}</div>
           <div className="text-[11px] text-ink-dim">Mitglieder</div>
         </Card>
-        <Card className="text-center">
+        <Card className="col-span-2 text-center">
           <div className="font-display text-3xl font-medium tnum text-terra">{eur(totalDebt)}</div>
           <div className="text-[11px] text-ink-dim">offene Schulden €</div>
-        </Card>
-        <Card className="text-center">
-          <div className="font-display text-3xl font-medium tnum text-sage">
-            {data.filter((m) => m.debt === 0).length}
-          </div>
-          <div className="text-[11px] text-ink-dim">schuldenfrei</div>
         </Card>
       </div>
 

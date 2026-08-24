@@ -545,7 +545,9 @@ export async function listTransactions(groupId) {
     category: t.category,
     amount: Number(t.amount) || 0,
     description: t.description,
-    member: t.member_name || null,
+    // Name: zugeordnetes Mitglied, sonst der Zahlungspartner aus dem Kontoauszug
+    // (z. B. bei Gastkegler-Einnahmen ohne Mitgliedszuordnung).
+    member: t.member_name || t.counterparty || null,
     source: t.source,
   }))
 }

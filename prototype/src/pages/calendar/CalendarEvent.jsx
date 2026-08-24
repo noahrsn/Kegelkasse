@@ -25,20 +25,45 @@ export const RSVP = {
 
 const TYPE_LABEL = { single: 'Einzeltermin', recurring: 'Regeltermin', multi_day: 'Mehrtägig' }
 
-/* Absagefrist als Restzeit „TT:HH:MM". Minutengenau reicht — die Anzeige wird
- * beim Laden der Seite berechnet und tickt bewusst nicht mit. */
-function deadlineCountdown(start, deadlineH) {
+/* Zeitpunkt der Absagefrist (= Terminstart minus Vorlauf) oder null. */
+function deadlineAt(start, deadlineH) {
   if (!start || deadlineH == null) return null
-  const deadline = new Date(start).getTime() - Number(deadlineH) * 3600_000
-  const left = deadline - Date.now()
-  if (!Number.isFinite(left)) return null
-  if (left <= 0) return { expired: true }
-  const mins = Math.floor(left / 60_000)
-  const pad = (n) => String(n).padStart(2, '0')
-  return {
-    expired: false,
-    text: `${pad(Math.floor(mins / 1440))}:${pad(Math.floor((mins % 1440) / 60))}:${pad(mins % 60)}`,
-  }
+  const ts = new Date(start).getTime() - Number(deadlineH) * 3600_000
+  return Number.isFinite(ts) ? ts : null
+}
+
+const pad = (n) => String(n).padStart(2, '0')
+
+/* Restzeit als „TT:HH:MM:SS". */
+function formatLeft(ms) {
+  const secs = Math.floor(ms / 1000)
+  return [
+    pad(Math.floor(secs / 86400)),
+    pad(Math.floor(secs / 3600) % 24),
+    pad(Math.floor(secs / 60) % 60),
+    pad(secs % 60),
+  ].join(':')
+}
+
+/* Sekundengenauer Countdown bis zur Absagefrist. Der Timer läuft nur, solange
+ * die Frist in der Zukunft liegt, und wird danach abgeräumt. */
+function useDeadlineCountdown(start, deadlineH) {
+  const deadline = deadlineAt(start, deadlineH)
+  const [now, setNow] = useState(() => Date.now())
+
+  useEffect(() => {
+    if (deadline == null || deadline <= Date.now()) return
+    const id = setInterval(() => {
+      const t = Date.now()
+      setNow(t)
+      if (t >= deadline) clearInterval(id)
+    }, 1000)
+    return () => clearInterval(id)
+  }, [deadline])
+
+  if (deadline == null) return null
+  const left = deadline - now
+  return left <= 0 ? { expired: true } : { expired: false, text: formatLeft(left) }
 }
 
 export default function CalendarEvent() {
@@ -98,7 +123,7 @@ function EventView({
 
   const d = new Date(vm.start)
   const timeStr = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
-  const countdown = deadlineCountdown(vm.start, vm.deadlineH)
+  const countdown = useDeadlineCountdown(vm.start, vm.deadlineH)
 
   return (
     <div className="space-y-5 pb-4">
@@ -155,13 +180,14 @@ function EventView({
         <div className="flex flex-wrap gap-x-6 gap-y-1 text-[13px] text-white/80">
           <span>🕢 {timeStr} Uhr</span>
           {vm.location && <span>📍 {vm.location}</span>}
-          {countdown && (
-            <span>
-              {countdown.expired
-                ? '⏳ Absagefrist abgelaufen'
-                : `⏳ Noch ${countdown.text} zum Absagen`}
-            </span>
-          )}
+          {countdown &&
+            (countdown.expired ? (
+              <span>⏳ Absagefrist abgelaufen</span>
+            ) : (
+              <span>
+                ⏳ Noch <span className="font-mono tnum">{countdown.text}</span> zum Absagen
+              </span>
+            ))}
         </div>
         {vm.description && <p className="text-[13px] leading-relaxed text-white/75">{vm.description}</p>}
       </Card>
