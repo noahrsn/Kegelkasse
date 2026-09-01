@@ -127,7 +127,7 @@ export default function Sessions() {
       <PageTitle
         kicker="Kegelabende"
         title="Übersicht"
-        action={<Button onClick={() => navigate('/sessions/new')}>+ Leeren starten</Button>}
+        action={<Button onClick={() => navigate('/sessions/new')}>Leeren starten</Button>}
       />
 
       {/* Nächsten Termin direkt starten */}

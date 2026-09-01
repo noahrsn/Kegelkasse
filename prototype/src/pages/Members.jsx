@@ -143,15 +143,11 @@ export default function Members() {
                   />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
+                  {/* Name und Rolle in einer Zeile — auf schmalen Displays umbrechend. */}
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                     <span className="truncate font-semibold">{m.name}</span>
                     <Badge tone={roleTone[m.role]}>{ROLE_LABEL[m.role]}</Badge>
                     {m.isPlaceholder && <Badge tone="amber">Nicht registriert</Badge>}
-                  </div>
-                  <div className="mt-1 text-[11px] text-ink-dim">
-                    {m.debt > 0
-                      ? `${m.openCount || 0} offen${m.nextDue ? ` · fällig ${fmtDate(m.nextDue)}` : ''}`
-                      : 'keine offenen Posten'}
                   </div>
                 </div>
                 <div className="text-right">

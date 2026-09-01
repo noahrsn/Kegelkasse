@@ -132,7 +132,7 @@ function Brand() {
       <Logo />
       <div>
         <div className="font-display text-[15px] font-medium tracking-tight">Pudl</div>
-        <div className="text-[10px] text-ink-dim">Kasse & Kegelabende</div>
+        <div className="text-[10px] text-ink-dim">Deine Kegelkasse</div>
       </div>
     </div>
   )
