@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
-import { Card, Button, Badge, PageTitle, Avatar, Field, Input } from '../components/ui'
+import { Card, Button, PageTitle, Avatar, Field, Input, Textarea } from '../components/ui'
 import { Sheet } from '../components/Modal'
-import { cx, eur, pal, ROLE_LABEL } from '../design/calm'
+import { eur, pal, ROLE_LABEL } from '../design/calm'
 import { useAuth } from '../context/AuthContext.jsx'
 import {
   listMembers,
@@ -16,7 +16,6 @@ import {
 } from '../lib/api.js'
 import { members as seed } from '../mock/data'
 
-const roleTone = { admin: 'navy', präsident: 'amber', kassenwart: 'sage', mitglied: 'neutral' }
 const debtColor = (d) => (d === 0 ? pal.sage : d > 15 ? pal.terra : pal.amber)
 
 const DEBT_TYPE = {
@@ -131,32 +130,13 @@ export default function Members() {
           <div className="py-8 text-center text-sm text-ink-dim">Lädt…</div>
         </Card>
       ) : (
+        /* Jede Zeile hat denselben Aufbau: Avatar | Name + Rolle | Betrag.
+           Rolle und Status stehen als eine einzelne, gekuerzte Meta-Zeile unter
+           dem Namen — dadurch sind alle Zeilen exakt gleich hoch, egal wie lang
+           der Name ist oder ob ein Zusatz dranhaengt. */
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {sorted.map((m) => (
-            <button key={m.userId} onClick={() => setSel(m)} className="text-left">
-              <Card className="flex items-center gap-3 transition hover:border-ink/20">
-                <div className="relative">
-                  <Avatar name={m.name} size={44} />
-                  <span
-                    className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-card"
-                    style={{ background: debtColor(m.debt) }}
-                  />
-                </div>
-                <div className="min-w-0 flex-1">
-                  {/* Name und Rolle in einer Zeile — auf schmalen Displays umbrechend. */}
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <span className="truncate font-semibold">{m.name}</span>
-                    <Badge tone={roleTone[m.role]}>{ROLE_LABEL[m.role]}</Badge>
-                    {m.isPlaceholder && <Badge tone="amber">Nicht registriert</Badge>}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="font-mono text-base font-semibold tnum" style={{ color: debtColor(m.debt) }}>
-                    {eur(m.debt)} €
-                  </div>
-                </div>
-              </Card>
-            </button>
+            <MemberRow key={m.userId} member={m} onClick={() => setSel(m)} />
           ))}
         </div>
       )}
@@ -188,6 +168,38 @@ export default function Members() {
         <InviteBox />
       </Sheet>
     </div>
+  )
+}
+
+/* ── Eine Zeile der Mitgliederliste ──────────────────────────────────────── */
+function MemberRow({ member: m, onClick }) {
+  const color = debtColor(m.debt)
+  return (
+    <button
+      onClick={onClick}
+      className="flex w-full items-center gap-3 rounded-[20px] border border-card-edge bg-card px-4 py-3 text-left transition hover:border-ink/20 active:scale-[0.99]"
+    >
+      <div className="relative shrink-0">
+        <Avatar name={m.name} size={40} />
+        {/* Punkt am Avatar spiegelt den Schuldenstand — dieselbe Farbe wie der Betrag. */}
+        <span
+          className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card"
+          style={{ background: color }}
+        />
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-[15px] font-semibold leading-snug">{m.name}</div>
+        <div className="truncate text-[12px] leading-snug text-ink-dim">
+          {ROLE_LABEL[m.role]}
+          {m.isPlaceholder && <span className="text-amber"> · Nicht registriert</span>}
+        </div>
+      </div>
+
+      <div className="shrink-0 font-mono text-[15px] font-semibold tnum" style={{ color }}>
+        {eur(m.debt)} €
+      </div>
+    </button>
   )
 }
 
@@ -398,14 +410,15 @@ function ManualPenaltySheet({ open, member, onClose, mockMode, groupId, onBooked
 }
 
 export function InviteBox({ token, onReset, canReset = false }) {
-  const { mockMode, activeGroup } = useAuth()
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://kegelkasse.de'
+  const { mockMode, activeGroupId } = useAuth()
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://pudlapp.de'
   const link = `${origin}/join/${token || 'pinroyal-7f3a9c'}`
   const [copied, setCopied] = useState(false)
   const [resetting, setResetting] = useState(false)
   const [showQr, setShowQr] = useState(false)
   const [emailMode, setEmailMode] = useState(false)
   const [email, setEmail] = useState('')
+  const [inviteMessage, setInviteMessage] = useState('')
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
 
@@ -424,14 +437,13 @@ export function InviteBox({ token, onReset, canReset = false }) {
     setSending(true)
     try {
       if (!mockMode) {
-        await sendInviteEmail(email.trim(), {
-          club: activeGroup?.name || 'Kegelclub',
-          url: link,
-          message: `Du wurdest zu ${activeGroup?.name || 'unserem Kegelclub'} eingeladen.`,
-        })
+        // Die Einladung geht in die Outbox; den Beitrittslink baut der Server
+        // selbst aus dem invite_token, damit er nie veraltet mitgeschickt wird.
+        await sendInviteEmail(email.trim(), { message: inviteMessage.trim() || null }, activeGroupId)
       }
       setSent(true)
       setEmail('')
+      setInviteMessage('')
       setTimeout(() => {
         setSent(false)
         setEmailMode(false)
@@ -477,6 +489,14 @@ export function InviteBox({ token, onReset, canReset = false }) {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="name@example.de"
               autoFocus
+            />
+          </Field>
+          <Field label="Persönliche Nachricht" hint="Optional — steht dann im Einladungstext.">
+            <Textarea
+              rows={2}
+              value={inviteMessage}
+              onChange={(e) => setInviteMessage(e.target.value)}
+              placeholder="Komm zu uns in den Club!"
             />
           </Field>
           <Button className="w-full" disabled={sending || !email.trim()} onClick={sendInvite}>

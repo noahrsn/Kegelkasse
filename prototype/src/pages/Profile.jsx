@@ -8,7 +8,10 @@ import {
   listOpenDebts,
   getAwards,
   getNotifSettings,
-  saveNotifSettings,
+  saveNotifSetting,
+  getNotifEmailEnabled,
+  setNotifEmailEnabled,
+  sendTestNotification,
   getMyAvatar,
   uploadAvatar,
   setMyAvatar,
@@ -16,41 +19,11 @@ import {
 import { currentUser, club, myDebts, awards } from '../mock/data'
 import { getTheme, setTheme } from '../theme'
 
-const NOTIFS = [
-  ['new_penalty', 'Neue Strafe', true],
-  ['monthly_summary', 'Monatszusammenfassung', true],
-  ['debt_reminder', 'Schulden-Erinnerung', true],
-  ['event_invitation', 'Termin-Einladung', true],
-  ['rsvp_reminder', 'RSVP-Erinnerung', true],
-  ['payment_received', 'Zahlung erhalten', true],
-  ['new_poll', 'Neue Abstimmung', true],
-  ['session_reminder', 'Kegelabend-Erinnerung', false],
-]
-
 const mockTitles = awards.filter((a) => a.holder === 'Martin Haas' || a.type === 'Goldesel')
 
 export default function Profile() {
   const navigate = useNavigate()
   const { mockMode, activeGroupId, role, user, profile, signOut } = useAuth()
-  const [notifs, setNotifs] = useState(() => Object.fromEntries(NOTIFS.map(([k, , v]) => [k, v])))
-
-  // Benachrichtigungs-Schalter laden (Echtmodus) bzw. einzeln speichern.
-  useEffect(() => {
-    if (mockMode || !activeGroupId) return
-    getNotifSettings(activeGroupId)
-      .then((s) => {
-        if (s) setNotifs((cur) => ({ ...cur, ...Object.fromEntries(NOTIFS.map(([k]) => [k, s[k] ?? cur[k]])) }))
-      })
-      .catch((e) => console.error(e))
-  }, [mockMode, activeGroupId])
-
-  const toggleNotif = (key, value) => {
-    setNotifs((s) => ({ ...s, [key]: value }))
-    if (!mockMode && activeGroupId && user) {
-      saveNotifSettings(activeGroupId, user.id, { [key]: value }).catch((e) => console.error(e))
-    }
-  }
-
   const [debts, setDebts] = useState(
     mockMode ? myDebts.filter((d) => !d.paid).map((d) => ({ description: d.desc, amount: d.amount })) : null,
   )
@@ -241,13 +214,7 @@ export default function Profile() {
         </div>
       </Card>
 
-      {/* Benachrichtigungen */}
-      <Card className="space-y-3.5">
-        <div className="text-[12px] font-semibold text-ink-soft">Benachrichtigungen</div>
-        {NOTIFS.map(([key, label]) => (
-          <Toggle key={key} label={label} checked={notifs[key]} onChange={(v) => toggleNotif(key, v)} />
-        ))}
-      </Card>
+      <NotificationsCard />
     </div>
   )
 }
@@ -291,6 +258,150 @@ function ThemeCard() {
             )}
           </button>
         ))}
+      </div>
+    </Card>
+  )
+}
+
+/* ── Benachrichtigungen ───────────────────────────────────────────────────
+ * Der Katalog kommt vom Server (get_notification_settings) — Kategorien,
+ * Labels und Defaults stehen in der DB. Neue Benachrichtigungstypen tauchen
+ * hier deshalb automatisch auf, ohne Änderung an dieser Datei.
+ * Auf dem Smartphone wären ~25 Schalter am Stück unbrauchbar, darum sind die
+ * Kategorien eingeklappt; nur die erste ist offen.
+ */
+function NotificationsCard() {
+  const { mockMode, activeGroupId, user } = useAuth()
+  const [types, setTypes] = useState([])
+  const [emailOn, setEmailOn] = useState(true)
+  const [open, setOpen] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [testing, setTesting] = useState(false)
+  const [testMsg, setTestMsg] = useState(null)
+
+  useEffect(() => {
+    if (mockMode || !activeGroupId) {
+      setLoading(false)
+      return
+    }
+    let alive = true
+    setLoading(true)
+    Promise.all([getNotifSettings(activeGroupId), getNotifEmailEnabled(activeGroupId)])
+      .then(([rows, master]) => {
+        if (!alive) return
+        setTypes(rows)
+        setEmailOn(master)
+        setOpen(rows[0]?.category ?? null)
+      })
+      .catch((e) => console.error(e))
+      .finally(() => alive && setLoading(false))
+    return () => {
+      alive = false
+    }
+  }, [mockMode, activeGroupId])
+
+  const toggle = (key, value) => {
+    setTypes((cur) => cur.map((t) => (t.key === key ? { ...t, enabled: value } : t)))
+    if (!mockMode && activeGroupId && user) {
+      saveNotifSetting(activeGroupId, user.id, key, value).catch((e) => {
+        console.error(e)
+        setTypes((cur) => cur.map((t) => (t.key === key ? { ...t, enabled: !value } : t)))
+      })
+    }
+  }
+
+  const toggleMaster = (value) => {
+    setEmailOn(value)
+    if (!mockMode && activeGroupId && user) {
+      setNotifEmailEnabled(activeGroupId, user.id, value).catch((e) => {
+        console.error(e)
+        setEmailOn(!value)
+      })
+    }
+  }
+
+  const sendTest = async () => {
+    if (!activeGroupId) return
+    setTesting(true)
+    setTestMsg(null)
+    try {
+      const to = await sendTestNotification(activeGroupId)
+      setTestMsg(`Testmail an ${to} eingereiht — sie kommt in wenigen Minuten an.`)
+    } catch (e) {
+      setTestMsg(e.message || 'Testmail fehlgeschlagen')
+    } finally {
+      setTesting(false)
+    }
+  }
+
+  // Nach Kategorie gruppieren; die Reihenfolge kommt schon sortiert vom Server.
+  const groups = []
+  for (const t of types) {
+    const last = groups[groups.length - 1]
+    if (last && last.key === t.category) last.items.push(t)
+    else groups.push({ key: t.category, label: t.category_label, items: [t] })
+  }
+
+  return (
+    <Card className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="text-[12px] font-semibold text-ink-soft">Benachrichtigungen</div>
+        {!loading && (
+          <Badge tone={emailOn ? 'sage' : 'neutral'}>{emailOn ? 'E-Mail an' : 'Nur in der App'}</Badge>
+        )}
+      </div>
+
+      <Toggle
+        label="E-Mails erhalten"
+        hint="Aus: du bekommst gar keine E-Mails mehr. In der App bleiben alle Hinweise hinter der Glocke."
+        checked={emailOn}
+        onChange={toggleMaster}
+      />
+
+      {loading ? (
+        <div className="py-4 text-center text-[12px] text-ink-dim">Wird geladen…</div>
+      ) : (
+        <div className="divide-y divide-card-edge border-t border-card-edge">
+          {groups.map((g) => {
+            const on = g.items.filter((t) => t.enabled).length
+            const isOpen = open === g.key
+            return (
+              <div key={g.key}>
+                <button
+                  type="button"
+                  onClick={() => setOpen(isOpen ? null : g.key)}
+                  className="flex w-full items-center gap-3 py-3 text-left"
+                >
+                  <span className="flex-1 text-[13px] font-semibold text-ink">{g.label}</span>
+                  <span className="text-[11px] text-ink-dim">
+                    {on}/{g.items.length}
+                  </span>
+                  <span className={cx('text-ink-dim transition-transform', isOpen && 'rotate-180')}>⌄</span>
+                </button>
+                {isOpen && (
+                  <div className="space-y-3.5 pb-4">
+                    {g.items.map((t) => (
+                      <Toggle
+                        key={t.key}
+                        label={t.label}
+                        hint={t.hint}
+                        checked={t.enabled}
+                        onChange={(v) => toggle(t.key, v)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-3">
+        <Button variant="soft" size="sm" disabled={testing || mockMode} onClick={sendTest}>
+          {testing ? 'Sendet…' : 'Testmail an mich'}
+        </Button>
+        {testMsg && <span className="text-[11px] text-ink-dim">{testMsg}</span>}
       </div>
     </Card>
   )

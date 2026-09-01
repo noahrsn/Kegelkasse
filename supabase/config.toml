@@ -49,8 +49,11 @@ verify_jwt = true
 [functions.monthly-fee]
 verify_jwt = false
 
-[functions.debt-reminder]
+# Leert die E-Mail-Outbox. Kein JWT (pg_cron hat keins) — die Function prüft
+# stattdessen selbst das Shared Secret NOTIFY_CRON_SECRET.
+[functions.notify-dispatch]
 verify_jwt = false
 
-[functions.send-email]
+# Abmelde-Link aus E-Mails: autorisiert wird über den Token in der URL.
+[functions.notify-unsubscribe]
 verify_jwt = false

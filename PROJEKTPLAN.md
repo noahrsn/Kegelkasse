@@ -173,8 +173,8 @@ kegelkasse/
 │       │   └── templates.ts     # HTML-E-Mail-Templates (Calm-Bento-Stil)
 │       ├── session-approve/     # Session genehmigen + Schulden buchen (RPC-Trigger)
 │       ├── monthly-fee/         # Monatsbeitrag buchen (via pg_cron)
-│       ├── debt-reminder/       # Wöchentlicher Schulden-Reminder (via pg_cron)
-│       └── send-email/          # Zentraler E-Mail-Versand via Resend
+│       ├── notify-dispatch/     # Leert die E-Mail-Outbox via Resend (via pg_cron, alle 5 Min)
+│       └── notify-unsubscribe/  # Abmelde-Link aus E-Mails (ohne Login, Token in der URL)
 │       # Hinweis: CSV-Import läuft client-seitig (lib/csv.js + RPC import_transactions),
 │       # Awards live über RPC group_awards — daher keine eigenen Edge Functions.
 ├── src/                         # React+Vite Frontend (aus Phase 1 weiterentwickelt)
@@ -277,24 +277,35 @@ CREATE TABLE group_members (
 > | `kassenwart` | ✓ | ✓ | ✓ | ✓ | — | — | — | ✓ |
 > | `mitglied` | ✓ | — | — | — | — | — | — | — |
 
-**Tabelle: `notification_settings`**
+**Benachrichtigungen** — seit Migration `029_notifications_v2.sql` katalogbasiert statt
+spaltenbasiert (siehe Phase 9). Ein neuer Typ ist eine Zeile in `notification_types`, keine
+Schema-Migration:
+
 ```sql
-CREATE TABLE notification_settings (
-  user_id             UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  group_id            UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
-  new_penalty         BOOLEAN DEFAULT TRUE,
-  monthly_summary     BOOLEAN DEFAULT TRUE,
-  session_reminder    BOOLEAN DEFAULT FALSE,
-  debt_reminder       BOOLEAN DEFAULT TRUE,
-  event_invitation    BOOLEAN DEFAULT TRUE,
-  rsvp_reminder       BOOLEAN DEFAULT TRUE,
-  deadline_warning    BOOLEAN DEFAULT TRUE,
-  payment_received    BOOLEAN DEFAULT TRUE,
-  late_payment_fee    BOOLEAN DEFAULT TRUE,
-  new_poll            BOOLEAN DEFAULT TRUE,
-  poll_closing_soon   BOOLEAN DEFAULT TRUE,
-  poll_closed         BOOLEAN DEFAULT FALSE,
-  PRIMARY KEY (user_id, group_id)
+CREATE TABLE notification_types (           -- Katalog: Label, Kategorie, Default, Zielgruppe
+  key TEXT PRIMARY KEY, category TEXT, category_label TEXT,
+  label TEXT, hint TEXT, default_enabled BOOLEAN, audience TEXT  -- member|board|system
+);
+
+CREATE TABLE notification_settings (        -- ein Schalter je User, Gruppe und Typ
+  user_id UUID, group_id UUID, type TEXT REFERENCES notification_types(key),
+  enabled BOOLEAN NOT NULL, PRIMARY KEY (user_id, group_id, type)
+);
+
+CREATE TABLE notification_prefs (           -- Master-Schalter + Abmelde-Token
+  user_id UUID, group_id UUID, email_enabled BOOLEAN DEFAULT TRUE,
+  unsub_token TEXT UNIQUE, PRIMARY KEY (user_id, group_id)
+);
+
+CREATE TABLE notifications (                -- In-App-Feed (Glocke)
+  id UUID PRIMARY KEY, user_id UUID, group_id UUID, type TEXT,
+  title TEXT, body TEXT, url TEXT, dedup_key TEXT, created_at TIMESTAMPTZ, read_at TIMESTAMPTZ
+);
+
+CREATE TABLE notification_outbox (          -- E-Mail-Warteschlange, nur service_role
+  id UUID PRIMARY KEY, notification_id UUID, user_id UUID, group_id UUID,
+  to_email TEXT, type TEXT, payload JSONB, scheduled_for TIMESTAMPTZ,
+  status TEXT, attempts INTEGER, last_error TEXT, provider_id TEXT, sent_at TIMESTAMPTZ
 );
 ```
 
@@ -878,55 +889,100 @@ Nicht berechtigte Sektionen werden ausgeblendet, nicht nur gesperrt.
 
 ---
 
-## Phase 9 — Benachrichtigungen ✅ (Kern)
+## Phase 9 — Benachrichtigungen ✅ (v2, komplett neu gebaut)
 
-**Ziel:** E-Mail-Benachrichtigungen mit Opt-in-Kontrolle.
+**Ziel:** In-App- und E-Mail-Benachrichtigungen, jede einzeln im Profil schaltbar.
 
-> **Status — Kern umgesetzt ✅:** Migration `010_phase9_notifications.sql` — RLS-Policies für
-> `notification_settings` (jedes Mitglied verwaltet eigene Schalter je Gruppe; Frontend schreibt
-> direkt per Upsert) + Service-Role-Funktion `debt_reminder_recipients()` (Join mit `auth.users`,
-> respektiert `debt_reminder`-Schalter). Edge Functions ausgebaut + deployed: `send-email`
-> (typbasierte HTML-Templates `_shared/templates.ts` im Calm-Bento-Stil; Aufruf `{type,to,data}`
-> oder roh; Dev-Modus loggt nur in die Konsole) und `debt-reminder` (ermittelt Schuldner, sendet
-> je Reminder-Mail). Frontend: Profil-Benachrichtigungs-Toggles persistieren echt; Einladung im
-> `InviteBox` per E-Mail (Edge Function) **und** QR-Code (`qrcode.react`) — die beiden
-> Platzhalter-Buttons aus Phase 3 sind damit umgesetzt.
->
-> **Offen für Produktion:** Live-Versand braucht einen Resend-API-Key (`ENVIRONMENT=production`).
-> Das automatische Auslösen pro Ereignis (`new_penalty`, `payment_received`, `session_approved`,
-> `new_poll`, …) aus den jeweiligen RPCs (via `pg_net`/Trigger → `send-email`) sowie die
-> pg_cron-Jobs für `debt-reminder`/`monthly_summary`/`close_due_polls` werden mit dem Live-Key
-> eingerichtet. Templates + Empfänger-Logik stehen bereits.
+> **Status — vollständig umgesetzt ✅.** Die erste Fassung (Migration `010`, Edge Functions
+> `send-email`/`debt-reminder`) wurde ersetzt: von 12 Bool-Spalten waren nur zwei Typen je
+> tatsächlich ausgelöst worden, und `send-email` stand ohne Auth offen im Netz. Migration
+> `029_notifications_v2.sql` baut das Thema von Grund auf neu; `send-email` und `debt-reminder`
+> sind gelöscht.
+
+### Architektur
+
+| Baustein | Wo | Aufgabe |
+|---|---|---|
+| `notification_types` | DB | Katalog: Schlüssel, Kategorie, Label, Hinweis, Default, Zielgruppe |
+| `notification_settings` | DB | Ein Schalter je (User, Gruppe, Typ) — zeilenbasiert, kein Spalten-Wildwuchs |
+| `notification_prefs` | DB | Master-Schalter „alle E-Mails" + Abmelde-Token |
+| `notifications` | DB | In-App-Feed hinter der Glocke (mit `dedup_key`) |
+| `notification_outbox` | DB | E-Mail-Warteschlange mit Status, Versuchen, Fehlertext, Provider-ID |
+| `emit_notification()` | DB | Einziger Erzeugungsweg — prüft Self-Ping, Rolle, Schalter, Ghost, Dedup |
+| 13 Trigger | DB | Ereignisse (Strafe, Zahlung, Termin, Abstimmung, Rolle, Award …) |
+| `run_notification_schedules()` | DB, stündlich | Zeitgesteuertes (Fristen, RSVP, Reminder, Kontoauszug) |
+| `notify-dispatch` | Edge Function, alle 5 Min | Rendert und versendet über Resend, mit Retry |
+| `notify-unsubscribe` | Edge Function | Abmeldung per Link aus der Mail, ohne Login |
+
+**Ein Schalter, zwei Kanäle:** Jede Benachrichtigung erscheint in der App (Glocke) und — sofern
+der Master-Schalter an ist — zusätzlich als E-Mail. Titel und Text sind identisch, weil die
+Templates aus demselben Outbox-Payload rendern.
+
+**Ruhezeiten:** Versand nur zwischen 08:00 und 22:00 (Europe/Berlin); außerhalb wird auf den
+nächsten Fensterbeginn verschoben. In-App erscheint sofort.
+
+**Kein Self-Ping:** Wer eine Aktion auslöst, wird darüber nicht benachrichtigt.
+
+**Bündelung:** Strafen eines Kegelabends kommen als eine Summenmail (`session_approved`) mit den
+eigenen Strafen hervorgehoben; ein CSV-Import, der fünf Schulden begleicht, erzeugt eine Nachricht
+statt fünf (Statement-Trigger mit Transition-Tables). Eine Terminserie über 12 Monate erzeugt genau
+eine Benachrichtigung (`dedup_key` auf `series_id`).
 
 ### Benachrichtigungstypen
 
-| Ereignis | Empfänger |
-|---|---|
-| `new_penalty` | Betroffenes Mitglied |
-| `session_approved` | Alle Mitglieder |
-| `monthly_fee` | Betroffenes Mitglied |
-| `debt_reminder` (wöchentlich) | Mitglied mit Schulden |
-| `pending_session` | Kassenwart & Admin |
-| `monthly_summary` | Alle Mitglieder |
-| `event_invitation` | Alle Mitglieder |
-| `rsvp_reminder` (24h vor Deadline) | Mitglieder ohne Rückmeldung |
-| `deadline_warning` | Mitglieder ohne Rückmeldung |
-| `payment_received` | Betroffenes Mitglied |
-| `late_payment_fee` | Betroffenes Mitglied + Kassenwart |
-| `new_poll` · `poll_closing_soon` · `poll_closed` | Alle / noch nicht Abgestimmt |
+| Kategorie | Typ | Empfänger | Default |
+|---|---|---|---|
+| Geld | `new_penalty` | Betroffener | an |
+| Geld | `monthly_fee` | Betroffener | aus |
+| Geld | `late_payment_fee` | Betroffener | an |
+| Geld | `payment_recorded` | Betroffener | aus |
+| Geld | `credit_added` | Betroffener | an |
+| Geld | `payment_due_soon` (3 Tage vorher) | Schuldner | an |
+| Geld | `debt_reminder` (montags) | Schuldner | aus |
+| Geld | `monthly_statement` (1. des Monats) | Alle | aus |
+| Termine | `event_created` | Alle | an |
+| Termine | `event_changed` | Zu-/Halbzusagen | an |
+| Termine | `event_cancelled` | Alle | an |
+| Termine | `rsvp_reminder` (3 Tage vorher) | Ohne Antwort | an |
+| Termine | `rsvp_deadline_soon` (24 h vorher) | Zu-/Halbzusagen | aus |
+| Termine | `event_reminder` (Vorabend 18 Uhr) | Zusagen | aus |
+| Kegelabend | `session_pending_approval` | Vorstand | an |
+| Kegelabend | `session_approved` | Teilnehmer | an |
+| Kegelabend | `session_own_approved` | Erfasser | an |
+| Kegelabend | `session_rejected` | Erfasser | an |
+| Abstimmung | `poll_new` | Alle | an |
+| Abstimmung | `poll_closing_soon` (24 h vorher) | Nicht-Wähler | an |
+| Abstimmung | `poll_closed` | Alle | aus |
+| Verein | `member_joined` | Alle | aus |
+| Verein | `role_changed` | Betroffener | an |
+| Verein | `rulebook_changed` | Alle | aus |
+| Verein | `award_received` | Betroffener | aus |
+| System | `club_invitation` | Eingeladener | transaktional |
+| System | `csv_import_reminder` (nach Frist, dann alle 2 Tage) | Vorstand | Club-Einstellung |
+| System | `test_email` | Auslöser | manuell |
 
-### Implementierung
-- **Resend** für den transaktionalen E-Mail-Versand (kostenlos bis 3.000 Mails/Monat)
-- E-Mail-Templates als HTML-Strings in der Edge Function `send-email/` (kein Jinja2)
-- Geplante Benachrichtigungen (`debt_reminder`, `monthly_summary`) via **pg_cron** — cron-Job in Supabase ruft die Edge Function auf
-- Toggles pro Benachrichtigungstyp und Gruppe in den Kontoeinstellungen
+### Sicherheit & Recht
+- **Kein offener Versand-Endpunkt mehr.** Einladungen laufen über die RPC `queue_club_invitation`
+  (Admin/Präsident) in die Outbox; `notify-dispatch` ist nur mit dem Vault-Secret oder dem
+  Service-Role-Key erreichbar und liest das Secret selbst aus dem Vault.
+- **Abmelde-Link** in jeder Mail: „nur diesen Typ" und „alle E-Mails", plus
+  `List-Unsubscribe` / One-Click (RFC 8058) für die Zustellbarkeit.
+- **Ghost-Mitglieder** (`profiles.is_placeholder`) bekommen nichts — sie haben kein Konto.
+- `notification_outbox` hat keine Policies für `authenticated` und ist für Clients unsichtbar.
 
-### Einladungsversand (verbindlich nachgezogen aus Phase 3)
+### Absender
+`"<Clubname> via Pudl" <noreply@pudlapp.de>` — Domain in Resend verifiziert, keine Reply-To.
+Env: `RESEND_API_KEY`, optional `RESEND_FROM_EMAIL`, `RESEND_FROM_NAME`, `APP_URL`
+(Default `https://pudlapp.de`). Ohne `RESEND_API_KEY` wird nur geloggt statt versendet.
 
-In Phase 3 wurde der Einladungslink (Kopieren/Reset) umgesetzt; die folgenden Versandwege waren dort nur Platzhalter und werden hier fest umgesetzt:
-
-- **E-Mail-Einladung:** Mitglieder direkt aus dem Einladen-Sheet (Mitgliederliste + Setup-Wizard Schritt 6) per Resend einladen — ersetzt den Platzhalter-Button „Per E-Mail senden".
-- **QR-Code:** QR-Code für den Einladungslink generieren (SVG, client- oder edge-seitig) — ersetzt den Platzhalter-Button „QR-Code zeigen".
+### Frontend
+- **Profil:** Katalog kommt vom Server (`get_notification_settings`), nach Kategorien
+  eingeklappt, Master-Schalter „E-Mails erhalten", Button „Testmail an mich".
+- **Glocke** in Sidebar und Mobile-Topbar mit Ungelesen-Zähler (Minuten-Polling), Sheet mit Feed,
+  Klick springt zum Ziel und markiert gelesen, „Alle als gelesen markieren".
+- **Club-Einstellungen → Kasse:** Schalter für die Kontoauszug-Erinnerung des Vorstands.
+- **Einladung:** E-Mail-Adresse + optionale persönliche Nachricht; der Beitrittslink wird
+  serverseitig aus dem aktuellen `invite_token` gebaut.
 
 ---
 

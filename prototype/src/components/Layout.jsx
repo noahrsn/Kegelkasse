@@ -1,8 +1,15 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { NavLink, useLocation, useNavigate, Link } from 'react-router-dom'
 import { cx, pal } from '../design/calm'
-import { Avatar } from './ui'
+import { Avatar, Button, Empty } from './ui'
+import { Sheet } from './Modal'
 import { useAuth } from '../context/AuthContext.jsx'
+import {
+  listNotifications,
+  countUnreadNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
+} from '../lib/api.js'
 
 const roleLabels = {
   admin: 'Admin',
@@ -58,6 +65,7 @@ export default function Layout({ children }) {
           ))}
         </nav>
         <div className="flex-1" />
+        <NotificationBell className="mb-2" wide />
         <UserCard />
       </aside>
 
@@ -81,6 +89,7 @@ export default function Layout({ children }) {
             <span className="font-display text-lg font-medium">Pudl</span>
           </div>
           <div className="flex-1" />
+          <NotificationBell />
           <Link to="/profile">
             <TopbarAvatar />
           </Link>
@@ -480,6 +489,159 @@ function DotsIcon(p) {
       <circle cx="5" cy="12" r="1.4" />
       <circle cx="12" cy="12" r="1.4" />
       <circle cx="19" cy="12" r="1.4" />
+    </I>
+  )
+}
+
+/* ── Glocke + Benachrichtigungs-Feed ──────────────────────────────────────
+ * Zeigt dieselben Nachrichten, die auch per E-Mail rausgehen — gesteuert von
+ * denselben Schaltern im Profil. Der ungelesen-Zähler wird beim Öffnen und
+ * danach minütlich aktualisiert (kein Realtime-Channel nötig, die Frequenz
+ * dieser App ist niedrig).
+ */
+function NotificationBell({ className = '', wide = false }) {
+  const navigate = useNavigate()
+  const { mockMode, activeGroupId } = useAuth()
+  const [open, setOpen] = useState(false)
+  const [unread, setUnread] = useState(0)
+  const [items, setItems] = useState(null)
+
+  const refreshCount = useCallback(() => {
+    if (mockMode || !activeGroupId) return
+    countUnreadNotifications(activeGroupId)
+      .then(setUnread)
+      .catch(() => {})
+  }, [mockMode, activeGroupId])
+
+  useEffect(() => {
+    refreshCount()
+    const t = setInterval(refreshCount, 60000)
+    return () => clearInterval(t)
+  }, [refreshCount])
+
+  useEffect(() => {
+    if (!open || mockMode || !activeGroupId) return
+    setItems(null)
+    listNotifications(activeGroupId)
+      .then(setItems)
+      .catch((e) => {
+        console.error(e)
+        setItems([])
+      })
+  }, [open, mockMode, activeGroupId])
+
+  const openItem = async (n) => {
+    setOpen(false)
+    if (!n.read_at) {
+      setUnread((u) => Math.max(0, u - 1))
+      markNotificationRead(n.id).catch(() => {})
+    }
+    if (n.url) navigate(n.url)
+  }
+
+  const readAll = async () => {
+    if (!activeGroupId) return
+    setUnread(0)
+    setItems((cur) => (cur || []).map((n) => ({ ...n, read_at: n.read_at || new Date().toISOString() })))
+    markAllNotificationsRead(activeGroupId).catch(() => {})
+  }
+
+  const badge = unread > 9 ? '9+' : String(unread)
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        aria-label={unread ? `Benachrichtigungen (${unread} ungelesen)` : 'Benachrichtigungen'}
+        className={cx(
+          'relative shrink-0 border border-card-edge bg-card text-ink-soft transition hover:text-ink',
+          wide
+            ? 'flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-[13px] font-medium'
+            : 'grid h-10 w-10 place-items-center rounded-full',
+          className,
+        )}
+      >
+        <span className="relative">
+          <BellIcon className="h-5 w-5" />
+          {unread > 0 && (
+            <span className="absolute -right-1.5 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-terra px-1 text-[9px] font-bold text-white">
+              {badge}
+            </span>
+          )}
+        </span>
+        {wide && <span className="flex-1 text-left">Benachrichtigungen</span>}
+      </button>
+
+      <Sheet
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Benachrichtigungen"
+        subtitle={unread ? `${unread} ungelesen` : 'Alles gelesen'}
+        footer={
+          unread > 0 ? (
+            <Button variant="soft" className="w-full" onClick={readAll}>
+              Alle als gelesen markieren
+            </Button>
+          ) : null
+        }
+      >
+        {items === null ? (
+          <div className="py-8 text-center text-[12px] text-ink-dim">Wird geladen…</div>
+        ) : items.length === 0 ? (
+          <Empty
+            icon="🔔"
+            title="Noch nichts passiert"
+            hint="Strafen, Termine und Abstimmungen tauchen hier auf."
+          />
+        ) : (
+          <div className="divide-y divide-card-edge">
+            {items.map((n) => (
+              <button
+                key={n.id}
+                onClick={() => openItem(n)}
+                className="flex w-full items-start gap-3 py-3 text-left"
+              >
+                <span
+                  className={cx(
+                    'mt-1.5 h-2 w-2 shrink-0 rounded-full',
+                    n.read_at ? 'bg-transparent' : 'bg-terra',
+                  )}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className={cx('block text-[13px]', n.read_at ? 'font-medium text-ink-soft' : 'font-semibold text-ink')}>
+                    {n.title}
+                  </span>
+                  {n.body && <span className="mt-0.5 block text-[12px] leading-relaxed text-ink-dim">{n.body}</span>}
+                  <span className="mt-1 block text-[10.5px] text-ink-dim">{relTime(n.created_at)}</span>
+                </span>
+                {n.url && <span className="mt-1 text-ink-dim">›</span>}
+              </button>
+            ))}
+          </div>
+        )}
+      </Sheet>
+    </>
+  )
+}
+
+/* „vor 3 Std." statt Zeitstempel — im Feed liest sich das schneller. */
+function relTime(iso) {
+  const ms = Date.now() - new Date(iso).getTime()
+  const min = Math.round(ms / 60000)
+  if (min < 1) return 'gerade eben'
+  if (min < 60) return `vor ${min} Min.`
+  const h = Math.round(min / 60)
+  if (h < 24) return `vor ${h} Std.`
+  const d = Math.round(h / 24)
+  if (d < 7) return `vor ${d} ${d === 1 ? 'Tag' : 'Tagen'}`
+  return new Date(iso).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })
+}
+
+function BellIcon(p) {
+  return (
+    <I {...p}>
+      <path d="M18 9a6 6 0 1 0-12 0c0 5-2 6-2 6h16s-2-1-2-6" />
+      <path d="M10.3 20a2 2 0 0 0 3.4 0" />
     </I>
   )
 }

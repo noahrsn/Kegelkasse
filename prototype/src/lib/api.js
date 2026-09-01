@@ -696,36 +696,108 @@ export async function getMyAvatar(userId) {
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
- * Phase 9 — Benachrichtigungen & Einladungsversand
+ * Benachrichtigungen (v2) — In-App-Feed, Schalter, Einladungen
  * ────────────────────────────────────────────────────────────────────────── */
 
-/* Eigene Benachrichtigungs-Einstellungen je Gruppe (RLS filtert auf auth.uid()). */
+/* Katalog + eigene Schalter je Gruppe. Der Server liefert nur, was für die
+   eigene Rolle relevant ist, inklusive Kategorie und Default. */
 export async function getNotifSettings(groupId) {
-  const { data, error } = await supabase
+  const { data, error } = await supabase.rpc('get_notification_settings', { p_group: groupId })
+  if (error) throw error
+  return data || []
+}
+
+/* Einzelnen Schalter speichern (Upsert auf (user_id, group_id, type)). */
+export async function saveNotifSetting(groupId, userId, type, enabled) {
+  const { error } = await supabase
     .from('notification_settings')
-    .select('*')
+    .upsert(
+      { user_id: userId, group_id: groupId, type, enabled, updated_at: new Date().toISOString() },
+      { onConflict: 'user_id,group_id,type' },
+    )
+  if (error) throw error
+}
+
+/* Master-Schalter „alle E-Mails". Fehlt die Zeile, gilt true. */
+export async function getNotifEmailEnabled(groupId) {
+  const { data, error } = await supabase
+    .from('notification_prefs')
+    .select('email_enabled')
     .eq('group_id', groupId)
     .maybeSingle()
   if (error) throw error
-  return data
+  return data?.email_enabled ?? true
 }
 
-/* Einzelnen Schalter speichern (Upsert auf (user_id, group_id)). */
-export async function saveNotifSettings(groupId, userId, patch) {
+export async function setNotifEmailEnabled(groupId, userId, enabled) {
   const { error } = await supabase
-    .from('notification_settings')
-    .upsert({ user_id: userId, group_id: groupId, ...patch }, { onConflict: 'user_id,group_id' })
+    .from('notification_prefs')
+    .upsert({ user_id: userId, group_id: groupId, email_enabled: enabled }, { onConflict: 'user_id,group_id' })
   if (error) throw error
 }
 
-/* Einladung per E-Mail versenden (Edge Function send-email, Typ event_invitation).
-   Im Dev-Modus loggt die Function nur in die Konsole und liefert { ok: true }. */
-export async function sendInviteEmail(to, { club, url, message }) {
-  const { data, error } = await supabase.functions.invoke('send-email', {
-    body: { type: 'event_invitation', to, data: { club, url, message } },
+/* Testmail an die eigene Adresse (prüft Domain/Absender/Versandweg). */
+export async function sendTestNotification(groupId) {
+  const { data, error } = await supabase.rpc('send_test_notification', { p_group: groupId })
+  if (error) throw error
+  return data
+}
+
+/* ── In-App-Feed (Glocke) ───────────────────────────────────────────────── */
+
+export async function listNotifications(groupId, limit = 30) {
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('id, type, title, body, url, created_at, read_at')
+    .eq('group_id', groupId)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (error) throw error
+  return data || []
+}
+
+export async function countUnreadNotifications(groupId) {
+  const { count, error } = await supabase
+    .from('notifications')
+    .select('id', { count: 'exact', head: true })
+    .eq('group_id', groupId)
+    .is('read_at', null)
+  if (error) throw error
+  return count || 0
+}
+
+export async function markNotificationRead(id) {
+  const { error } = await supabase
+    .from('notifications')
+    .update({ read_at: new Date().toISOString() })
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function markAllNotificationsRead(groupId) {
+  const { error } = await supabase
+    .from('notifications')
+    .update({ read_at: new Date().toISOString() })
+    .eq('group_id', groupId)
+    .is('read_at', null)
+  if (error) throw error
+}
+
+/* Einladung in die Outbox legen (RPC prüft Admin/Präsident; Versand per Cron). */
+export async function sendInviteEmail(to, { message } = {}, groupId) {
+  const { error } = await supabase.rpc('queue_club_invitation', {
+    p_group: groupId,
+    p_email: to,
+    p_message: message || null,
   })
   if (error) throw error
-  return data
+  return { ok: true }
+}
+
+/* Club-weiter Schalter: Erinnerung an den Kontoauszug (Vorstand). */
+export async function setGroupNotifyCsv(groupId, enabled) {
+  const { error } = await supabase.rpc('set_group_notify_csv', { p_group: groupId, p_enabled: enabled })
+  if (error) throw error
 }
 
 /* ──────────────────────────────────────────────────────────────────────────

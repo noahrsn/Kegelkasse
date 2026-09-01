@@ -17,6 +17,7 @@ import {
   listPlaceholders,
   addPlaceholder,
   removePlaceholder,
+  setGroupNotifyCsv,
 } from '../lib/api.js'
 import { InviteBox } from './Members'
 
@@ -354,8 +355,38 @@ function Finance({ group, onSave }) {
           />
         </div>
       </Card>
+      <CsvReminderCard group={group} />
       <SaveBar onDiscard={ed.discard} onSave={() => ed.save(transform)} saving={ed.saving} saved={ed.saved} />
     </div>
+  )
+}
+
+/* Club-weite Erinnerung an den Kontoauszug. Bewusst NICHT im Profil, sondern
+   hier: sie richtet sich an das Amt (Kassenwart/Präsident/Admin), nicht an eine
+   Person. Speichert sofort per RPC, hängt also nicht an der SaveBar oben. */
+function CsvReminderCard({ group }) {
+  const { mockMode, activeGroupId } = useAuth()
+  const [on, setOn] = useState(group?.notify_csv_import ?? true)
+
+  const toggle = (v) => {
+    setOn(v)
+    if (mockMode || !activeGroupId) return
+    setGroupNotifyCsv(activeGroupId, v).catch((e) => {
+      console.error(e)
+      setOn(!v)
+    })
+  }
+
+  return (
+    <Card className="space-y-4">
+      <div className="text-[12px] font-semibold text-ink-soft">Benachrichtigungen des Vorstands</div>
+      <Toggle
+        checked={on}
+        onChange={toggle}
+        label="An fehlenden Kontoauszug erinnern"
+        hint="Ist eine Zahlungsfrist verstrichen, ohne dass ein Kontoauszug bis zu diesem Datum importiert wurde, bekommen Kassenwart, Präsident und Admin am Tag danach und dann alle 2 Tage eine Erinnerung."
+      />
+    </Card>
   )
 }
 
