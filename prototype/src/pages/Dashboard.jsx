@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Card, Badge, Button, Avatar } from '../components/ui'
-import { pal, eur, creamLight, cx } from '../design/calm'
+import { pal, eur, creamLight, cx, accentsOnNavy } from '../design/calm'
 import { useAuth } from '../context/AuthContext.jsx'
 import {
   getGroup,
@@ -9,7 +9,6 @@ import {
   listMemberDebts,
   getNextEvent,
   getTreasury,
-  getMonthlyBilanz,
   listActivity,
   listSessions,
   getImportStatus,
@@ -81,22 +80,9 @@ function niceTime(d) {
   return d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) + ' Uhr'
 }
 
-// Monatskürzel fürs Bilanz-Diagramm (z. B. „Jul").
-function monthLabel(iso) {
-  return new Date(iso).toLocaleDateString('de-DE', { month: 'short' }).replace('.', '')
-}
-
 function buildMock() {
   const next = events.find((e) => !e.past)
   const me = members.find((m) => m.id === currentUser.id)
-  const mockBilanz = [
-    { month: '2026-01-01', bilanz: 142.5 },
-    { month: '2026-02-01', bilanz: 168.0 },
-    { month: '2026-03-01', bilanz: -34.2 },
-    { month: '2026-04-01', bilanz: 96.4 },
-    { month: '2026-05-01', bilanz: 121.8 },
-    { month: '2026-06-01', bilanz: 88.6 },
-  ]
   return {
     name: currentUser.firstName,
     meName: currentUser.name,
@@ -109,7 +95,7 @@ function buildMock() {
       attendees: members.slice(0, 5).map((m) => ({ name: m.name.split(' ')[0], full: m.name })),
       decliners: members.slice(5, 7).map((m) => ({ name: m.name.split(' ')[0], full: m.name })),
     },
-    treasury: { balance: club.treasuryBalance, bilanz: mockBilanz },
+    treasury: { balance: club.treasuryBalance, income_30d: 312.4, expense_30d: -84.2 },
     activity: activity.slice(0, 5).map((a) => ({ who: a.who, what: a.what, when: a.when, tag: a.tag, tone: a.tone })),
     pending: { sessionId: 's1', text: '09.05. · H. Meier · 12 Teilnehmer · Σ 14,80 €' },
     members: {
@@ -191,11 +177,10 @@ export default function Dashboard() {
       listMemberDebts(activeGroupId),
       getNextEvent(activeGroupId).catch(() => null),
       getTreasury(activeGroupId).catch(() => null),
-      getMonthlyBilanz(activeGroupId, 6).catch(() => []),
       listActivity(activeGroupId, 5).catch(() => []),
       listSessions(activeGroupId).catch(() => []),
     ])
-      .then(([group, mem, debts, ev, treasury, bilanz, acts, sessions]) => {
+      .then(([group, mem, debts, ev, treasury, acts, sessions]) => {
         if (!alive) return
         const myDebt = debts.find((d) => d.userId === user?.id)
         const start = ev ? new Date(ev.start_date) : null
@@ -249,7 +234,13 @@ export default function Dashboard() {
                 decliners,
               }
             : null,
-          treasury: treasury ? { balance: treasury.balance, bilanz: bilanz || [] } : null,
+          treasury: treasury
+            ? {
+                balance: treasury.balance,
+                income_30d: treasury.income_30d,
+                expense_30d: treasury.expense_30d,
+              }
+            : null,
           activity: (acts || []).map((l) => ({
             who: l.actorName,
             what: ACTION_VERB[l.action] || 'Aktivität',
@@ -301,9 +292,6 @@ export default function Dashboard() {
           <h1 className="mt-1 font-display text-3xl font-medium tracking-tight sm:text-4xl">
             Guten Tag, {vm.name}.
           </h1>
-        </div>
-        <div className="flex gap-2">
-          <Button onClick={() => navigate('/sessions/new')}>+ Kegelabend</Button>
         </div>
       </header>
 
@@ -449,9 +437,19 @@ export default function Dashboard() {
             {eur(vm.treasury?.balance ?? 0)} <span className="text-2xl font-normal text-ink-dim">€</span>
           </div>
           <div className="flex-1" />
-          <div className="mt-5 border-t border-card-edge pt-4">
-            <div className="text-[10px] uppercase tracking-wide text-ink-dim">Bilanz · 6 Monate</div>
-            <BilanzChart data={vm.treasury?.bilanz ?? []} />
+          <div className="mt-5 flex gap-2 border-t border-card-edge pt-4">
+            <div className="min-w-0 flex-1 rounded-2xl bg-sage-bg px-3 py-2.5">
+              <div className="text-[10px] uppercase text-sage">Ein · 30 Tage</div>
+              <div className="font-mono text-base font-semibold text-sage">
+                + {eur(vm.treasury?.income_30d ?? 0)} €
+              </div>
+            </div>
+            <div className="min-w-0 flex-1 rounded-2xl bg-terra-bg px-3 py-2.5">
+              <div className="text-[10px] uppercase text-terra">Aus · 30 Tage</div>
+              <div className="font-mono text-base font-semibold text-terra">
+                − {eur(Math.abs(vm.treasury?.expense_30d ?? 0))} €
+              </div>
+            </div>
           </div>
         </Card>
 
@@ -721,7 +719,7 @@ function RsvpRow({ dotColor, label, people, empty }) {
         <div className="flex flex-1 items-center">
           <div className="flex -space-x-2">
             {people.slice(0, 7).map((p, i) => (
-              <Avatar key={i} name={p.full} size={26} ring={pal.navySurface} />
+              <Avatar key={i} name={p.full} size={26} ring={pal.navySurface} accents={accentsOnNavy} />
             ))}
           </div>
           {count > 7 && (
@@ -735,36 +733,3 @@ function RsvpRow({ dotColor, label, people, empty }) {
   )
 }
 
-// Säulendiagramm der Monats-Bilanz. Höhe ∝ Betrag, Farbe nach Vorzeichen
-// (Überschuss sage, Defizit terra). Aktueller Monat hervorgehoben.
-function BilanzChart({ data }) {
-  if (!data || data.length === 0) {
-    return <div className="mt-3 py-4 text-center text-[11px] text-ink-dim">Noch keine Daten.</div>
-  }
-  const max = Math.max(1, ...data.map((d) => Math.abs(Number(d.bilanz) || 0)))
-  return (
-    <div className="mt-3 flex items-end gap-1.5" style={{ height: 88 }}>
-      {data.map((d, i) => {
-        const val = Number(d.bilanz) || 0
-        const h = Math.round((Math.abs(val) / max) * 100)
-        const pos = val >= 0
-        const last = i === data.length - 1
-        return (
-          <div key={i} className="flex flex-1 flex-col items-center justify-end gap-1.5" title={`${eur(val)} €`}>
-            <div
-              className="w-full rounded-md transition-all"
-              style={{
-                height: `${Math.max(h, 4)}%`,
-                background: pos ? pal.sage : pal.terra,
-                opacity: last ? 1 : 0.6,
-              }}
-            />
-            <span className={cx('text-[9px]', last ? 'font-semibold text-ink-soft' : 'text-ink-dim')}>
-              {monthLabel(d.month)}
-            </span>
-          </div>
-        )
-      })}
-    </div>
-  )
-}

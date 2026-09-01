@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
-import { Card, Button, Badge, PageTitle, Avatar, Bar, Field, Input } from '../components/ui'
+import { Card, Button, Badge, PageTitle, Avatar, Field, Input } from '../components/ui'
 import { Sheet } from '../components/Modal'
 import { cx, eur, pal, ROLE_LABEL } from '../design/calm'
 import { useAuth } from '../context/AuthContext.jsx'
@@ -148,24 +148,16 @@ export default function Members() {
                     <Badge tone={roleTone[m.role]}>{ROLE_LABEL[m.role]}</Badge>
                     {m.isPlaceholder && <Badge tone="amber">Nicht registriert</Badge>}
                   </div>
-                  {m.attendance != null ? (
-                    <div className="mt-1.5 flex items-center gap-2">
-                      <Bar value={m.attendance} color={pal.sage} />
-                      <span className="text-[11px] text-ink-dim">{Math.round(m.attendance * 100)}%</span>
-                    </div>
-                  ) : (
-                    <div className="mt-1 text-[11px] text-ink-dim">
-                      {m.debt > 0
-                        ? `${m.openCount || 0} offen${m.nextDue ? ` · fällig ${fmtDate(m.nextDue)}` : ''}`
-                        : 'keine offenen Posten'}
-                    </div>
-                  )}
+                  <div className="mt-1 text-[11px] text-ink-dim">
+                    {m.debt > 0
+                      ? `${m.openCount || 0} offen${m.nextDue ? ` · fällig ${fmtDate(m.nextDue)}` : ''}`
+                      : 'keine offenen Posten'}
+                  </div>
                 </div>
                 <div className="text-right">
                   <div className="font-mono text-base font-semibold tnum" style={{ color: debtColor(m.debt) }}>
                     {eur(m.debt)} €
                   </div>
-                  <div className="text-[10px] text-ink-dim">{m.debt === 0 ? 'bezahlt' : 'offen'}</div>
                 </div>
               </Card>
             </button>

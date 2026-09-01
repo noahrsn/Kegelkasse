@@ -126,7 +126,7 @@ export default function PollNew() {
 
         {/* Einstellungen */}
         <Card className="space-y-4">
-          <Toggle checked={anonymous} onChange={setAnonymous} label="Anonyme Abstimmung" hint="Wer wie abgestimmt hat, bleibt verborgen." />
+          <Toggle checked={anonymous} onChange={setAnonymous} label="Anonyme Abstimmung" hint="An: nur Zähler. Aus: jeder sieht namentlich, wer wie gestimmt hat." />
           <Toggle
             checked={resultsVisible}
             onChange={setResultsVisible}

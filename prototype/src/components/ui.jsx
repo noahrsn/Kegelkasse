@@ -92,7 +92,7 @@ export function Badge({ children, tone: t = 'neutral', className = '' }) {
 }
 
 /* ── Avatar ───────────────────────────────────────────────────────────── */
-export function Avatar({ name, size = 36, ring, src }) {
+export function Avatar({ name, size = 36, ring, src, accents }) {
   const style = {
     width: size,
     height: size,
@@ -111,7 +111,7 @@ export function Avatar({ name, size = 36, ring, src }) {
   return (
     <div
       className="grid place-items-center rounded-full font-semibold text-white shrink-0"
-      style={{ ...style, background: accentFor(name), fontSize: size * 0.36 }}
+      style={{ ...style, background: accentFor(name, accents), fontSize: size * 0.36 }}
     >
       {initials(name)}
     </div>

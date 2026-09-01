@@ -126,7 +126,7 @@ export default function Sessions() {
     <div className="space-y-5">
       <PageTitle
         kicker="Kegelabende"
-        title="Vergangene Abende"
+        title="Übersicht"
         action={<Button onClick={() => navigate('/sessions/new')}>+ Leeren starten</Button>}
       />
 
@@ -187,6 +187,7 @@ export default function Sessions() {
         </Card>
       ) : (
         <div className="space-y-3">
+          <h2 className="text-[13px] font-semibold text-ink-soft">Vergangene Abende</h2>
           {list.map((s) => {
             const st = STATUS[s.status] ?? STATUS.draft
             const to =

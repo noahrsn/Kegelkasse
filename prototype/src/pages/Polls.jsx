@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, Button, Badge, PageTitle, Empty } from '../components/ui'
+import { Card, Button, Badge, PageTitle, Empty, Avatar } from '../components/ui'
 import { Sheet } from '../components/Modal'
 import { cx, pal } from '../design/calm'
 import { useAuth } from '../context/AuthContext.jsx'
@@ -215,7 +215,7 @@ function PollCard({ poll, onVote, canManage, onClosePoll }) {
           {poll.description && <p className="mt-1 text-[12px] text-ink-soft">{poll.description}</p>}
           <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-ink-dim">
             <Badge tone={poll.closed ? 'neutral' : 'sage'}>{poll.closed ? 'Geschlossen' : 'Läuft'}</Badge>
-            {poll.anonymous && <Badge tone="navy">Anonym</Badge>}
+            <Badge tone={poll.anonymous ? 'navy' : 'neutral'}>{poll.anonymous ? 'Anonym' : 'Namentlich'}</Badge>
             {!poll.show_results && !poll.closed && <Badge tone="amber">Verdeckt</Badge>}
             {showResults && <span>{total} Stimmen</span>}
             {!poll.closed && poll.deadline && (
@@ -256,6 +256,20 @@ function PollCard({ poll, onVote, canManage, onClosePoll }) {
                 <div className="h-2.5 overflow-hidden rounded-full bg-ink/10">
                   <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: win ? pal.sage : pal.navy }} />
                 </div>
+                {/* Bei offener (nicht anonymer) Abstimmung: wer hat so gestimmt? */}
+                {!poll.anonymous && o.voters != null && o.voters.length > 0 && (
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {o.voters.map((n, i) => (
+                      <span
+                        key={i}
+                        className="inline-flex items-center gap-1 rounded-full bg-bg py-0.5 pl-0.5 pr-2"
+                      >
+                        <Avatar name={n} size={18} />
+                        <span className="text-[11px] text-ink-soft">{n}</span>
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             )
           })}

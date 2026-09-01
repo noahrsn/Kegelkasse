@@ -27,10 +27,15 @@ export const navyInk = '#2b3a55' // dunkle Schrift auf hellen Cream-Buttons
 
 // Akzentfarbe pro Person (stabil über den Namen gehasht)
 const accents = [pal.sage, pal.terra, pal.navy, pal.amber]
-export function accentFor(name = '') {
+
+// Auf der dunklen Navy-Fläche fällt pal.navy mit dem Kartengrund zusammen — dort
+// wird aus festen, helleren Tönen gewählt (in beiden Themes gleich sichtbar).
+export const accentsOnNavy = ['#8aad82', '#cf8763', '#c99a48', '#8fa6d2']
+
+export function accentFor(name = '', palette = accents) {
   let h = 0
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0
-  return accents[h % accents.length]
+  return palette[h % palette.length]
 }
 
 export function initials(name = '') {
