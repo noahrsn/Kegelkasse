@@ -1,5 +1,13 @@
 // Route-Guard. Mock-Modus: immer durchlassen (Prototyp-Demo).
 // Echtmodus: Session erforderlich; optional zusätzlich eine aktive Gruppe.
+//
+// Reihenfolge ist hier das Wesentliche:
+//   1. Solange die Session-Frage offen ist, wird nichts entschieden.
+//   2. Keine Session -> Login. Das ist der Normalfall einer abgelaufenen
+//      Anmeldung und niemals eine Fehlermeldung.
+//   3. Session da, Stammdaten noch unterwegs -> warten. Erst wenn sie da sind,
+//      darf über "hat einen Club" entschieden werden.
+import { useEffect, useState } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { Button } from './ui'
@@ -9,18 +17,23 @@ export default function ProtectedRoute({ children, requireGroup = true }) {
   const location = useLocation()
 
   if (mockMode) return children
-  if (loading) return <FullScreenLoader />
 
-  // Start ist gescheitert (Netz weg, Timeout, Backend down). Ohne diesen Zweig
-  // sähe der User einen Spinner ohne Ende oder würde fälschlich ins Onboarding
-  // geschickt, weil die Mitgliedschaften nur wegen des Fehlers leer sind.
-  if (authError) return <AuthErrorScreen error={authError} onRetry={retryAuth} />
+  // Session-Frage noch offen (Start / Wiederherstellen aus dem Storage).
+  if (!session && loading) return <FullScreenLoader />
 
   if (!session) {
     return <Navigate to="/login" replace state={{ from: location }} />
   }
 
-  // Eingeloggt, aber noch in keinem Club → Onboarding (Gruppe anlegen/beitreten).
+  // Angemeldet, aber Profil/Mitgliedschaften sind nicht erreichbar (Netz weg,
+  // Backend down). Nur hier ist ein Fehlerschirm angebracht.
+  if (authError) return <AuthErrorScreen error={authError} onRetry={retryAuth} />
+
+  // Angemeldet, Stammdaten noch unterwegs.
+  if (loading) return <FullScreenLoader />
+
+  // Eingeloggt, aber in keinem Club → Onboarding (Club gründen/beitreten).
+  // Greift erst jetzt, wo die Mitgliedschaften nachweislich geladen sind.
   if (requireGroup && memberships.length === 0) {
     return <Navigate to="/groups/new" replace />
   }
@@ -28,10 +41,23 @@ export default function ProtectedRoute({ children, requireGroup = true }) {
   return children
 }
 
-function FullScreenLoader() {
+/**
+ * Spinner mit Anlaufzeit: Ein aus dem Storage wiederhergestellter Login ist in
+ * der Regel in Millisekunden fertig. Ein sofort sichtbarer Spinner würde dabei
+ * nur kurz aufblitzen — deshalb zeigen wir erst nach einer kurzen Karenz etwas.
+ */
+export function FullScreenLoader({ delay = 350 }) {
+  const [show, setShow] = useState(false)
+  useEffect(() => {
+    const t = setTimeout(() => setShow(true), delay)
+    return () => clearTimeout(t)
+  }, [delay])
+
+  if (!show) return <div className="min-h-dvh" />
+
   return (
     <div className="grid min-h-dvh place-items-center text-sm text-ink-dim">
-      <div className="flex flex-col items-center gap-3">
+      <div className="flex animate-fade flex-col items-center gap-3">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-card-edge border-t-ink" />
         Lädt…
       </div>
@@ -54,7 +80,7 @@ function AuthErrorScreen({ error, onRetry }) {
           Keine Verbindung.
         </h1>
         <p className="mt-2 text-[14px] text-ink-soft">
-          Dein Anmeldestatus konnte nicht geladen werden. Prüf kurz deine Internetverbindung.
+          Deine Daten konnten nicht geladen werden. Prüf kurz deine Internetverbindung.
         </p>
         {error?.message && (
           <p className="mt-3 text-[12px] font-medium text-terra">{error.message}</p>

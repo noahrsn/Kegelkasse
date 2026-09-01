@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
+import PublicOnlyRoute from './components/PublicOnlyRoute'
 
 import Login from './pages/auth/Login'
 import Register from './pages/auth/Register'
@@ -46,10 +47,14 @@ function Protected({ children }) {
 export default function App() {
   return (
     <Routes>
-      {/* Öffentlich — Auth */}
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
-      <Route path="/forgot-password" element={<ForgotPassword />} />
+      {/* Öffentlich — Auth. Wer schon angemeldet ist, wird durchgereicht. */}
+      <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
+      <Route path="/register" element={<PublicOnlyRoute><Register /></PublicOnlyRoute>} />
+      <Route
+        path="/forgot-password"
+        element={<PublicOnlyRoute><ForgotPassword /></PublicOnlyRoute>}
+      />
+      {/* Recovery-Link erzeugt selbst eine Session — darf nicht umgeleitet werden. */}
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/verify-email" element={<VerifyEmail />} />
       <Route path="/join/:token" element={<Join />} />

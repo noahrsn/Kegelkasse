@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { Button, Field, Input } from '../../components/ui'
 import AuthShell from './AuthShell'
+import { afterLoginPath } from '../../components/PublicOnlyRoute.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { supabase } from '../../lib/supabase.js'
 
@@ -15,7 +16,9 @@ export default function Login() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
-  const dest = location.state?.from?.pathname || '/'
+  // Nach dem Anmelden geht es in die App — nie zurück auf eine Auth- oder
+  // Onboarding-Seite, von der man gerade erst umgeleitet wurde.
+  const dest = afterLoginPath(location)
 
   async function onSubmit(e) {
     e.preventDefault()
@@ -26,8 +29,8 @@ export default function Login() {
     }
     setBusy(true)
     const { error } = await supabase.auth.signInWithPassword({ email, password })
-    setBusy(false)
     if (error) {
+      setBusy(false)
       setError(
         error.message === 'Invalid login credentials'
           ? 'E-Mail oder Passwort ist falsch.'
@@ -35,6 +38,8 @@ export default function Login() {
       )
       return
     }
+    // `busy` bleibt bis zum Wechsel stehen — der Guard hält den Screen, bis
+    // Profil und Mitgliedschaften geladen sind.
     navigate(dest, { replace: true })
   }
 
