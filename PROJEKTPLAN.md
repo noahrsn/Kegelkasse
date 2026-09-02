@@ -90,8 +90,8 @@ Die **mobile Nutzung hat absolute Priorität.** Die App wird primär von Mitglie
 | 15 | Termin anlegen | `/calendar/new` | Einzel / Wiederkehrend / Mehrtägig; **flexibler Turnus** (täglich…jährlich) + Muster (Datum / Wochentag / n-ter Wochentag); Opt-in/Opt-out; Pflicht-Notiz-Schalter; Absagefrist als **Freitext (Stunden)** |
 | 16 | Einstellungs-Hub | `/settings` | Alle Tabs: Allgemein, Finanzen, Strafenkatalog, Regeltermine, Regelwerk, Mitglieder, Einladung |
 | 17 | Setup-Wizard | `/setup/:step` | Alle 6 Schritte klickbar durchlaufen |
-| 18 | Statistiken | `/stats` | Awards, Top-Listen, Monatsdiagramm |
-| 19 | Ewige Tabelle | `/stats/alltime` | Historisches Ranking |
+| 18 | Statistiken | `/stats` | Hub mit vier Tabs: **Club** (Kennzahlen, Verlauf, Aufschlüsselung, Rekorde), **Rangliste** (sechs wertfreie Listen), **Titel** (Auszeichnungen + Ehrentafel + Hall of Fame), **Ich**; Zeitraum **12 Monate / Gesamt** |
+| 19 | Mitglieds-Statistik | `/stats/mitglied/:userId` | Steckbrief mit Clubvergleich; `/stats/alltime` leitet auf die Rangliste um |
 | 20 | Profil | `/profile` | Eigene Daten, aktive Titel, Benachrichtigungs-Toggles, **Darstellung: Hell / Dunkel / System** |
 | 21 | Abstimmungen | `/polls` | Offene und abgeschlossene Abstimmungen, Abstimmen-Modal |
 
@@ -1112,6 +1112,18 @@ Phase 8  →  Abstimmungen & Umfragen
 Phase 9  →  Benachrichtigungen (alle Typen)
 Phase 10 →  Hardening, Tests, Sicherheit
 ```
+
+> **Nachgezogen — Statistik v2 (Migration `030_stats_v2.sql`):** Der Statistik-Bereich aus
+> Phase 7 wurde vollständig ersetzt. Neu: Zeitraumfilter (12 Monate / Gesamt, **kein**
+> Saisonbegriff), sechs wertfreie Ranglisten, persönliche Sicht mit Clubvergleich, Titel
+> getrennt in ernst gemeinte **Auszeichnungen** und die augenzwinkernde **Ehrentafel**,
+> Hall of Fame aus monatlichen `pg_cron`-Schnappschüssen.
+>
+> Dabei behoben: Rinnenwürfe hingen an `name ILIKE 'Rinnenwurf%'` (neu: Spalte
+> `penalties_catalog.stat_kind`), die Anwesenheitsquote lief gegen alle Abende der Gruppe
+> statt ab dem eigenen Beitritt, und „Eisenmann" war eine Näherung statt der echten Serie.
+> `group_awards()`, `stats_monthly()` und `member_session_stats` bleiben für Dashboard und
+> Mitgliederliste bestehen.
 
 ---
 

@@ -627,7 +627,9 @@ export async function getImportStatus(groupId) {
   return data || { needs_import: false }
 }
 
-/* Aktuelle Auszeichnungen (RPC, live berechnet). */
+/* Aktuelle Auszeichnungen (RPC, live berechnet).
+   Alt — nur noch für Members.jsx/Dashboard.jsx. Der /stats-Bereich nutzt
+   getClubAwards() aus dem Statistik-v2-Block weiter unten. */
 export async function getAwards(groupId) {
   const { data, error } = await supabase.rpc('group_awards', { p_group_id: groupId })
   if (error) throw error
@@ -659,6 +661,113 @@ export async function listSessionStats(groupId) {
     paymentTotal: Number(s.payment_total) || 0,
     attendance: Number(s.total_sessions) > 0 ? Number(s.attended) / Number(s.total_sessions) : 0,
   }))
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Statistik v2 (Migration 030) — Club, Rangliste, Titel, Ich
+ *
+ * Es gibt bewusst keinen Saisonbegriff: der Zeitraum ist entweder die letzten
+ * zwölf Monate oder alles. Alle RPCs nehmen p_from/p_to, NULL heißt unbegrenzt.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+export const STATS_RANGES = ['12m', 'all']
+
+/* '12m' → ab dem Ersten des Monats vor elf Monaten (12 Monatsbalken inkl.
+   dem laufenden). 'all' → keine Grenze. p_to bleibt offen, die RPCs deckeln
+   selbst auf heute. */
+export function statsRange(range = '12m') {
+  if (range === 'all') return { from: null, to: null }
+  const d = new Date()
+  const start = new Date(d.getFullYear(), d.getMonth() - 11, 1)
+  const pad = (n) => String(n).padStart(2, '0')
+  return { from: `${start.getFullYear()}-${pad(start.getMonth() + 1)}-01`, to: null }
+}
+
+/* Club-Kennzahlen und Rekord-Abende. */
+export async function getStatsOverview(groupId, range = '12m') {
+  const { from, to } = statsRange(range)
+  const { data, error } = await supabase.rpc('stats_overview', {
+    p_group_id: groupId,
+    p_from: from,
+    p_to: to,
+  })
+  if (error) throw error
+  return data || {}
+}
+
+/* Monatsreihe mit allen Kennzahlen — das Chart schaltet clientseitig um. */
+export async function getStatsTimeline(groupId, range = '12m') {
+  const { from, to } = statsRange(range)
+  const { data, error } = await supabase.rpc('stats_timeline', {
+    p_group_id: groupId,
+    p_from: from,
+    p_to: to,
+  })
+  if (error) throw error
+  return data || []
+}
+
+/* Eine wertfreie Rangliste. metric: penalties | rinnen | attendance | games |
+   late | late_fees. Immer absteigend — die Einordnung macht die Beschriftung. */
+export async function getLeaderboard(groupId, metric = 'penalties', range = '12m') {
+  const { from, to } = statsRange(range)
+  const { data, error } = await supabase.rpc('stats_leaderboard', {
+    p_group_id: groupId,
+    p_metric: metric,
+    p_from: from,
+    p_to: to,
+  })
+  if (error) throw error
+  return data || []
+}
+
+/* Strafen nach Katalogposition. userId = null → ganzer Club. */
+export async function getPenaltyBreakdown(groupId, range = '12m', userId = null) {
+  const { from, to } = statsRange(range)
+  const { data, error } = await supabase.rpc('stats_penalty_breakdown', {
+    p_group_id: groupId,
+    p_from: from,
+    p_to: to,
+    p_user_id: userId,
+  })
+  if (error) throw error
+  return data || []
+}
+
+/* Persönliche Kennzahlen inkl. Clubschnitt, Verlauf und Aufschlüsselung.
+   userId = null → der angemeldete Nutzer. */
+export async function getMemberStats(groupId, userId = null, range = '12m') {
+  const { from, to } = statsRange(range)
+  const { data, error } = await supabase.rpc('stats_member', {
+    p_group_id: groupId,
+    p_user_id: userId,
+    p_from: from,
+    p_to: to,
+  })
+  if (error) throw error
+  return data || {}
+}
+
+/* Titel: kind 'honor' = Auszeichnung, kind 'fun' = Ehrentafel. */
+export async function getClubAwards(groupId, range = '12m') {
+  const { from, to } = statsRange(range)
+  const { data, error } = await supabase.rpc('group_awards_v2', {
+    p_group_id: groupId,
+    p_from: from,
+    p_to: to,
+  })
+  if (error) throw error
+  return data || []
+}
+
+/* Titel-Historie aus den monatlichen Schnappschüssen (pg_cron). */
+export async function getHallOfFame(groupId, limit = 12) {
+  const { data, error } = await supabase.rpc('stats_hall_of_fame', {
+    p_group_id: groupId,
+    p_limit: limit,
+  })
+  if (error) throw error
+  return data || []
 }
 
 /* ──────────────────────────────────────────────────────────────────────────

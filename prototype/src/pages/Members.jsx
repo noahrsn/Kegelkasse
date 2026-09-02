@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { Card, Button, PageTitle, Avatar, Field, Input, Textarea } from '../components/ui'
 import { Sheet } from '../components/Modal'
@@ -289,6 +290,14 @@ function MemberSheet({ member, onClose, canManage, mockMode, groupId, onChanged 
               </div>
             )}
           </div>
+
+          <Link
+            to={`/stats/mitglied/${member.userId ?? member.id}`}
+            className="flex items-center justify-between rounded-2xl bg-bg px-4 py-3 text-[13px] font-semibold"
+          >
+            Statistik ansehen
+            <span className="text-ink-dim">›</span>
+          </Link>
 
           {/* Offene Posten (Echtmodus) */}
           {!mockMode && (

@@ -29,7 +29,7 @@ import CalendarNew from './pages/calendar/CalendarNew'
 import CalendarEdit from './pages/calendar/CalendarEdit'
 import Settings from './pages/Settings'
 import Stats from './pages/stats/Stats'
-import StatsAlltime from './pages/stats/StatsAlltime'
+import MemberStats from './pages/stats/MemberStats'
 import Profile from './pages/Profile'
 import Polls from './pages/Polls'
 import PollNew from './pages/PollNew'
@@ -88,7 +88,9 @@ export default function App() {
       <Route path="/calendar/:id/edit" element={<Protected><CalendarEdit /></Protected>} />
       <Route path="/settings" element={<Protected><Settings /></Protected>} />
       <Route path="/stats" element={<Protected><Stats /></Protected>} />
-      <Route path="/stats/alltime" element={<Protected><StatsAlltime /></Protected>} />
+      <Route path="/stats/mitglied/:userId" element={<Protected><MemberStats /></Protected>} />
+      {/* Die ewige Tabelle ist in der Rangliste aufgegangen. */}
+      <Route path="/stats/alltime" element={<Navigate to="/stats?tab=rangliste&p=all" replace />} />
       <Route path="/profile" element={<Protected><Profile /></Protected>} />
       <Route path="/polls" element={<Protected><Polls /></Protected>} />
       <Route path="/polls/new" element={<Protected><PollNew /></Protected>} />
