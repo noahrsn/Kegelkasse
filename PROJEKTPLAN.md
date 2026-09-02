@@ -959,7 +959,7 @@ eine Benachrichtigung (`dedup_key` auf `series_id`).
 | Verein | `award_received` | Betroffener | aus |
 | System | `club_invitation` | Eingeladener | transaktional |
 | System | `csv_import_reminder` (nach Frist, dann alle 2 Tage) | Vorstand | Club-Einstellung |
-| System | `test_email` | Auslöser | manuell |
+| System | `test_email` | nur via SQL (`send_test_notification`, service_role) | Debug |
 
 ### Sicherheit & Recht
 - **Kein offener Versand-Endpunkt mehr.** Einladungen laufen über die RPC `queue_club_invitation`
@@ -976,8 +976,8 @@ Env: `RESEND_API_KEY`, optional `RESEND_FROM_EMAIL`, `RESEND_FROM_NAME`, `APP_UR
 (Default `https://pudlapp.de`). Ohne `RESEND_API_KEY` wird nur geloggt statt versendet.
 
 ### Frontend
-- **Profil:** Katalog kommt vom Server (`get_notification_settings`), nach Kategorien
-  eingeklappt, Master-Schalter „E-Mails erhalten", Button „Testmail an mich".
+- **Profil:** Katalog kommt vom Server (`get_notification_settings`), alle Kategorien
+  eingeklappt, Master-Schalter „E-Mails erhalten".
 - **Glocke** in Sidebar und Mobile-Topbar mit Ungelesen-Zähler (Minuten-Polling), Sheet mit Feed,
   Klick springt zum Ziel und markiert gelesen, „Alle als gelesen markieren".
 - **Club-Einstellungen → Kasse:** Schalter für die Kontoauszug-Erinnerung des Vorstands.

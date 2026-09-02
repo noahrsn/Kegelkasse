@@ -1179,8 +1179,11 @@ BEGIN
 END;
 $$;
 
-REVOKE EXECUTE ON FUNCTION public.send_test_notification(UUID) FROM anon, public;
-GRANT  EXECUTE ON FUNCTION public.send_test_notification(UUID) TO authenticated;
+-- Kein Client-Aufrufer: der „Testmail an mich"-Button im Profil wurde wieder
+-- entfernt. Die Funktion bleibt als Debug-Werkzeug über SQL erreichbar, ist
+-- aber bewusst nicht mehr aus dem Browser aufrufbar.
+REVOKE EXECUTE ON FUNCTION public.send_test_notification(UUID) FROM anon, authenticated, public;
+GRANT  EXECUTE ON FUNCTION public.send_test_notification(UUID) TO service_role;
 
 -- Einladung per E-Mail. Läuft bewusst über die Outbox statt über eine offene
 -- Edge Function — nur Admin/Präsident dürfen einladen.

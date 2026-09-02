@@ -11,7 +11,6 @@ import {
   saveNotifSetting,
   getNotifEmailEnabled,
   setNotifEmailEnabled,
-  sendTestNotification,
   getMyAvatar,
   uploadAvatar,
   setMyAvatar,
@@ -276,8 +275,6 @@ function NotificationsCard() {
   const [emailOn, setEmailOn] = useState(true)
   const [open, setOpen] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [testing, setTesting] = useState(false)
-  const [testMsg, setTestMsg] = useState(null)
 
   useEffect(() => {
     if (mockMode || !activeGroupId) {
@@ -291,7 +288,6 @@ function NotificationsCard() {
         if (!alive) return
         setTypes(rows)
         setEmailOn(master)
-        setOpen(rows[0]?.category ?? null)
       })
       .catch((e) => console.error(e))
       .finally(() => alive && setLoading(false))
@@ -317,20 +313,6 @@ function NotificationsCard() {
         console.error(e)
         setEmailOn(!value)
       })
-    }
-  }
-
-  const sendTest = async () => {
-    if (!activeGroupId) return
-    setTesting(true)
-    setTestMsg(null)
-    try {
-      const to = await sendTestNotification(activeGroupId)
-      setTestMsg(`Testmail an ${to} eingereiht — sie kommt in wenigen Minuten an.`)
-    } catch (e) {
-      setTestMsg(e.message || 'Testmail fehlgeschlagen')
-    } finally {
-      setTesting(false)
     }
   }
 
@@ -396,13 +378,6 @@ function NotificationsCard() {
           })}
         </div>
       )}
-
-      <div className="flex flex-wrap items-center gap-3">
-        <Button variant="soft" size="sm" disabled={testing || mockMode} onClick={sendTest}>
-          {testing ? 'Sendet…' : 'Testmail an mich'}
-        </Button>
-        {testMsg && <span className="text-[11px] text-ink-dim">{testMsg}</span>}
-      </div>
     </Card>
   )
 }

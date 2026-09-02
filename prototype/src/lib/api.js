@@ -736,13 +736,6 @@ export async function setNotifEmailEnabled(groupId, userId, enabled) {
   if (error) throw error
 }
 
-/* Testmail an die eigene Adresse (prüft Domain/Absender/Versandweg). */
-export async function sendTestNotification(groupId) {
-  const { data, error } = await supabase.rpc('send_test_notification', { p_group: groupId })
-  if (error) throw error
-  return data
-}
-
 /* ── In-App-Feed (Glocke) ───────────────────────────────────────────────── */
 
 export async function listNotifications(groupId, limit = 30) {
