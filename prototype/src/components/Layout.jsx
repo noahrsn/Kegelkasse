@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { NavLink, useLocation, useNavigate, Link } from 'react-router-dom'
 import { cx, pal } from '../design/calm'
 import { Avatar, Button, Empty } from './ui'
@@ -10,6 +10,7 @@ import {
   markNotificationRead,
   markAllNotificationsRead,
 } from '../lib/api.js'
+import { notifications as mockNotifications } from '../mock/data'
 
 const roleLabels = {
   admin: 'Admin',
@@ -47,6 +48,14 @@ const more = [
 ]
 
 export default function Layout({ children }) {
+  return (
+    <NotificationsProvider>
+      <Shell>{children}</Shell>
+    </NotificationsProvider>
+  )
+}
+
+function Shell({ children }) {
   const [drawer, setDrawer] = useState(false)
 
   return (
@@ -118,6 +127,9 @@ export default function Layout({ children }) {
 
       {/* ── Mobile-Drawer ─────────────────────────────────────────────── */}
       {drawer && <Drawer onClose={() => setDrawer(false)} />}
+
+      {/* Ein einziges Sheet für beide Glocken (Sidebar + Topbar). */}
+      <NotificationSheet />
     </div>
   )
 }
@@ -495,132 +507,209 @@ function DotsIcon(p) {
 
 /* ── Glocke + Benachrichtigungs-Feed ──────────────────────────────────────
  * Zeigt dieselben Nachrichten, die auch per E-Mail rausgehen — gesteuert von
- * denselben Schaltern im Profil. Der ungelesen-Zähler wird beim Öffnen und
- * danach minütlich aktualisiert (kein Realtime-Channel nötig, die Frequenz
- * dieser App ist niedrig).
+ * denselben Schaltern im Profil.
+ *
+ * Der Zustand liegt bewusst im Provider und nicht in der Glocke: Sidebar und
+ * Mobile-Topbar rendern BEIDE eine Glocke (die jeweils andere ist nur per CSS
+ * versteckt, aber trotzdem gemountet). Mit lokalem State fragte jede ihren
+ * eigenen Zähler ab, und „alles gelesen" in der einen bekam die andere nicht
+ * mit. Das Sheet hängt aus demselben Grund einmal am Layout statt an jeder
+ * Glocke.
  */
-function NotificationBell({ className = '', wide = false }) {
-  const navigate = useNavigate()
+const NotifCtx = createContext(null)
+const useNotifs = () => useContext(NotifCtx)
+
+function NotificationsProvider({ children }) {
   const { mockMode, activeGroupId } = useAuth()
   const [open, setOpen] = useState(false)
   const [unread, setUnread] = useState(0)
   const [items, setItems] = useState(null)
 
+  /* Badge: günstige Count-Abfrage. Minütlich und zusätzlich, sobald der Tab
+     wieder sichtbar wird — nach dem Sperrbildschirm ist das der Normalfall. */
   const refreshCount = useCallback(() => {
-    if (mockMode || !activeGroupId) return
+    if (mockMode) {
+      setUnread(mockNotifications.filter((n) => !n.read_at).length)
+      return
+    }
+    if (!activeGroupId) {
+      setUnread(0)
+      return
+    }
     countUnreadNotifications(activeGroupId)
       .then(setUnread)
-      .catch(() => {})
+      .catch((e) => console.error(e))
   }, [mockMode, activeGroupId])
 
   useEffect(() => {
     refreshCount()
-    const t = setInterval(refreshCount, 60000)
-    return () => clearInterval(t)
+    const timer = setInterval(refreshCount, 60000)
+    const onWake = () => document.visibilityState === 'visible' && refreshCount()
+    window.addEventListener('focus', onWake)
+    document.addEventListener('visibilitychange', onWake)
+    return () => {
+      clearInterval(timer)
+      window.removeEventListener('focus', onWake)
+      document.removeEventListener('visibilitychange', onWake)
+    }
   }, [refreshCount])
 
+  /* Den Feed erst beim Öffnen laden — und in JEDEM Zweig einen Endzustand
+     setzen, sonst hängt das Sheet dauerhaft im „Wird geladen…". */
   useEffect(() => {
-    if (!open || mockMode || !activeGroupId) return
+    if (!open) return undefined
+    if (mockMode) {
+      setItems(mockNotifications)
+      return undefined
+    }
+    if (!activeGroupId) {
+      setItems([])
+      return undefined
+    }
+    let alive = true
     setItems(null)
     listNotifications(activeGroupId)
-      .then(setItems)
+      .then((rows) => alive && setItems(rows))
       .catch((e) => {
         console.error(e)
-        setItems([])
+        if (alive) setItems([])
       })
+    return () => {
+      alive = false
+    }
   }, [open, mockMode, activeGroupId])
 
-  const openItem = async (n) => {
+  /* Clubwechsel: alten Feed verwerfen, sonst zeigt die Glocke kurz fremde Posts. */
+  useEffect(() => {
+    setItems(null)
     setOpen(false)
-    if (!n.read_at) {
+  }, [activeGroupId])
+
+  const markRead = useCallback(
+    (n) => {
+      if (n.read_at) return
+      const now = new Date().toISOString()
       setUnread((u) => Math.max(0, u - 1))
-      markNotificationRead(n.id).catch(() => {})
-    }
-    if (n.url) navigate(n.url)
-  }
+      setItems((cur) => (cur || []).map((x) => (x.id === n.id ? { ...x, read_at: now } : x)))
+      if (!mockMode) markNotificationRead(n.id).catch((e) => console.error(e))
+    },
+    [mockMode],
+  )
 
-  const readAll = async () => {
-    if (!activeGroupId) return
+  const markAllRead = useCallback(() => {
+    const now = new Date().toISOString()
     setUnread(0)
-    setItems((cur) => (cur || []).map((n) => ({ ...n, read_at: n.read_at || new Date().toISOString() })))
-    markAllNotificationsRead(activeGroupId).catch(() => {})
-  }
+    setItems((cur) => (cur || []).map((x) => ({ ...x, read_at: x.read_at || now })))
+    if (!mockMode && activeGroupId) {
+      markAllNotificationsRead(activeGroupId).catch((e) => console.error(e))
+    }
+  }, [mockMode, activeGroupId])
 
+  return (
+    <NotifCtx.Provider value={{ open, setOpen, unread, items, markRead, markAllRead }}>
+      {children}
+    </NotifCtx.Provider>
+  )
+}
+
+function NotificationBell({ className = '', wide = false }) {
+  const { unread, setOpen } = useNotifs()
   const badge = unread > 9 ? '9+' : String(unread)
 
   return (
-    <>
-      <button
-        onClick={() => setOpen(true)}
-        aria-label={unread ? `Benachrichtigungen (${unread} ungelesen)` : 'Benachrichtigungen'}
-        className={cx(
-          'relative shrink-0 border border-card-edge bg-card text-ink-soft transition hover:text-ink',
-          wide
-            ? 'flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-[13px] font-medium'
-            : 'grid h-10 w-10 place-items-center rounded-full',
-          className,
+    <button
+      onClick={() => setOpen(true)}
+      aria-label={unread ? `Benachrichtigungen (${unread} ungelesen)` : 'Benachrichtigungen'}
+      className={cx(
+        'relative shrink-0 border border-card-edge bg-card text-ink-soft transition hover:text-ink',
+        wide
+          ? 'flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-[13px] font-medium'
+          : 'grid h-10 w-10 place-items-center rounded-full',
+        className,
+      )}
+    >
+      <span className="relative">
+        <BellIcon className="h-5 w-5" />
+        {!wide && unread > 0 && (
+          <span className="absolute -right-1.5 -top-1 grid h-4 min-w-[16px] place-items-center rounded-full bg-terra px-1 text-[9px] font-bold text-white">
+            {badge}
+          </span>
         )}
-      >
-        <span className="relative">
-          <BellIcon className="h-5 w-5" />
-          {unread > 0 && (
-            <span className="absolute -right-1.5 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-terra px-1 text-[9px] font-bold text-white">
-              {badge}
-            </span>
-          )}
-        </span>
-        {wide && <span className="flex-1 text-left">Benachrichtigungen</span>}
-      </button>
+      </span>
+      {wide && <span className="flex-1 text-left">Benachrichtigungen</span>}
+      {wide && unread > 0 && (
+        <span className="rounded-full bg-terra-bg px-2 py-0.5 text-[10px] font-bold text-terra">{badge}</span>
+      )}
+    </button>
+  )
+}
 
-      <Sheet
-        open={open}
-        onClose={() => setOpen(false)}
-        title="Benachrichtigungen"
-        subtitle={unread ? `${unread} ungelesen` : 'Alles gelesen'}
-        footer={
-          unread > 0 ? (
-            <Button variant="soft" className="w-full" onClick={readAll}>
-              Alle als gelesen markieren
-            </Button>
-          ) : null
-        }
-      >
-        {items === null ? (
-          <div className="py-8 text-center text-[12px] text-ink-dim">Wird geladen…</div>
-        ) : items.length === 0 ? (
-          <Empty
-            icon="🔔"
-            title="Noch nichts passiert"
-            hint="Strafen, Termine und Abstimmungen tauchen hier auf."
-          />
-        ) : (
-          <div className="divide-y divide-card-edge">
-            {items.map((n) => (
-              <button
-                key={n.id}
-                onClick={() => openItem(n)}
-                className="flex w-full items-start gap-3 py-3 text-left"
-              >
+function NotificationSheet() {
+  const navigate = useNavigate()
+  const { open, setOpen, unread, items, markRead, markAllRead } = useNotifs()
+
+  const openItem = (n) => {
+    setOpen(false)
+    markRead(n)
+    if (n.url) navigate(n.url)
+  }
+
+  return (
+    <Sheet
+      open={open}
+      onClose={() => setOpen(false)}
+      title="Benachrichtigungen"
+      subtitle={unread ? `${unread} ungelesen` : 'Alles gelesen'}
+      footer={
+        unread > 0 ? (
+          <Button variant="soft" className="w-full" onClick={markAllRead}>
+            Alle als gelesen markieren
+          </Button>
+        ) : null
+      }
+    >
+      {items === null ? (
+        <div className="py-8 text-center text-[12px] text-ink-dim">Wird geladen…</div>
+      ) : items.length === 0 ? (
+        <Empty
+          icon="🔔"
+          title="Noch nichts passiert"
+          hint="Strafen, Termine und Abstimmungen tauchen hier auf."
+        />
+      ) : (
+        <div className="divide-y divide-card-edge">
+          {items.map((n) => (
+            <button
+              key={n.id}
+              onClick={() => openItem(n)}
+              className="flex w-full items-start gap-3 py-3 text-left"
+            >
+              <span
+                className={cx(
+                  'mt-1.5 h-2 w-2 shrink-0 rounded-full',
+                  n.read_at ? 'bg-transparent' : 'bg-terra',
+                )}
+              />
+              <span className="min-w-0 flex-1">
                 <span
                   className={cx(
-                    'mt-1.5 h-2 w-2 shrink-0 rounded-full',
-                    n.read_at ? 'bg-transparent' : 'bg-terra',
+                    'block text-[13px]',
+                    n.read_at ? 'font-medium text-ink-soft' : 'font-semibold text-ink',
                   )}
-                />
-                <span className="min-w-0 flex-1">
-                  <span className={cx('block text-[13px]', n.read_at ? 'font-medium text-ink-soft' : 'font-semibold text-ink')}>
-                    {n.title}
-                  </span>
-                  {n.body && <span className="mt-0.5 block text-[12px] leading-relaxed text-ink-dim">{n.body}</span>}
-                  <span className="mt-1 block text-[10.5px] text-ink-dim">{relTime(n.created_at)}</span>
+                >
+                  {n.title}
                 </span>
-                {n.url && <span className="mt-1 text-ink-dim">›</span>}
-              </button>
-            ))}
-          </div>
-        )}
-      </Sheet>
-    </>
+                {n.body && (
+                  <span className="mt-0.5 block text-[12px] leading-relaxed text-ink-dim">{n.body}</span>
+                )}
+                <span className="mt-1 block text-[10.5px] text-ink-dim">{relTime(n.created_at)}</span>
+              </span>
+              {n.url && <span className="mt-1 text-ink-dim">›</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </Sheet>
   )
 }
 

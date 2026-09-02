@@ -247,3 +247,55 @@ export const myDebts = [
   { id: 'd4', type: 'monthly_fee', desc: 'Monatsbeitrag April', amount: 5.0, due: '2026-04-21', paid: true },
   { id: 'd5', type: 'late_payment_fee', desc: 'Verspätungsstrafe März', amount: 2.0, due: '2026-04-21', paid: true },
 ]
+
+// Benachrichtigungs-Feed hinter der Glocke (Prototyp-Modus).
+// created_at relativ zu "jetzt", damit die Zeitangaben im Feed plausibel bleiben.
+const ago = (min) => new Date(Date.now() - min * 60000).toISOString()
+
+export const notifications = [
+  {
+    id: 'n1',
+    type: 'session_approved',
+    title: 'Kegelabend genehmigt',
+    body: 'Abend vom 25.04.2026 · deine Strafen: 6,50 €',
+    url: '/sessions',
+    created_at: ago(35),
+    read_at: null,
+  },
+  {
+    id: 'n2',
+    type: 'event_created',
+    title: 'Neuer Termin: Kegelabend Mai',
+    body: '16.05.2026 um 19:30 Uhr · Bowlingcenter Pin Royal',
+    url: '/calendar',
+    created_at: ago(190),
+    read_at: null,
+  },
+  {
+    id: 'n3',
+    type: 'poll_new',
+    title: 'Neue Abstimmung: Sommerausflug',
+    body: 'Stimme bis 20.05.2026 um 18:00 Uhr ab.',
+    url: '/polls',
+    created_at: ago(1500),
+    read_at: null,
+  },
+  {
+    id: 'n4',
+    type: 'payment_due_soon',
+    title: 'Zahlungsfrist am 21.05.2026',
+    body: 'Offen: 15,60 € — bitte bis dahin überweisen.',
+    url: '/profile',
+    created_at: ago(2900),
+    read_at: ago(2800),
+  },
+  {
+    id: 'n5',
+    type: 'award_received',
+    title: 'Neuer Titel: Goldesel',
+    body: 'Zeitraum: April 2026',
+    url: '/stats',
+    created_at: ago(4300),
+    read_at: ago(4200),
+  },
+]
