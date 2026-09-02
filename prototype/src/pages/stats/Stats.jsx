@@ -7,10 +7,12 @@ import RankingTab from './RankingTab.jsx'
 import AwardsTab from './AwardsTab.jsx'
 import MeTab from './MeTab.jsx'
 
+// Titel zuerst: das ist der Teil, den man sich zwischendurch ansieht.
+// Club und Rangliste sind Nachschlagewerke.
 const TABS = [
+  { key: 'titel', label: 'Titel' },
   { key: 'club', label: 'Club' },
   { key: 'rangliste', label: 'Rangliste' },
-  { key: 'titel', label: 'Titel' },
   { key: 'ich', label: 'Ich' },
 ]
 
@@ -49,7 +51,7 @@ export default function Stats() {
 
   // Tab und Zeitraum stehen in der URL, damit Zurück-Taste und geteilte Links
   // funktionieren.
-  const tab = TABS.some((t) => t.key === params.get('tab')) ? params.get('tab') : 'club'
+  const tab = TABS.some((t) => t.key === params.get('tab')) ? params.get('tab') : 'titel'
   const range = RANGES.some((r) => r.key === params.get('p')) ? params.get('p') : '12m'
 
   const setParam = (key, val) => {

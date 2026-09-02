@@ -214,7 +214,16 @@ export function SplitBar({ items = [], color = pal.amber }) {
           <span className="w-6 shrink-0 text-center text-[15px]">{it.icon || '🎳'}</span>
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline justify-between gap-2">
-              <span className="truncate text-[13px]">{it.name}</span>
+              <span className="flex min-w-0 items-baseline gap-1.5">
+                <span className="truncate text-[13px]">{it.name}</span>
+                {/* Spielpositionen abheben, damit „Verloren" (normale
+                    Katalogstrafe) und „3,50 €-Spiel" nicht verwechselt werden. */}
+                {it.game_kind && (
+                  <span className="shrink-0 rounded-full bg-ink/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-ink-soft">
+                    Spiel
+                  </span>
+                )}
+              </span>
               <span className="shrink-0 font-mono text-[13px] font-semibold tnum">
                 {eur(it.amount)} €
               </span>

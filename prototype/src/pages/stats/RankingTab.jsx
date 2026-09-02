@@ -15,13 +15,14 @@ import { statsLeaderboards as mockBoards } from '../../mock/stats'
 const METRICS = [
   {
     key: 'penalties', label: 'Strafen', color: pal.terra, zeroCollapse: true,
-    format: (v) => `${eur(v)} €`, note: 'Summe der erfassten Strafen im Zeitraum.',
+    format: (v) => `${eur(v)} €`,
+    note: 'Endsumme der Kegelabende inklusive Durchschnittsstrafen, plus Verspätungsstrafen.',
     zeroNote: 'ohne Strafen',
   },
   {
-    key: 'rinnen', label: 'Rinnen', color: pal.sage, zeroCollapse: true,
-    format: (v) => String(v), note: 'Gezählt wird jede Katalogposition, die als Rinnenwurf markiert ist.',
-    zeroNote: 'ohne Rinnenwurf',
+    key: 'rinnen', label: 'Pudel', color: pal.sage, zeroCollapse: true,
+    format: (v) => String(v), note: 'Gezählt wird jede Katalogposition, die als Pudel markiert ist — ohne Gastkegler.',
+    zeroNote: 'ohne Pudel',
   },
   {
     key: 'attendance', label: 'Anwesenheit', color: pal.navy, zeroCollapse: false,
@@ -30,7 +31,7 @@ const METRICS = [
   },
   {
     key: 'games', label: 'Spiele verloren', color: pal.amber, zeroCollapse: true,
-    format: (v) => String(v), note: 'Verlorene Einzel-, Team- und 3,50-€-Spiele.',
+    format: (v) => String(v), note: 'Verlorene Einzel- und 2-Teams-Spiele. Das 3,50-€-Spiel zählt nicht mit.',
     zeroNote: 'ohne verlorenes Spiel',
   },
   {

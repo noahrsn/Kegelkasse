@@ -6,15 +6,26 @@ import { cx, creamLight } from '../../design/calm'
 import { getClubAwards, getHallOfFame } from '../../lib/api.js'
 import { statsAwards as mockAwards, statsHallOfFame as mockHof } from '../../mock/stats'
 
+/* „Anna", „Anna & Ben", „Anna, Ben & Cem" */
+function joinNames(names) {
+  if (names.length <= 1) return names[0] || ''
+  return `${names.slice(0, -1).join(', ')} & ${names[names.length - 1]}`
+}
+
 /* Titelkarte. `tone: 'navy'` ist eine dunkle Fläche — dort brauchen Schrift
-   und Icon eigene Helligkeiten. */
-function AwardCard({ a, onClick, index }) {
+   und Icon eigene Helligkeiten.
+   Ein Titel kann geteilt sein: bei Gleichstand tragen ihn bis zu drei
+   gemeinsam. Mehr als drei, und der Server gibt ihn gar nicht erst aus. */
+function AwardCard({ a, onOpen, index }) {
   const dark = a.tone === 'navy'
+  const holders = a.holders || []
+  const shared = holders.length > 1
+
   return (
     <Card
       as="button"
       tone={a.tone}
-      onClick={onClick}
+      onClick={() => holders[0] && onOpen(holders[0].user_id)}
       className={cx('animate-rise w-full text-left', dark && 'text-white')}
       style={{ animationDelay: `${index * 45}ms` }}
     >
@@ -28,16 +39,32 @@ function AwardCard({ a, onClick, index }) {
       </div>
 
       <div
-        className="mt-3 text-[13px] font-semibold"
+        className="mt-3 flex items-center gap-2 text-[13px] font-semibold"
         style={dark ? { color: creamLight } : undefined}
       >
         {a.type}
+        {shared && (
+          <span
+            className={cx(
+              'rounded-full px-2 py-0.5 text-[10px] font-semibold',
+              dark ? 'bg-white/15 text-white/80' : 'bg-ink/10 text-ink-soft',
+            )}
+          >
+            geteilt
+          </span>
+        )}
       </div>
 
       <div className="mt-2 flex items-center gap-2">
-        <Avatar name={a.holder} src={a.avatar_url || undefined} size={28} />
+        <div className="flex items-center">
+          {holders.map((h, i) => (
+            <div key={h.user_id} style={{ marginLeft: i === 0 ? 0 : -8 }}>
+              <Avatar name={h.holder} src={h.avatar_url || undefined} size={28} />
+            </div>
+          ))}
+        </div>
         <span className={cx('text-[14px] font-semibold', dark ? 'text-white' : 'text-ink')}>
-          {a.holder}
+          {joinNames(holders.map((h) => h.holder))}
         </span>
       </div>
 
@@ -99,7 +126,7 @@ export default function AwardsTab({ groupId, range, mockMode }) {
         <Empty
           icon="🏆"
           title="Noch keine Titel"
-          hint="Titel entstehen aus genehmigten Kegelabenden. Für Serien und Quoten braucht es mindestens drei Abende."
+          hint="Titel entstehen aus genehmigten Kegelabenden. Für Serien und Quoten braucht es mindestens drei Abende — und mehr als drei Gleichplatzierte lassen einen Titel unvergeben."
         />
       </Card>
     )
@@ -115,7 +142,7 @@ export default function AwardsTab({ groupId, range, mockMode }) {
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {honors.map((a, i) => (
-              <AwardCard key={a.type} a={a} index={i} onClick={() => open(a.user_id)} />
+              <AwardCard key={a.type} a={a} index={i} onOpen={open} />
             ))}
           </div>
         </section>
@@ -131,7 +158,7 @@ export default function AwardsTab({ groupId, range, mockMode }) {
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {fun.map((a, i) => (
-              <AwardCard key={a.type} a={a} index={i} onClick={() => open(a.user_id)} />
+              <AwardCard key={a.type} a={a} index={i} onOpen={open} />
             ))}
           </div>
         </section>
@@ -167,7 +194,7 @@ export default function AwardsTab({ groupId, range, mockMode }) {
                 <div className="mt-2">
                   {period.titles.map((t) => (
                     <button
-                      key={`${period.period_ref}-${t.type}`}
+                      key={`${period.period_ref}-${t.type}-${t.user_id}`}
                       onClick={() => open(t.user_id)}
                       className="flex w-full items-center gap-3 border-b border-card-edge py-2.5 text-left last:border-0"
                     >

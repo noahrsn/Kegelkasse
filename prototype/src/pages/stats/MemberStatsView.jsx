@@ -56,7 +56,7 @@ export default function MemberStatsView({ data, self = false, showHeader = true 
               />
               <KpiTile label="Strafen" value={eur(d.penalty_total)} unit="€" tone="terra" />
               <KpiTile label="Ø je Abend" value={eur(d.penalty_per_session)} unit="€" />
-              <KpiTile label="Rinnen" value={d.rinnen} tone="sage" />
+              <KpiTile label="Pudel" value={d.rinnen} tone="sage" />
               <KpiTile label="Spiele verloren" value={d.games} tone="amber" />
             </div>
           </Card>
@@ -85,7 +85,7 @@ export default function MemberStatsView({ data, self = false, showHeader = true 
                 format={(v) => String(Math.round(v))}
               />
               <CompareRow
-                label="Rinnenwürfe"
+                label="Pudel"
                 value={d.rinnen}
                 avg={d.club_avg?.rinnen}
                 format={(v) => String(Math.round(v))}

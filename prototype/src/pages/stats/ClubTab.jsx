@@ -15,7 +15,7 @@ import {
 const METRICS = [
   { key: 'penalties', label: 'Strafen', color: pal.terra, format: (v) => `${eur(v)} €` },
   { key: 'participants', label: 'Teilnehmer', color: pal.navy, format: (v) => String(v) },
-  { key: 'rinnen', label: 'Rinnen', color: pal.sage, format: (v) => String(v) },
+  { key: 'rinnen', label: 'Pudel', color: pal.sage, format: (v) => String(v) },
   { key: 'games', label: 'Spiele', color: pal.amber, format: (v) => String(v) },
 ]
 
@@ -114,7 +114,7 @@ export default function ClubTab({ groupId, range, mockMode }) {
           <KpiTile label="Ø Teilnehmer" value={ov.participants_avg} />
           <KpiTile label="Strafen" value={eur(ov.penalty_total)} unit="€" tone="terra" />
           <KpiTile label="Ø je Abend" value={eur(ov.penalty_per_session)} unit="€" />
-          <KpiTile label="Ø je Kopf" value={eur(ov.penalty_per_head)} unit="€" />
+          <KpiTile label="Ø je Mitglied" value={eur(ov.penalty_per_head)} unit="€" />
           <KpiTile label="Gäste" value={ov.guests} />
         </div>
       </Card>
@@ -170,7 +170,7 @@ export default function ClubTab({ groupId, range, mockMode }) {
         <div className="mt-2">
           <RecordRow icon="💸" label="Teuerster Abend" rec={ov.records?.costliest} unit="€" />
           <RecordRow icon="👥" label="Vollster Abend" rec={ov.records?.fullest} unit="Leute" />
-          <RecordRow icon="🌊" label="Meiste Rinnenwürfe" rec={ov.records?.rinnen} unit="" />
+          <RecordRow icon="🌊" label="Meiste Pudel" rec={ov.records?.rinnen} unit="" />
         </div>
       </Card>
 

@@ -1124,6 +1124,18 @@ Phase 10 →  Hardening, Tests, Sicherheit
 > statt ab dem eigenen Beitritt, und „Eisenmann" war eine Näherung statt der echten Serie.
 > `group_awards()`, `stats_monthly()` und `member_session_stats` bleiben für Dashboard und
 > Mitgliederliste bestehen.
+>
+> **Nachgeschärft (Migration `031_stats_v2_corrections.sql`):** Strafen werden
+> nicht mehr aus `session_penalties` summiert, sondern aus `debts` — das ist die
+> Endsumme des Abends inklusive Abwesenheits-, Nachzügler- und Frühgeher-
+> Durchschnitt und der Aufrundung, ohne Gastkegler. Dazu kommen die
+> Verspätungsstrafen; manuelle Direktbuchungen bleiben draußen, weil dort auch
+> Umlagen wie „Kegeltour" landen (die App kann Umlage und Strafe derzeit nicht
+> unterscheiden). Verspätungsstrafen mit Betrag 0,00 € zählen nicht mehr mit,
+> „Spiele verloren" ohne das 3,50-€-Spiel. Titel gehen bei Gleichstand an bis zu
+> drei gemeinsam und gelten bei mehr als drei als nicht vergeben; „Goldesel" ist
+> raus, „Weiße Weste" und „Zahlungsmuffel" sind neu. Rinnenwurf heißt überall
+> „Pudel".
 
 ---
 
