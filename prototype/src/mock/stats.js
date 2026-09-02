@@ -113,17 +113,15 @@ export const statsLeaderboards = {
 }
 
 export const statsBreakdown = [
-  { catalog_id: 'p1', name: 'Pudel', icon: '🌊', game_kind: null, count: 412, amount: 412.0, share: 0.3208 },
-  { catalog_id: 'p2', name: 'Verloren', icon: '💸', game_kind: null, count: 126, amount: 315.0, share: 0.2453 },
-  { catalog_id: 'p3', name: 'Einzelspiel', icon: '🏅', game_kind: 'einzel', count: 63, amount: 189.5, share: 0.1476 },
-  { catalog_id: 'p4', name: 'Kugel bekommen', icon: '🎳', game_kind: null, count: 148, amount: 148.0, share: 0.1152 },
-  { catalog_id: 'p5', name: 'Fluchen', icon: '🤬', game_kind: null, count: 92, amount: 92.0, share: 0.0716 },
-  { catalog_id: 'p6', name: 'Verspätung', icon: '⏰', game_kind: null, count: 11, amount: 55.0, share: 0.0428 },
-  { catalog_id: 'p7', name: 'Lustwurf', icon: '🎳', game_kind: null, count: 46, amount: 46.0, share: 0.0358 },
-  { catalog_id: 'p8', name: 'Glas kaputt', icon: '🥃', game_kind: null, count: 5, amount: 25.0, share: 0.0195 },
-  { catalog_id: 'p9', name: '3,50 €-Spiel', icon: '💰', game_kind: 'progressive', count: 12, amount: 42.0, share: 0.0327 },
-  { catalog_id: 'avg', name: 'Durchschnitt & Rundung', icon: '➗', game_kind: null, count: 0, amount: 96.5, share: 0.0752 },
-  { catalog_id: 'late_fee', name: 'Verspätungsstrafen', icon: '⏳', game_kind: null, count: 6, amount: 12.0, share: 0.0093 },
+  { catalog_id: 'p1', name: 'Pudel', icon: '🌊', game_kind: null, count: 412, amount: 412.0, share: 0.3547 },
+  { catalog_id: 'p2', name: 'Verloren', icon: '💸', game_kind: null, count: 126, amount: 315.0, share: 0.2712 },
+  { catalog_id: 'game_duel', name: 'Einzel- & Teams-Spiele', icon: '🏅', game_kind: 'game', count: 63, amount: 189.5, share: 0.1631 },
+  { catalog_id: 'p4', name: 'Kugel bekommen', icon: '🎳', game_kind: null, count: 148, amount: 148.0, share: 0.1274 },
+  { catalog_id: 'p5', name: 'Fluchen', icon: '🤬', game_kind: null, count: 92, amount: 92.0, share: 0.0792 },
+  { catalog_id: 'p6', name: 'Verspätung', icon: '⏰', game_kind: null, count: 11, amount: 55.0, share: 0.0473 },
+  { catalog_id: 'game_progressive', name: '3,50 €-Spiel', icon: '💰', game_kind: 'game', count: 12, amount: 42.0, share: 0.0362 },
+  { catalog_id: 'p8', name: 'Glas kaputt', icon: '🥃', game_kind: null, count: 5, amount: 25.0, share: 0.0215 },
+  { catalog_id: 'late_fee', name: 'Verspätungsstrafen', icon: '⏳', game_kind: null, count: 6, amount: 12.0, share: 0.0103 },
 ]
 
 export const statsAwards = [
@@ -131,41 +129,41 @@ export const statsAwards = [
     type: 'Streber', icon: '✨', tone: 'sage', kind: 'honor', metric: 'attendance',
     hint: 'Kein Abend verpasst', value: '100 % Anwesenheit (18 Abende)',
     holders: [{ user_id: 'u11', holder: 'Maria Wolf', avatar_url: null }],
-    runner_up: { holder: 'Martin Haas', user_id: 'u4' },
+    runner_up: { holder: 'Martin Haas', user_id: 'u4' }, reason: null, tied: 1,
   },
   {
+    // Unvergeben — zeigt die gedämpfte Platzhalter-Karte im Demo-Modus.
     type: 'Eisenmann', icon: '🛡️', tone: 'navy', kind: 'honor', metric: 'streak',
-    hint: 'Längste Serie ohne Fehlen', value: '11 Abende in Folge',
-    holders: [{ user_id: 'u4', holder: 'Martin Haas', avatar_url: null }],
-    runner_up: { holder: 'Noah Roosen', user_id: 'u1' },
+    hint: 'Längste Serie ohne Fehlen', value: null,
+    holders: [], runner_up: null, reason: 'gleichstand', tied: 5,
   },
   {
     type: 'Weiße Weste', icon: '🤍', tone: 'sage', kind: 'honor', metric: 'clean',
     hint: 'Niedrigste Strafen je Abend', value: '3,25 € je Abend',
     holders: [{ user_id: 'u6', holder: 'Tobias Brandt', avatar_url: null }],
-    runner_up: { holder: 'Anna Schulz', user_id: 'u8' },
+    runner_up: { holder: 'Anna Schulz', user_id: 'u8' }, reason: null, tied: 1,
   },
   {
     type: 'Pudelkönig', icon: '👑', tone: 'terra', kind: 'fun', metric: 'rinnen',
     hint: 'Meiste Pudel', value: '78 Pudel',
     holders: [{ user_id: 'u4', holder: 'Martin Haas', avatar_url: null }],
-    runner_up: { holder: 'Petra Lang', user_id: 'u5' },
+    runner_up: { holder: 'Petra Lang', user_id: 'u5' }, reason: null, tied: 1,
   },
   {
     type: 'Kassenschreck', icon: '💸', tone: 'amber', kind: 'fun', metric: 'penalties',
     hint: 'Höchste Strafensumme', value: '214,50 € Strafen',
     holders: [{ user_id: 'u4', holder: 'Martin Haas', avatar_url: null }],
-    runner_up: { holder: 'Karin Voss', user_id: 'u3' },
+    runner_up: { holder: 'Karin Voss', user_id: 'u3' }, reason: null, tied: 1,
   },
   {
-    // Geteilter Titel — zeigt die Mehrfachvergabe im Demo-Modus.
+    // Geteilter Titel — zeigt die Mehrfachvergabe.
     type: 'Zahlungsmuffel', icon: '🐌', tone: 'terra', kind: 'fun', metric: 'fees',
     hint: 'Meiste Verspätungsstrafen', value: '3 Verspätungsstrafen',
     holders: [
       { user_id: 'u9', holder: 'Jan Fischer', avatar_url: null },
       { user_id: 'u5', holder: 'Petra Lang', avatar_url: null },
     ],
-    runner_up: null,
+    runner_up: null, reason: null, tied: 2,
   },
 ]
 

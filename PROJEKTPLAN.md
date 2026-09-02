@@ -1136,6 +1136,14 @@ Phase 10 →  Hardening, Tests, Sicherheit
 > drei gemeinsam und gelten bei mehr als drei als nicht vergeben; „Goldesel" ist
 > raus, „Weiße Weste" und „Zahlungsmuffel" sind neu. Rinnenwurf heißt überall
 > „Pudel".
+>
+> **Feinschliff (Migration `032_stats_awards_placeholder.sql`):** Alle sechs Titel
+> erscheinen immer — unvergebene als gedämpfte Karte mit Begründung
+> („x liegen gleichauf" / „noch keine Grundlage"), damit ein Titel nicht
+> zeitweise aus der Ansicht verschwindet. Die Aufschlüsselung verliert die
+> Sammelzeile „Durchschnitt & Rundung" und bündelt Spiele in „3,50 €-Spiel" und
+> „Einzel- & Teams-Spiele". Die aktuellen Titel stehen zusätzlich auf dem
+> Dashboard neben der Aktivität, die dafür von zwei auf eine Spalte schrumpft.
 
 ---
 

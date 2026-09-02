@@ -14,8 +14,10 @@ import {
   getImportStatus,
   getPolls,
   castVote,
+  getClubAwards,
 } from '../lib/api.js'
 import { activity, members, club, events, currentUser, polls as pollSeed } from '../mock/data'
+import { statsAwards as mockAwards } from '../mock/stats'
 
 const ACTION_VERB = {
   session_approved: 'gab einen Kegelabend frei',
@@ -113,6 +115,22 @@ export default function Dashboard() {
   const [importStatus, setImportStatus] = useState(null)
   const [polls, setPolls] = useState(() => (mockMode ? pollSeed.map(normalizeMockPoll) : []))
   const [justVotedId, setJustVotedId] = useState(null)
+  const [awards, setAwards] = useState(() => (mockMode ? mockAwards : null))
+
+  // Titel als eigener Roundtrip — sie sollen die Hauptdaten nicht aufhalten.
+  useEffect(() => {
+    if (mockMode || !activeGroupId) return
+    let alive = true
+    getClubAwards(activeGroupId, '12m')
+      .then((a) => alive && setAwards(a))
+      .catch((e) => {
+        console.error(e)
+        if (alive) setAwards([])
+      })
+    return () => {
+      alive = false
+    }
+  }, [mockMode, activeGroupId])
 
   useEffect(() => {
     if (mockMode || !activeGroupId) return
@@ -480,8 +498,8 @@ export default function Dashboard() {
           </div>
         </Card>
 
-        {/* Aktivität (auf Mobile ganz unten) */}
-        <Card className="flex flex-col sm:col-span-2 animate-rise" style={{ animationDelay: '200ms' }}>
+        {/* Aktivität — teilt sich die Breite mit den Titeln */}
+        <Card className="flex flex-col animate-rise" style={{ animationDelay: '200ms' }}>
           <div className="flex items-center justify-between">
             <div className="text-[12px] font-semibold text-ink-soft">Aktivität</div>
             <Link to="/log" className="text-[11px] text-ink-dim hover:text-ink">
@@ -526,8 +544,67 @@ export default function Dashboard() {
             )}
           </div>
         </Card>
+
+        {/* Titel — die zweite Hälfte der früheren Aktivitäts-Kachel */}
+        <AwardsTile awards={awards} style={{ animationDelay: '240ms' }} />
       </div>
     </div>
+  )
+}
+
+/* Aktuelle Titel in Kurzform. Nur vergebene Titel; wo nichts vergeben ist,
+   steht das als eine Zeile darunter statt als halbe Seite Platzhalter. */
+function AwardsTile({ awards, style }) {
+  const given = (awards || []).filter((a) => (a.holders || []).length > 0)
+  const openCount = (awards || []).length - given.length
+
+  return (
+    <Card className="flex flex-col animate-rise" style={style}>
+      <div className="flex items-center justify-between">
+        <div className="text-[12px] font-semibold text-ink-soft">Titel</div>
+        <Link to="/stats?tab=titel" className="text-[11px] text-ink-dim hover:text-ink">
+          Alle ansehen →
+        </Link>
+      </div>
+
+      <div className="mt-1.5 flex-1">
+        {awards == null ? (
+          <div className="py-6 text-center text-[12px] text-ink-dim">Lädt…</div>
+        ) : given.length === 0 ? (
+          <div className="py-6 text-center text-[12px] text-ink-dim">
+            Noch keine Titel vergeben.
+          </div>
+        ) : (
+          given.map((a, i) => (
+            <Link
+              key={a.type}
+              to="/stats?tab=titel"
+              className="flex items-center gap-3 py-2.5"
+              style={{ borderBottom: i < given.length - 1 ? `1px solid ${pal.cardEdge}` : 'none' }}
+            >
+              <span className="text-[20px]">{a.icon}</span>
+              <div className="min-w-0 flex-1 text-[13px] leading-tight">
+                <div className="truncate">
+                  <strong>{a.type}</strong>
+                  <span className="text-ink-soft">
+                    {' · '}
+                    {a.holders.map((h) => h.holder.split(' ')[0]).join(' & ')}
+                  </span>
+                </div>
+                <div className="mt-0.5 text-[11px] text-ink-dim">{a.value}</div>
+              </div>
+              <Avatar name={a.holders[0].holder} src={a.holders[0].avatar_url || undefined} size={28} />
+            </Link>
+          ))
+        )}
+      </div>
+
+      {openCount > 0 && (
+        <div className="mt-2 text-[11px] text-ink-dim">
+          {openCount === 1 ? '1 Titel ist' : `${openCount} Titel sind`} noch nicht vergeben.
+        </div>
+      )}
+    </Card>
   )
 }
 

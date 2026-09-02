@@ -31,7 +31,7 @@ const METRICS = [
   },
   {
     key: 'games', label: 'Spiele verloren', color: pal.amber, zeroCollapse: true,
-    format: (v) => String(v), note: 'Verlorene Einzel- und 2-Teams-Spiele. Das 3,50-€-Spiel zählt nicht mit.',
+    format: (v) => String(v), note: 'Verlorene Einzel- und Teams-Spiele.',
     zeroNote: 'ohne verlorenes Spiel',
   },
   {

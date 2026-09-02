@@ -14,32 +14,51 @@ function joinNames(names) {
 
 /* Titelkarte. `tone: 'navy'` ist eine dunkle Fläche — dort brauchen Schrift
    und Icon eigene Helligkeiten.
+
    Ein Titel kann geteilt sein: bei Gleichstand tragen ihn bis zu drei
-   gemeinsam. Mehr als drei, und der Server gibt ihn gar nicht erst aus. */
+   gemeinsam. Ist er gar nicht vergeben (mehr als drei gleichauf, oder noch
+   keine Grundlage), bleibt die Karte trotzdem stehen — nur gedämpft und mit
+   dem Grund. Ein Titel, der zeitweise verschwindet, wirkt wie ein Fehler. */
 function AwardCard({ a, onOpen, index }) {
-  const dark = a.tone === 'navy'
   const holders = a.holders || []
+  const awarded = holders.length > 0
+  const dark = awarded && a.tone === 'navy'
   const shared = holders.length > 1
+
+  const reason =
+    a.reason === 'gleichstand'
+      ? `${a.tied} liegen gleichauf`
+      : 'Noch keine Grundlage'
 
   return (
     <Card
-      as="button"
-      tone={a.tone}
-      onClick={() => holders[0] && onOpen(holders[0].user_id)}
-      className={cx('animate-rise w-full text-left', dark && 'text-white')}
+      as={awarded ? 'button' : 'div'}
+      tone={awarded ? a.tone : undefined}
+      onClick={awarded ? () => onOpen(holders[0].user_id) : undefined}
+      className={cx(
+        'animate-rise w-full text-left',
+        dark && 'text-white',
+        !awarded && 'border-dashed',
+      )}
       style={{ animationDelay: `${index * 45}ms` }}
     >
       <div className="flex items-start justify-between gap-3">
-        <span className="text-3xl">{a.icon}</span>
+        <span className={cx('text-3xl', !awarded && 'opacity-30 grayscale')}>{a.icon}</span>
         <span
-          className={cx('text-[10px] uppercase tracking-[0.1em]', dark ? 'text-white/60' : 'text-ink-dim')}
+          className={cx(
+            'text-[10px] uppercase tracking-[0.1em]',
+            dark ? 'text-white/60' : 'text-ink-dim',
+          )}
         >
           {a.hint}
         </span>
       </div>
 
       <div
-        className="mt-3 flex items-center gap-2 text-[13px] font-semibold"
+        className={cx(
+          'mt-3 flex items-center gap-2 text-[13px] font-semibold',
+          !awarded && 'text-ink-soft',
+        )}
         style={dark ? { color: creamLight } : undefined}
       >
         {a.type}
@@ -55,26 +74,35 @@ function AwardCard({ a, onOpen, index }) {
         )}
       </div>
 
-      <div className="mt-2 flex items-center gap-2">
-        <div className="flex items-center">
-          {holders.map((h, i) => (
-            <div key={h.user_id} style={{ marginLeft: i === 0 ? 0 : -8 }}>
-              <Avatar name={h.holder} src={h.avatar_url || undefined} size={28} />
+      {awarded ? (
+        <>
+          <div className="mt-2 flex items-center gap-2">
+            <div className="flex items-center">
+              {holders.map((h, i) => (
+                <div key={h.user_id} style={{ marginLeft: i === 0 ? 0 : -8 }}>
+                  <Avatar name={h.holder} src={h.avatar_url || undefined} size={28} />
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-        <span className={cx('text-[14px] font-semibold', dark ? 'text-white' : 'text-ink')}>
-          {joinNames(holders.map((h) => h.holder))}
-        </span>
-      </div>
+            <span className={cx('text-[14px] font-semibold', dark ? 'text-white' : 'text-ink')}>
+              {joinNames(holders.map((h) => h.holder))}
+            </span>
+          </div>
 
-      <div className={cx('mt-1 text-[12px]', dark ? 'text-white/70' : 'text-ink-soft')}>
-        {a.value}
-      </div>
+          <div className={cx('mt-1 text-[12px]', dark ? 'text-white/70' : 'text-ink-soft')}>
+            {a.value}
+          </div>
 
-      {a.runner_up && (
-        <div className={cx('mt-2 text-[11px]', dark ? 'text-white/50' : 'text-ink-dim')}>
-          dicht dahinter: {a.runner_up.holder}
+          {a.runner_up && (
+            <div className={cx('mt-2 text-[11px]', dark ? 'text-white/50' : 'text-ink-dim')}>
+              dicht dahinter: {a.runner_up.holder}
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="mt-2">
+          <div className="text-[14px] font-semibold text-ink-dim">Noch nicht vergeben</div>
+          <div className="mt-1 text-[12px] text-ink-dim">{reason}</div>
         </div>
       )}
     </Card>
@@ -136,10 +164,7 @@ export default function AwardsTab({ groupId, range, mockMode }) {
     <div className="space-y-5">
       {honors.length > 0 && (
         <section className="space-y-3">
-          <div className="px-1">
-            <CardLabel>Auszeichnungen</CardLabel>
-            <div className="mt-0.5 text-[11px] text-ink-dim">Ernst gemeint.</div>
-          </div>
+          <CardLabel className="px-1">Auszeichnungen</CardLabel>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {honors.map((a, i) => (
               <AwardCard key={a.type} a={a} index={i} onOpen={open} />
@@ -150,12 +175,7 @@ export default function AwardsTab({ groupId, range, mockMode }) {
 
       {fun.length > 0 && (
         <section className="space-y-3">
-          <div className="px-1">
-            <CardLabel>Ehrentafel</CardLabel>
-            <div className="mt-0.5 text-[11px] text-ink-dim">
-              Mit Augenzwinkern — und ausdrücklich keine Wertung.
-            </div>
-          </div>
+          <CardLabel className="px-1">Ehrentafel</CardLabel>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {fun.map((a, i) => (
               <AwardCard key={a.type} a={a} index={i} onOpen={open} />
@@ -165,12 +185,7 @@ export default function AwardsTab({ groupId, range, mockMode }) {
       )}
 
       <section className="space-y-3">
-        <div className="px-1">
-          <CardLabel>Hall of Fame</CardLabel>
-          <div className="mt-0.5 text-[11px] text-ink-dim">
-            Wer wann welchen Titel hielt — monatlich festgehalten.
-          </div>
-        </div>
+        <CardLabel className="px-1">Hall of Fame</CardLabel>
 
         {hof == null ? (
           <Card>
