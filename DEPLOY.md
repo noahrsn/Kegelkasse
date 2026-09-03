@@ -145,7 +145,36 @@ Produktionsnah testen (identisches Image wie auf der LXC):
 docker compose up --build        # http://localhost:8081
 ```
 
-## 5. Troubleshooting
+## 5. Anmeldung: Supabase-Sessions (einmalig prüfen)
+
+Die App ist darauf ausgelegt, dass man sich **einmal** anmeldet und danach
+dauerhaft angemeldet bleibt. Der Access-Token läuft zwar nach einer Stunde ab,
+wird aber über den Refresh-Token automatisch erneuert (`src/lib/session.js`);
+abgemeldet wird nur, wenn der Server diesen Token ausdrücklich ablehnt.
+
+Damit das in Produktion greift, im **Supabase-Dashboard** einmal kontrollieren
+(`supabase/config.toml` gilt nur für den lokalen Stack):
+
+*Authentication → Sessions*
+- **Time-box user sessions** — leer. Ein Wert hier beendet jede Session nach
+  Ablauf der Zeit, unabhängig von Aktivität.
+- **Inactivity timeout** — leer. Sonst fliegt raus, wer die App ein paar Tage
+  nicht öffnet.
+
+*Authentication → Sessions → Refresh Tokens*
+- **Detect and revoke potentially compromised refresh tokens** darf an bleiben,
+  aber das **Reuse interval** sollte bei mindestens 30 Sekunden liegen. Zu knapp
+  bemessen wertet der Server einen legitimen zweiten Refresh (zwei Tabs, Retry
+  nach Netzaussetzer) als Token-Diebstahl und entwertet die ganze Session.
+
+Zweiter Baustein ist die **Installation als App** („Zum Startbildschirm
+hinzufügen"): Bei einer normal im Browser geöffneten Website löscht Safari den
+Speicher — und damit den Refresh-Token — nach sieben Tagen ohne Besuch. Die App
+weist im Betrieb selbst darauf hin (`src/components/InstallPrompt.jsx`); dafür
+liegt ein minimaler Service Worker unter `prototype/public/sw.js`, ohne den
+Chrome kein „Installieren" anbietet. Er cached bewusst nichts.
+
+## 6. Troubleshooting
 
 | Symptom | Prüfen |
 |---------|--------|
@@ -155,4 +184,6 @@ docker compose up --build        # http://localhost:8081
 | Änderungen nicht sichtbar | `--build` vergessen, oder Browser-Cache: `index.html` wird `no-cache` ausgeliefert, ein Hard-Reload (Strg+F5) hilft. |
 | Login/Passwort-Reset-Mails zeigen falsche URL | Supabase → *Authentication → URL Configuration* auf die aktuelle Domain setzen. |
 | Requests an Supabase werden blockiert (Konsole: CSP) | `connect-src` in `nginx.conf` erlaubt `https://*.supabase.co` und `wss://*.supabase.co` – bei anderer Backend-Domain dort ergänzen. |
+| Nutzer müssen sich ständig neu anmelden | Session-Einstellungen aus Abschnitt 5 prüfen (Time-box / Inactivity leer, Reuse interval ≥ 30 s). Auf dem iPhone zusätzlich die App auf den Startbildschirm legen. |
+| „Installieren" wird nicht angeboten | Nur über HTTPS und mit registriertem Service Worker. In den DevTools unter *Application → Service Workers* prüfen; auf iOS gibt es kein Install-Event, dort geht es nur über *Teilen → Zum Home-Bildschirm*. |
 | CT-IP hat sich geändert | Im Proxmox der LXC eine statische IP geben und den Tunnel-Eintrag anpassen. |

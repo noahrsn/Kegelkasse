@@ -7,12 +7,16 @@
 //   1) Session — kommt aus dem Storage bzw. vom Auth-Client. Fehlt sie oder ist
 //      sie nicht mehr gueltig, ist das kein Fehler, sondern schlicht "nicht
 //      angemeldet" -> Login-Screen, keine Fehlermeldung.
+//      Ein abgelaufener Access-Token ist dabei ausdruecklich kein "nicht
+//      angemeldet": Er wird ueber den Refresh-Token erneuert (lib/session.js),
+//      abgemeldet wird nur, wenn der Server diesen Token ablehnt.
 //   2) Stammdaten — Profil + Mitgliedschaften zum eingeloggten User. Erst wenn
 //      die fuer genau diese User-ID geladen sind, gilt der Kontext als bereit.
 //      Vorher zeigt der Guard den Loader — sonst landet man direkt nach dem
 //      Anmelden im Onboarding, nur weil die Mitgliedschaften noch fehlen.
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { supabase, hasSupabase } from '../lib/supabase.js'
+import { renewSession, touchSession } from '../lib/session.js'
 import { currentUser, clubs as mockClubs } from '../mock/data.js'
 
 const AuthContext = createContext(null)
@@ -32,6 +36,18 @@ class AuthTimeoutError extends Error {
   constructor() {
     super('Zeitüberschreitung beim Verbinden mit dem Server.')
     this.name = 'AuthTimeoutError'
+  }
+}
+
+/**
+ * Der Auth-Client hat gar keine Session mehr herausgerückt. Wird wie ein
+ * abgelaufener Token behandelt: erst erneuern, erst dann abmelden.
+ */
+class SessionGoneError extends Error {
+  constructor() {
+    super('Die Anmeldung ist abgelaufen.')
+    this.name = 'SessionGoneError'
+    this.status = 401
   }
 }
 
@@ -134,6 +150,9 @@ function SupabaseProvider({ children }) {
   // User-ID, deren Stammdaten zuletzt erfolgreich geladen wurden. Damit lösen
   // reine Token-Refreshs (gleiche ID) kein überflüssiges Nachladen aus.
   const loadedUid = useRef(null)
+  // Zuletzt vom Auth-Client gemeldete User-ID — auch dann schon gesetzt, wenn
+  // die Stammdaten noch unterwegs sind.
+  const seenUid = useRef(null)
 
   const user = session?.user ?? null
 
@@ -161,12 +180,21 @@ function SupabaseProvider({ children }) {
     }
 
     let lastErr = null
-    for (let attempt = 0; attempt < 2; attempt++) {
-      if (attempt > 0) {
-        await sleep(RETRY_DELAY_MS)
-        if (stale()) return []
-      }
+    let sessionDead = false
+    // Höchstens ein Refresh pro Ladelauf. Klappt der nicht, hilft ein zweiter
+    // erst recht nicht — und bei aktivierter Token-Rotation schadet er sogar.
+    let renewTried = false
+
+    for (let attempt = 0; attempt < 3; attempt++) {
       try {
+        // Vor jedem Versuch einen brauchbaren Token besorgen: getSession()
+        // erneuert einen abgelaufenen selbst. Liefert es gar keine Session,
+        // liefen die Queries mit dem anon-Key — die kämen dank RLS leer zurück
+        // und der User landete fälschlich im Onboarding.
+        const { data: sess } = await withTimeout(supabase.auth.getSession())
+        if (stale()) return []
+        if (!sess?.session) throw new SessionGoneError()
+
         const [{ data: prof, error: profErr }, { data: mems, error: memErr }] = await withTimeout(
           Promise.all([
             supabase
@@ -204,13 +232,37 @@ function SupabaseProvider({ children }) {
       } catch (err) {
         lastErr = err
         if (stale()) return []
-        if (isExpiredAuth(err)) break // Wiederholen bringt nichts.
+
+        if (isExpiredAuth(err)) {
+          // Abgelaufener Access-Token — dafür gibt es den Refresh-Token.
+          if (renewTried) {
+            // Frischer Token und trotzdem 401: jetzt ist die Anmeldung hin.
+            sessionDead = true
+            break
+          }
+          renewTried = true
+          const renewal = await renewSession()
+          if (stale()) return []
+          if (renewal === 'ok') continue // sofort erneut laden, ohne Wartezeit
+          // 'dead' -> Refresh-Token vom Server abgelehnt, Abmelden ist richtig.
+          sessionDead = renewal === 'dead'
+          // 'unreachable' -> nur das Netz fehlt, die Anmeldung bleibt bestehen.
+          // Dann gehört auch die Verbindung auf den Fehlerschirm und nicht das
+          // technische "JWT expired" des ersten Fehlversuchs.
+          if (!sessionDead) lastErr = new AuthTimeoutError()
+          break
+        }
+
+        // Netz- oder Serverproblem: einmal kurz warten und neu versuchen.
+        if (attempt > 0) break
+        await sleep(RETRY_DELAY_MS)
+        if (stale()) return []
       }
     }
 
-    if (isExpiredAuth(lastErr)) {
-      // Abgelaufene Anmeldung sauber beenden: Der SIGNED_OUT-Event räumt den
-      // Kontext auf, der Guard zeigt anschließend das Login-Fenster.
+    if (sessionDead) {
+      // Nachweislich tote Anmeldung sauber beenden: Der SIGNED_OUT-Event räumt
+      // den Kontext auf, der Guard zeigt anschließend das Login-Fenster.
       supabase.auth.signOut().catch(() => {})
       return []
     }
@@ -261,6 +313,14 @@ function SupabaseProvider({ children }) {
       setSession(s)
 
       const uid = s?.user?.id ?? null
+      const sameUser = uid !== null && uid === seenUid.current
+      seenUid.current = uid
+
+      // Ein erneuerter Token ändert an Profil und Mitgliedschaften nichts —
+      // auch nicht mitten im ersten Laden. Ohne diese Zeile bräche ein Refresh
+      // den laufenden Ladevorgang ab und stieße ihn neu an; scheitert der
+      // wieder mit 401, liefe das im Kreis.
+      if (event === 'TOKEN_REFRESHED' && sameUser) return
 
       // Token-Refresh ohne User-Wechsel: Stammdaten sind unverändert.
       if (uid && uid === loadedUid.current && event !== 'USER_UPDATED') return
@@ -298,6 +358,28 @@ function SupabaseProvider({ children }) {
     return () => window.removeEventListener('online', retry)
   }, [data.status, data.uid, loadUserData])
 
+  // Wiedereinstieg in die App: aus dem Hintergrund zurück, Fenster wieder im
+  // Fokus, Netz wieder da. Der automatische Token-Refresh von supabase-js hängt
+  // an einem Timer, den mobile Browser im Hintergrund einfrieren — nach einer
+  // Stunde Bildschirmsperre ist der Access-Token deshalb abgelaufen. Hier wird
+  // aktiv nachgefasst, bevor die Seite ihre Daten nachlädt.
+  useEffect(() => {
+    const uid = user?.id
+    if (!uid) return
+    const wake = () => {
+      if (document.visibilityState === 'hidden') return
+      touchSession()
+    }
+    document.addEventListener('visibilitychange', wake)
+    window.addEventListener('focus', wake)
+    window.addEventListener('online', wake)
+    return () => {
+      document.removeEventListener('visibilitychange', wake)
+      window.removeEventListener('focus', wake)
+      window.removeEventListener('online', wake)
+    }
+  }, [user?.id])
+
   // Nachladen auf Zuruf (z. B. nach Änderungen in den Einstellungen). Bewusst
   // fehlertolerant: die Aufrufer behandeln das Ergebnis als Bonus, nicht als
   // Voraussetzung.
@@ -331,6 +413,7 @@ function SupabaseProvider({ children }) {
   const signOut = useCallback(async () => {
     loadSeq.current += 1 // laufende Ladevorgänge entwerten
     loadedUid.current = null
+    seenUid.current = null
     setMemberships([])
     setProfile(null)
     setActiveGroupId(null)
