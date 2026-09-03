@@ -7,3 +7,7 @@
   Permissions-Policy: camera=(), microphone=(), geolocation=()
   Cross-Origin-Opener-Policy: same-origin
   Content-Security-Policy: default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; img-src 'self' data: blob: https://*.supabase.co; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co; form-action 'self'
+
+# Service Worker nie cachen — sonst bleibt nach einem Deploy ein alter aktiv.
+/sw.js
+  Cache-Control: no-cache

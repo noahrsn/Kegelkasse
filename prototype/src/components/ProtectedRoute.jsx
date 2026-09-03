@@ -13,7 +13,7 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { Button } from './ui'
 
 export default function ProtectedRoute({ children, requireGroup = true }) {
-  const { mockMode, loading, authError, retryAuth, session, memberships } = useAuth()
+  const { mockMode, loading, authError, retryAuth, signOut, session, memberships } = useAuth()
   const location = useLocation()
 
   if (mockMode) return children
@@ -27,7 +27,9 @@ export default function ProtectedRoute({ children, requireGroup = true }) {
 
   // Angemeldet, aber Profil/Mitgliedschaften sind nicht erreichbar (Netz weg,
   // Backend down). Nur hier ist ein Fehlerschirm angebracht.
-  if (authError) return <AuthErrorScreen error={authError} onRetry={retryAuth} />
+  if (authError) {
+    return <AuthErrorScreen error={authError} onRetry={retryAuth} onSignOut={signOut} />
+  }
 
   // Angemeldet, Stammdaten noch unterwegs.
   if (loading) return <FullScreenLoader />
@@ -65,7 +67,7 @@ export function FullScreenLoader({ delay = 350 }) {
   )
 }
 
-function AuthErrorScreen({ error, onRetry }) {
+function AuthErrorScreen({ error, onRetry, onSignOut }) {
   return (
     <div className="grid min-h-dvh place-items-center px-5 py-10">
       <div className="w-full max-w-sm text-center">
@@ -88,6 +90,15 @@ function AuthErrorScreen({ error, onRetry }) {
         <Button size="lg" className="mt-7 w-full" onClick={onRetry}>
           Erneut versuchen
         </Button>
+        {/* Notausgang: Die Anmeldung wird bei Verbindungsproblemen bewusst
+            nicht mehr automatisch verworfen — wer hier trotzdem festhängt,
+            kommt so von Hand zum Login zurück. */}
+        <button
+          onClick={onSignOut}
+          className="mt-4 text-[12px] font-semibold text-ink-dim hover:text-ink"
+        >
+          Stattdessen abmelden
+        </button>
       </div>
     </div>
   )

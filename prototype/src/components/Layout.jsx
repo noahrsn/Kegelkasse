@@ -3,6 +3,7 @@ import { NavLink, useLocation, useNavigate, Link } from 'react-router-dom'
 import { cx, pal } from '../design/calm'
 import { Avatar, Button, Empty } from './ui'
 import { Sheet } from './Modal'
+import InstallPrompt from './InstallPrompt.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import {
   listNotifications,
@@ -130,6 +131,9 @@ function Shell({ children }) {
 
       {/* Ein einziges Sheet für beide Glocken (Sidebar + Topbar). */}
       <NotificationSheet />
+
+      {/* Hinweis auf die Installation — hält die Anmeldung dauerhaft. */}
+      <InstallPrompt />
     </div>
   )
 }
