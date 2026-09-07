@@ -767,24 +767,16 @@ function PollTile({ poll, moreCount = 0, onVote, className = '' }) {
 /* ── Mitglieder-Kachel ───────────────────────────────────────────────────
    War vorher eine Wolke aus Namens-Chips: jede unterschiedlich breit, die
    Zeilen zerfranst, jeder Name gleich laut — bei zwölf Mitgliedern eine Wand
-   ohne Aussage. Jetzt drei klar getrennte Ebenen:
-     1. Kopfzahl + Verteilungsbalken → wie steht der Club insgesamt da,
-     2. die drei höchsten offenen Posten in gleich hohen Rasterzeilen mit
-        rechtsbündigen, tabellarischen Beträgen → wer braucht eine Erinnerung,
-     3. der Rest als Avatar-Stapel → wer noch dazugehört, ohne Lärm.
-   Beträge laufen über eurBalance, damit ein Guthaben auch hier „+ 20,00 €"
-   heißt und nicht als negative Schuld erscheint. */
+   ohne Aussage. Der Zweck der Kachel ist, auf einen Blick alle Mitglieder mit
+   offenen Strafen zu sehen; also stehen die vollständig und namentlich drin,
+   höchster Betrag zuerst, in einem festen Raster mit tabellarischen Beträgen.
+   Darüber nur der Balken offen/schuldenfrei, darunter der Rest als Avatar-
+   Stapel. Beträge laufen über eurBalance, damit ein Guthaben auch hier
+   „+ 20,00 €" heißt und nicht als negative Schuld erscheint. */
 function MembersTile({ members, onClick, style }) {
   const list = members.list || []
   const debtors = list.filter((m) => m.open > 0).sort((a, b) => b.open - a.open)
-  const settled = list.filter((m) => m.open === 0)
-  const credited = list.filter((m) => m.open < 0)
-  const top = debtors.slice(0, 3)
-
-  // Der Avatar-Stapel zeigt alle, die nicht schon namentlich oben stehen. Die
-  // Aufschlüsselung steht bereits im Kopf — hier reicht die reine Anzahl,
-  // sonst wird die Zeile abgeschnitten.
-  const rest = list.filter((m) => !top.includes(m))
+  const clear = list.filter((m) => m.open <= 0)
 
   return (
     <Card
@@ -798,19 +790,8 @@ function MembersTile({ members, onClick, style }) {
         <span className="text-[11px] font-semibold text-amber">Alle ansehen →</span>
       </div>
 
-      {/* Kopfzahl in derselben Display-Type wie Kasse und Schulden */}
-      <div className="mt-2.5 flex items-end gap-3">
-        <div className="font-display text-5xl font-medium leading-none tracking-tight tnum text-ink">
-          {members.count}
-        </div>
-        <div className="pb-0.5 text-[12px] leading-[1.35] text-ink-soft">
-          <div>{debtors.length} mit offenen Posten</div>
-          <div>{settled.length + credited.length} ohne Schulden</div>
-        </div>
-      </div>
-
-      {/* Verteilung als ein schmaler Balken — gleiche Reihenfolge wie die
-          beiden Zeilen darüber, damit die Farben eindeutig zuzuordnen sind. */}
+      {/* Verhältnis offen zu schuldenfrei — die einzige Kennzahl, die es hier
+          noch braucht; die konkreten Namen darunter sagen den Rest. */}
       <div className="mt-3 flex h-1.5 gap-[3px]">
         {debtors.length > 0 && (
           <div
@@ -818,62 +799,61 @@ function MembersTile({ members, onClick, style }) {
             style={{ flexGrow: debtors.length, background: pal.terra }}
           />
         )}
-        {settled.length + credited.length > 0 && (
+        {clear.length > 0 && (
           <div
             className="basis-0 rounded-full"
-            style={{ flexGrow: settled.length + credited.length, background: pal.sage }}
+            style={{ flexGrow: clear.length, background: pal.sage }}
           />
         )}
       </div>
 
-      {top.length > 0 ? (
-        <div className="mt-5">
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-ink-soft">
-            Höchste offene Posten
-          </div>
-          <ul className="mt-2 space-y-1">
-            {top.map((m, i) => (
-              <li
-                key={i}
-                className="grid grid-cols-[24px_1fr_auto] items-center gap-2.5 rounded-xl bg-bg/50 px-2 py-1.5"
+      {/* Vollständige Schuldnerliste, höchster Betrag zuerst — genau dafür
+          ist die Kachel da. Festes Raster: alle Zeilen gleich hoch, die
+          Beträge stehen tabellarisch untereinander. */}
+      {debtors.length > 0 ? (
+        <ul className="mt-4 space-y-px">
+          {debtors.map((m, i) => (
+            <li
+              key={i}
+              className="grid grid-cols-[22px_1fr_auto] items-center gap-2.5 rounded-lg py-[3px]"
+            >
+              <Avatar name={m.full || m.name} size={22} />
+              <span className="truncate text-[12.5px] font-medium text-ink">{m.name}</span>
+              <span
+                className="font-mono text-[12.5px] font-semibold tnum"
+                style={{ color: balanceColor(m.open) }}
               >
-                <Avatar name={m.full || m.name} size={24} />
-                <span className="truncate text-[12.5px] font-medium text-ink">{m.name}</span>
-                <span
-                  className="font-mono text-[12.5px] font-semibold tnum"
-                  style={{ color: balanceColor(m.open) }}
-                >
-                  {eurBalance(m.open)} €
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
+                {eurBalance(m.open)} €
+              </span>
+            </li>
+          ))}
+        </ul>
       ) : (
-        <div className="mt-5 rounded-xl bg-bg/50 px-3 py-2.5 text-[12px] font-semibold text-sage">
+        <div className="mt-4 rounded-xl bg-bg/50 px-3 py-2.5 text-[12px] font-semibold text-sage">
           Alle schuldenfrei 🎉
         </div>
       )}
 
       <div className="flex-1" />
 
-      {rest.length > 0 && (
+      {/* Wer nichts offen hat, steht nur noch als Gesicht da. */}
+      {clear.length > 0 && (
         <div className="mt-4 flex items-center gap-2 border-t border-ink/10 pt-3">
           <div className="flex shrink-0 -space-x-1.5">
-            {rest.slice(0, 5).map((m, i) => (
+            {clear.slice(0, 5).map((m, i) => (
               <Avatar key={i} name={m.full || m.name} size={22} ring={pal.cream} />
             ))}
-            {rest.length > 5 && (
+            {clear.length > 5 && (
               <span
                 className="grid h-[22px] w-[22px] place-items-center rounded-full bg-bg text-[9px] font-semibold text-ink-soft"
                 style={{ boxShadow: `0 0 0 2px ${pal.cream}` }}
               >
-                +{rest.length - 5}
+                +{clear.length - 5}
               </span>
             )}
           </div>
           <span className="min-w-0 flex-1 truncate text-[11px] text-ink-soft">
-            {rest.length} weitere
+            {clear.length} ohne offene Posten
           </span>
         </div>
       )}
