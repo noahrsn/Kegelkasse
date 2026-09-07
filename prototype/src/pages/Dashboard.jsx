@@ -4,19 +4,20 @@ import { Card, Badge, Button, Avatar } from '../components/ui'
 import { pal, eur, eurBalance, balanceColor, creamLight, cx, accentsOnNavy } from '../design/calm'
 import { useAuth } from '../context/AuthContext.jsx'
 import {
-  getGroup,
   listMembers,
   listMemberDebts,
   getNextEvent,
   getTreasury,
   listActivity,
   listSessions,
+  listOpenDebts,
+  splitOpenDebts,
   getImportStatus,
   getPolls,
   castVote,
   getClubAwards,
 } from '../lib/api.js'
-import { activity, members, club, events, currentUser, polls as pollSeed } from '../mock/data'
+import { activity, members, club, events, currentUser, myDebts, polls as pollSeed } from '../mock/data'
 import { statsAwards as mockAwards } from '../mock/stats'
 
 const ACTION_VERB = {
@@ -88,7 +89,12 @@ function buildMock() {
   return {
     name: currentUser.firstName,
     meName: currentUser.name,
-    myDebt: { amount: me.debt, sub: null, iban: club.iban, due: 'Frist 21.06.' },
+    myDebt: {
+      amount: me.debt,
+      sub: null,
+      due: 'Frist 21.06.',
+      split: splitOpenDebts(myDebts.filter((d) => !d.paid)),
+    },
     nextEvent: {
       id: next.id,
       dateNice: '25. Juli',
@@ -190,15 +196,15 @@ export default function Dashboard() {
     if (mockMode || !activeGroupId) return
     let alive = true
     Promise.all([
-      getGroup(activeGroupId),
       listMembers(activeGroupId),
       listMemberDebts(activeGroupId),
       getNextEvent(activeGroupId).catch(() => null),
       getTreasury(activeGroupId).catch(() => null),
       listActivity(activeGroupId, 5).catch(() => []),
       listSessions(activeGroupId).catch(() => []),
+      user ? listOpenDebts(activeGroupId, user.id).catch(() => []) : Promise.resolve([]),
     ])
-      .then(([group, mem, debts, ev, treasury, acts, sessions]) => {
+      .then(([mem, debts, ev, treasury, acts, sessions, myItems]) => {
         if (!alive) return
         const myDebt = debts.find((d) => d.userId === user?.id)
         const start = ev ? new Date(ev.start_date) : null
@@ -232,14 +238,14 @@ export default function Dashboard() {
                 amount: myDebt.open,
                 credit: 0,
                 sub: null,
-                iban: group?.payment_iban || '—',
+                split: splitOpenDebts(myItems),
                 due: myDebt.nextDue ? `Frist ${new Date(myDebt.nextDue).toLocaleDateString('de-DE')}` : null,
               }
             : {
                 amount: 0,
                 credit: myDebt && myDebt.open < 0 ? -myDebt.open : 0,
                 sub: myDebt && myDebt.open < 0 ? 'Guthaben' : 'Keine offenen Posten',
-                iban: group?.payment_iban || '—',
+                split: null,
                 due: null,
               },
           nextEvent: ev
@@ -384,12 +390,32 @@ export default function Dashboard() {
             </div>
           )}
           <div className="flex-1" />
-          <div className="mt-5 flex items-center gap-3 rounded-2xl bg-bg/60 p-3">
-            <div className="min-w-0 flex-1">
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-ink-soft">IBAN</div>
-              <div className="truncate font-mono text-[11.5px] text-ink">{vm.myDebt.iban}</div>
+          {/* Woraus die Summe besteht — dieselben zwei Kästen wie bei der
+              Kegelkasse, damit die Kachelfüße einem Muster folgen. Die IBAN
+              steht dort, wo man sie braucht: im Profil beim Bezahlen. */}
+          {vm.myDebt.split && vm.myDebt.amount > 0 && (
+            <div className="mt-5 border-t border-ink/10 pt-4">
+              <div className="flex gap-2">
+                <div className="min-w-0 flex-1 rounded-2xl bg-bg/60 px-3 py-2.5">
+                  <div className="text-[10px] uppercase tracking-wide text-ink-soft">Strafen</div>
+                  <div className="font-mono text-base font-semibold tnum text-ink">
+                    {eur(vm.myDebt.split.penalties)} €
+                  </div>
+                </div>
+                <div className="min-w-0 flex-1 rounded-2xl bg-bg/60 px-3 py-2.5">
+                  <div className="text-[10px] uppercase tracking-wide text-ink-soft">Monatsbeitrag</div>
+                  <div className="font-mono text-base font-semibold tnum text-ink">
+                    {eur(vm.myDebt.split.fees)} €
+                  </div>
+                </div>
+              </div>
+              {vm.myDebt.split.other > 0 && (
+                <div className="mt-2 text-[11px] text-ink-soft">
+                  + {eur(vm.myDebt.split.other)} € Sonstiges
+                </div>
+              )}
             </div>
-          </div>
+          )}
         </Card>
 
         {/* Nächster Abend → Termine */}
@@ -767,16 +793,16 @@ function PollTile({ poll, moreCount = 0, onVote, className = '' }) {
 /* ── Mitglieder-Kachel ───────────────────────────────────────────────────
    War vorher eine Wolke aus Namens-Chips: jede unterschiedlich breit, die
    Zeilen zerfranst, jeder Name gleich laut — bei zwölf Mitgliedern eine Wand
-   ohne Aussage. Der Zweck der Kachel ist, auf einen Blick alle Mitglieder mit
-   offenen Strafen zu sehen; also stehen die vollständig und namentlich drin,
-   höchster Betrag zuerst, in einem festen Raster mit tabellarischen Beträgen.
-   Darüber nur der Balken offen/schuldenfrei, darunter der Rest als Avatar-
-   Stapel. Beträge laufen über eurBalance, damit ein Guthaben auch hier
-   „+ 20,00 €" heißt und nicht als negative Schuld erscheint. */
+   ohne Aussage. Jetzt eine echte Liste: alle Mitglieder untereinander, höchste
+   Schuld zuerst, Guthaben am Ende. Festes Raster, damit alle Zeilen gleich hoch
+   sind und die Beträge tabellarisch untereinander stehen. Darüber nur der
+   Balken offen/schuldenfrei als einzige Kennzahl. Beträge laufen über
+   eurBalance, damit ein Guthaben „+ 20,00 €" heißt und nicht als negative
+   Schuld erscheint. */
 function MembersTile({ members, onClick, style }) {
   const list = members.list || []
-  const debtors = list.filter((m) => m.open > 0).sort((a, b) => b.open - a.open)
-  const clear = list.filter((m) => m.open <= 0)
+  const debtors = list.filter((m) => m.open > 0)
+  const sorted = [...list].sort((a, b) => b.open - a.open)
 
   return (
     <Card
@@ -791,7 +817,7 @@ function MembersTile({ members, onClick, style }) {
       </div>
 
       {/* Verhältnis offen zu schuldenfrei — die einzige Kennzahl, die es hier
-          noch braucht; die konkreten Namen darunter sagen den Rest. */}
+          noch braucht; die Namen darunter sagen den Rest. */}
       <div className="mt-3 flex h-1.5 gap-[3px]">
         {debtors.length > 0 && (
           <div
@@ -799,64 +825,36 @@ function MembersTile({ members, onClick, style }) {
             style={{ flexGrow: debtors.length, background: pal.terra }}
           />
         )}
-        {clear.length > 0 && (
+        {list.length - debtors.length > 0 && (
           <div
             className="basis-0 rounded-full"
-            style={{ flexGrow: clear.length, background: pal.sage }}
+            style={{ flexGrow: list.length - debtors.length, background: pal.sage }}
           />
         )}
       </div>
 
-      {/* Vollständige Schuldnerliste, höchster Betrag zuerst — genau dafür
-          ist die Kachel da. Festes Raster: alle Zeilen gleich hoch, die
-          Beträge stehen tabellarisch untereinander. */}
-      {debtors.length > 0 ? (
-        <ul className="mt-4 space-y-px">
-          {debtors.map((m, i) => (
-            <li
-              key={i}
-              className="grid grid-cols-[22px_1fr_auto] items-center gap-2.5 rounded-lg py-[3px]"
+      <ul className="mt-4 space-y-px">
+        {sorted.map((m, i) => (
+          <li
+            key={i}
+            className="grid grid-cols-[22px_1fr_auto] items-center gap-2.5 py-[3px]"
+          >
+            <Avatar name={m.full || m.name} size={22} />
+            <span className="truncate text-[12.5px] font-medium text-ink">{m.name}</span>
+            {/* Ausgeglichene Salden treten zurück, damit die Aufmerksamkeit
+                bei den offenen Beträgen und den Guthaben bleibt. */}
+            <span
+              className={cx(
+                'font-mono text-[12.5px] font-semibold tnum',
+                m.open === 0 && 'text-ink-dim',
+              )}
+              style={m.open === 0 ? undefined : { color: balanceColor(m.open) }}
             >
-              <Avatar name={m.full || m.name} size={22} />
-              <span className="truncate text-[12.5px] font-medium text-ink">{m.name}</span>
-              <span
-                className="font-mono text-[12.5px] font-semibold tnum"
-                style={{ color: balanceColor(m.open) }}
-              >
-                {eurBalance(m.open)} €
-              </span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <div className="mt-4 rounded-xl bg-bg/50 px-3 py-2.5 text-[12px] font-semibold text-sage">
-          Alle schuldenfrei 🎉
-        </div>
-      )}
-
-      <div className="flex-1" />
-
-      {/* Wer nichts offen hat, steht nur noch als Gesicht da. */}
-      {clear.length > 0 && (
-        <div className="mt-4 flex items-center gap-2 border-t border-ink/10 pt-3">
-          <div className="flex shrink-0 -space-x-1.5">
-            {clear.slice(0, 5).map((m, i) => (
-              <Avatar key={i} name={m.full || m.name} size={22} ring={pal.cream} />
-            ))}
-            {clear.length > 5 && (
-              <span
-                className="grid h-[22px] w-[22px] place-items-center rounded-full bg-bg text-[9px] font-semibold text-ink-soft"
-                style={{ boxShadow: `0 0 0 2px ${pal.cream}` }}
-              >
-                +{clear.length - 5}
-              </span>
-            )}
-          </div>
-          <span className="min-w-0 flex-1 truncate text-[11px] text-ink-soft">
-            {clear.length} ohne offene Posten
-          </span>
-        </div>
-      )}
+              {eurBalance(m.open)} €
+            </span>
+          </li>
+        ))}
+      </ul>
     </Card>
   )
 }

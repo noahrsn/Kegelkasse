@@ -9,7 +9,7 @@ import {
   listMembers,
   listMemberDebts,
   listOpenDebts,
-  listSessionStats,
+  splitOpenDebts,
   markMemberPaid,
   bookManualPenalty,
   cancelDebt,
@@ -40,7 +40,6 @@ export default function Members() {
           name: m.name,
           role: m.role,
           debt: m.debt,
-          attendance: m.attendance,
           iban: m.iban,
         }))
       : null,
@@ -54,15 +53,12 @@ export default function Members() {
     Promise.all([
       listMembers(activeGroupId),
       listMemberDebts(activeGroupId),
-      listSessionStats(activeGroupId).catch(() => []),
     ])
-      .then(([mem, debts, stats]) => {
+      .then(([mem, debts]) => {
         const byUser = new Map(debts.map((d) => [d.userId, d]))
-        const statByUser = new Map(stats.map((s) => [s.userId, s]))
         setList(
           mem.map((m) => {
             const d = byUser.get(m.userId)
-            const st = statByUser.get(m.userId)
             return {
               userId: m.userId,
               name: m.name,
@@ -74,7 +70,6 @@ export default function Members() {
               penalties: d ? d.penalties : 0,
               fees: d ? d.fees : 0,
               nextDue: d ? d.nextDue : null,
-              attendance: st && st.totalSessions > 0 ? st.attendance : null,
             }
           }),
         )
@@ -216,6 +211,9 @@ function MemberSheet({ member, onClose, canManage, mockMode, groupId, onChanged 
   const [items, setItems] = useState(null)
   const [busy, setBusy] = useState(false)
   const [penaltyOpen, setPenaltyOpen] = useState(false)
+  // Die Aufteilung kommt aus derselben Postenliste, die unten ohnehin steht —
+  // keine zweite Abfrage.
+  const split = items ? splitOpenDebts(items) : null
 
   useEffect(() => {
     if (!member || mockMode) {
@@ -280,20 +278,38 @@ function MemberSheet({ member, onClose, canManage, mockMode, groupId, onChanged 
         }
       >
         <div className="space-y-3">
-          <div className="flex items-center gap-3 rounded-2xl bg-bg p-4">
-            <Avatar name={member.name} size={48} />
-            <div className="flex-1">
-              <div className="text-[12px] text-ink-dim">{balanceLabel(member.debt)}</div>
-              <div className="font-display text-3xl font-medium tnum" style={{ color: balanceColor(member.debt) }}>
-                {eurBalance(member.debt)} €
+          {/* Erster Blick: die Gesamtsumme. Zweiter Blick: woraus sie besteht.
+              Die Anwesenheit steht in der Statistik, die einen Klick weiter
+              verlinkt ist — hier lenkte sie nur vom Geld ab. */}
+          <div className="rounded-2xl bg-bg p-4">
+            <div className="flex items-center gap-3">
+              <Avatar name={member.name} size={48} />
+              <div className="min-w-0 flex-1">
+                <div className="text-[12px] text-ink-dim">{balanceLabel(member.debt)}</div>
+                <div className="font-display text-3xl font-medium tnum" style={{ color: balanceColor(member.debt) }}>
+                  {eurBalance(member.debt)} €
+                </div>
               </div>
             </div>
-            {member.attendance != null && (
-              <div className="text-right">
-                <div className="text-[12px] text-ink-dim">Anwesenheit</div>
-                <div className="font-mono text-lg font-semibold text-sage">
-                  {Math.round(member.attendance * 100)}%
+            {split && member.debt > 0 && (
+              <div className="mt-3 flex gap-2">
+                <div className="min-w-0 flex-1 rounded-xl bg-card px-3 py-2">
+                  <div className="text-[10px] uppercase tracking-wide text-ink-dim">Strafen</div>
+                  <div className="font-mono text-[15px] font-semibold tnum">
+                    {eur(split.penalties)} €
+                  </div>
                 </div>
+                <div className="min-w-0 flex-1 rounded-xl bg-card px-3 py-2">
+                  <div className="text-[10px] uppercase tracking-wide text-ink-dim">Monatsbeiträge</div>
+                  <div className="font-mono text-[15px] font-semibold tnum">
+                    {eur(split.fees)} €
+                  </div>
+                </div>
+              </div>
+            )}
+            {split && split.other > 0 && (
+              <div className="mt-2 text-[11px] text-ink-soft">
+                + {eur(split.other)} € Sonstiges
               </div>
             )}
           </div>

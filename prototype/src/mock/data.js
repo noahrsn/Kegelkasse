@@ -32,7 +32,7 @@ export const club = {
 }
 
 export const members = [
-  { id: 'u1', name: 'Noah Roosen', role: 'kassenwart', debt: 17.6, attendance: 0.92, iban: 'DE81 3205 0000 0002 8025 69' },
+  { id: 'u1', name: 'Noah Roosen', role: 'kassenwart', debt: 15.6, attendance: 0.92, iban: 'DE81 3205 0000 0002 8025 69' },
   { id: 'u2', name: 'Hans Meier', role: 'präsident', debt: 4.5, attendance: 0.83, iban: 'DE12 3705 0198 0001 2345 67' },
   { id: 'u3', name: 'Karin Voss', role: 'mitglied', debt: 8.5, attendance: 0.75, iban: 'DE44 5001 0517 0648 4898 90' },
   { id: 'u4', name: 'Martin Haas', role: 'admin', debt: 23.8, attendance: 1.0, iban: 'DE89 3704 0044 0532 0130 00' },

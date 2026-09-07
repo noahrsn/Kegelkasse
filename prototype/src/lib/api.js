@@ -510,11 +510,26 @@ export async function getMemberBalance(groupId, userId) {
   }
 }
 
+/* Offene Posten nach Art bündeln: Verspätungsstrafen zählen als Strafe,
+   alles Übrige (Korrekturen, Storno) landet in `other` und wird nur
+   ausgewiesen, wenn wirklich etwas drinsteht. */
+const PENALTY_TYPES = ['penalty', 'late_payment_fee']
+
+export function splitOpenDebts(items = []) {
+  const sum = (pick) =>
+    items.filter(pick).reduce((a, d) => a + (d.open ?? d.amount ?? 0), 0)
+  return {
+    penalties: sum((d) => PENALTY_TYPES.includes(d.type)),
+    fees: sum((d) => d.type === 'monthly_fee'),
+    other: sum((d) => !PENALTY_TYPES.includes(d.type) && d.type !== 'monthly_fee'),
+  }
+}
+
 /* Offene Einzelposten eines Mitglieds (Detail-Sheet / Profil). */
 export async function listOpenDebts(groupId, userId) {
   const { data, error } = await supabase
     .from('debts')
-    .select('id, type, amount, description, due_date, created_at')
+    .select('id, type, amount, paid_amount, description, due_date, created_at')
     .eq('group_id', groupId)
     .eq('user_id', userId)
     .eq('paid', false)
@@ -525,6 +540,9 @@ export async function listOpenDebts(groupId, userId) {
     id: d.id,
     type: d.type,
     amount: Number(d.amount) || 0,
+    // Restbetrag nach Teilzahlung — Grundlage jeder Summe, damit schon
+    // gezahltes Geld nicht ein zweites Mal in der Aufteilung auftaucht.
+    open: (Number(d.amount) || 0) - (Number(d.paid_amount) || 0),
     description: d.description,
     dueDate: d.due_date,
   }))
