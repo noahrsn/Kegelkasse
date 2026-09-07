@@ -39,7 +39,7 @@ export const members = [
   { id: 'u5', name: 'Petra Lang', role: 'mitglied', debt: 11.2, attendance: 0.67, iban: '' },
   { id: 'u6', name: 'Tobias Brandt', role: 'mitglied', debt: 0, attendance: 0.92, iban: 'DE27 1002 0500 0001 1942 88' },
   { id: 'u7', name: 'Lisa Köhler', role: 'mitglied', debt: 6.0, attendance: 0.58, iban: '' },
-  { id: 'u8', name: 'Anna Schulz', role: 'mitglied', debt: 0, attendance: 0.83, iban: 'DE60 3001 0700 0123 4567 89' },
+  { id: 'u8', name: 'Anna Schulz', role: 'mitglied', debt: -20, attendance: 0.83, iban: 'DE60 3001 0700 0123 4567 89' },
   { id: 'u9', name: 'Jan Fischer', role: 'mitglied', debt: 14.0, attendance: 0.5, iban: '' },
   { id: 'u10', name: 'Sven Decker', role: 'mitglied', debt: 2.5, attendance: 0.75, iban: 'DE02 1203 0000 0009 8765 43' },
   { id: 'u11', name: 'Maria Wolf', role: 'mitglied', debt: 0, attendance: 1.0, iban: 'DE11 5205 0353 0011 2233 44' },

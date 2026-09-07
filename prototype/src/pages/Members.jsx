@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { Card, Button, PageTitle, Avatar, Field, Input, Textarea } from '../components/ui'
 import { Sheet } from '../components/Modal'
-import { eur, pal, ROLE_LABEL } from '../design/calm'
+import { eur, eurBalance, balanceColor, balanceLabel, pal, ROLE_LABEL } from '../design/calm'
 import { useAuth } from '../context/AuthContext.jsx'
 import {
   listMembers,
@@ -16,8 +16,6 @@ import {
   sendInviteEmail,
 } from '../lib/api.js'
 import { members as seed } from '../mock/data'
-
-const debtColor = (d) => (d === 0 ? pal.sage : d > 15 ? pal.terra : pal.amber)
 
 const DEBT_TYPE = {
   penalty: 'Strafe',
@@ -93,7 +91,11 @@ export default function Members() {
   const sorted = [...data].sort((a, b) =>
     sort === 'debt' ? b.debt - a.debt : a.name.localeCompare(b.name),
   )
-  const totalDebt = data.reduce((a, m) => a + m.debt, 0)
+  // Nur die positiven Salden summieren: Guthaben ist bereits gezahltes Geld und
+  // würde die offene Forderung des Clubs sonst künstlich kleinrechnen — es steht
+  // deshalb als eigene Zeile daneben statt im Saldo zu verschwinden.
+  const totalDebt = data.reduce((a, m) => a + Math.max(0, m.debt), 0)
+  const totalCredit = data.reduce((a, m) => a + Math.max(0, -m.debt), 0)
 
   return (
     <div className="space-y-5">
@@ -113,6 +115,11 @@ export default function Members() {
         <Card className="col-span-2 text-center">
           <div className="font-display text-3xl font-medium tnum text-terra">{eur(totalDebt)}</div>
           <div className="text-[11px] text-ink-dim">offene Schulden €</div>
+          {totalCredit > 0 && (
+            <div className="mt-1 text-[11px] font-semibold text-sage">
+              + {eur(totalCredit)} € Guthaben
+            </div>
+          )}
         </Card>
       </div>
 
@@ -174,7 +181,7 @@ export default function Members() {
 
 /* ── Eine Zeile der Mitgliederliste ──────────────────────────────────────── */
 function MemberRow({ member: m, onClick }) {
-  const color = debtColor(m.debt)
+  const color = balanceColor(m.debt)
   return (
     <button
       onClick={onClick}
@@ -198,7 +205,7 @@ function MemberRow({ member: m, onClick }) {
       </div>
 
       <div className="shrink-0 font-mono text-[15px] font-semibold tnum" style={{ color }}>
-        {eur(m.debt)} €
+        {eurBalance(m.debt)} €
       </div>
     </button>
   )
@@ -276,9 +283,9 @@ function MemberSheet({ member, onClose, canManage, mockMode, groupId, onChanged 
           <div className="flex items-center gap-3 rounded-2xl bg-bg p-4">
             <Avatar name={member.name} size={48} />
             <div className="flex-1">
-              <div className="text-[12px] text-ink-dim">Offene Schulden</div>
-              <div className="font-display text-3xl font-medium tnum" style={{ color: debtColor(member.debt) }}>
-                {eur(member.debt)} €
+              <div className="text-[12px] text-ink-dim">{balanceLabel(member.debt)}</div>
+              <div className="font-display text-3xl font-medium tnum" style={{ color: balanceColor(member.debt) }}>
+                {eurBalance(member.debt)} €
               </div>
             </div>
             {member.attendance != null && (

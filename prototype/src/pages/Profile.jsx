@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Button, Badge, PageTitle, Avatar, Field, Input, Toggle } from '../components/ui'
-import { eur, pal, cx, ROLE_LABEL } from '../design/calm'
+import { eur, eurBalance, balanceColor, pal, cx, ROLE_LABEL } from '../design/calm'
 import { useAuth } from '../context/AuthContext.jsx'
 import {
   getGroup,
   listOpenDebts,
+  getMemberBalance,
   getAwards,
   getNotifSettings,
   saveNotifSetting,
@@ -27,6 +28,9 @@ export default function Profile() {
     mockMode ? myDebts.filter((d) => !d.paid).map((d) => ({ description: d.desc, amount: d.amount })) : null,
   )
   const [pay, setPay] = useState(mockMode ? { iban: club.iban, paypal: club.paypal } : null)
+  // Guthaben kommt aus member_debts, nicht aus der Postenliste — sonst zeigt das
+  // Profil eine andere Zahl als Dashboard und Mitgliederliste.
+  const [credit, setCredit] = useState(0)
   const [titles, setTitles] = useState(mockMode ? mockTitles : [])
   const [avatarUrl, setAvatarUrl] = useState(null)
   const [uploading, setUploading] = useState(false)
@@ -62,6 +66,9 @@ export default function Profile() {
         console.error(e)
         setDebts([])
       })
+    getMemberBalance(activeGroupId, user.id)
+      .then((b) => setCredit(b.credit))
+      .catch((e) => console.error(e))
     getGroup(activeGroupId)
       .then((g) => setPay({ iban: g?.payment_iban || '', paypal: g?.payment_paypal || '' }))
       .catch((e) => console.error(e))
@@ -71,7 +78,10 @@ export default function Profile() {
   }, [mockMode, activeGroupId, user])
 
   const open = debts || []
-  const total = open.reduce((a, d) => a + (d.amount || 0), 0)
+  // Saldo = offene Posten minus Guthaben. Negativ heißt Guthaben und wird als
+  // „+ 20,00 €" angezeigt, nie als „-20,00 €".
+  const gross = open.reduce((a, d) => a + (d.amount || 0), 0)
+  const total = gross - credit
   const name = mockMode ? currentUser.name : profile?.name || '—'
   const email = mockMode ? currentUser.email : user?.email || ''
   const [first, ...rest] = name.split(' ')
@@ -126,12 +136,20 @@ export default function Profile() {
       <Card tone={total > 0 ? 'terra' : 'sage'}>
         <div className="flex items-end justify-between">
           <div>
-            <div className="text-[12px] font-semibold" style={{ color: total > 0 ? pal.terra : pal.sage }}>
-              Meine offenen Schulden
+            <div
+              className="text-[12px] font-semibold"
+              style={{ color: balanceColor(total) }}
+            >
+              {total < 0 ? 'Mein Guthaben' : 'Meine offenen Schulden'}
             </div>
             <div className="mt-1 font-display text-4xl font-medium tnum text-ink">
-              {eur(total)} <span className="text-2xl font-normal">€</span>
+              {eurBalance(total)} <span className="text-2xl font-normal">€</span>
             </div>
+            {credit > 0 && total > 0 && (
+              <div className="mt-1 text-[11px] text-ink-soft">
+                {eur(gross)} € offen · + {eur(credit)} € Guthaben verrechnet
+              </div>
+            )}
           </div>
           {total > 0 && pay?.iban && (
             <div className="rounded-2xl bg-bg/60 p-3 text-right">

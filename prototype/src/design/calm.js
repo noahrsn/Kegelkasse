@@ -55,6 +55,29 @@ export function eur(n) {
   }).format(n)
 }
 
+// Ein Mitglieds-Saldo aus Kassensicht. `open_amount` wird negativ, sobald das
+// Guthaben größer als die offenen Posten ist — dann soll überall „+ 20,00"
+// stehen und nie „-20,00": ein Guthaben ist keine negative Schuld.
+export function eurBalance(n) {
+  const v = Number(n) || 0
+  return v < 0 ? `+ ${eur(-v)}` : eur(v)
+}
+
+// Passende Farbe zum Saldo: Guthaben und Schuldenfreiheit sind gruen, offene
+// Posten amber und ab der Mahnschwelle terra.
+export function balanceColor(n, warnAbove = 15) {
+  const v = Number(n) || 0
+  if (v <= 0) return pal.sage
+  return v > warnAbove ? pal.terra : pal.amber
+}
+
+// Beschriftung zum Saldo — dieselbe Sprache auf Dashboard, Mitgliedern, Profil.
+export function balanceLabel(n) {
+  const v = Number(n) || 0
+  if (v < 0) return 'Guthaben'
+  return v > 0 ? 'Offene Schulden' : 'Keine offenen Posten'
+}
+
 export const ROLE_LABEL = {
   admin: 'Admin',
   präsident: 'Präsident',

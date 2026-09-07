@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Card, Badge, Button, Avatar } from '../components/ui'
-import { pal, eur, creamLight, cx, accentsOnNavy } from '../design/calm'
+import { pal, eur, eurBalance, balanceColor, creamLight, cx, accentsOnNavy } from '../design/calm'
 import { useAuth } from '../context/AuthContext.jsx'
 import {
   getGroup,
@@ -102,7 +102,7 @@ function buildMock() {
     pending: { sessionId: 's1', text: '09.05. · H. Meier · 12 Teilnehmer · Σ 14,80 €' },
     members: {
       count: members.length,
-      list: members.map((m) => ({ name: m.name.split(' ')[0], open: m.debt })),
+      list: members.map((m) => ({ name: m.name.split(' ')[0], full: m.name, open: m.debt })),
     },
   }
 }
@@ -274,7 +274,11 @@ export default function Dashboard() {
             : null,
           members: {
             count: mem.length,
-            list: mem.map((m) => ({ name: m.name.split(' ')[0], open: openOf(m.userId) })),
+            list: mem.map((m) => ({
+              name: m.name.split(' ')[0],
+              full: m.name,
+              open: openOf(m.userId),
+            })),
           },
         })
       })
@@ -472,31 +476,11 @@ export default function Dashboard() {
         </Card>
 
         {/* Mitglieder → Mitglieder (auf Mobile über der Aktivität) */}
-        <Card
-          tone="cream"
+        <MembersTile
+          members={vm.members}
           onClick={() => navigate('/members')}
-          className="flex cursor-pointer flex-col animate-rise transition hover:brightness-[0.99]"
           style={{ animationDelay: '160ms' }}
-        >
-          <div className="flex items-center justify-between">
-            <div className="text-[12px] font-semibold text-ink">Mitglieder</div>
-            <span className="text-[11px] font-semibold text-amber">{vm.members.count} aktiv →</span>
-          </div>
-          <div className="mt-3.5 flex flex-wrap gap-1.5">
-            {vm.members.list.map((m, i) => (
-              <div key={i} className="flex items-center gap-1.5 rounded-full bg-bg/70 py-1 pl-1 pr-2.5">
-                <Avatar name={m.name} size={20} />
-                <span className="text-[11px] font-medium">{m.name}</span>
-                <span
-                  className="font-mono text-[11px] font-semibold"
-                  style={{ color: m.open > 0 ? pal.terra : pal.sage }}
-                >
-                  {m.open > 0 ? `${eur(m.open)} €` : m.open < 0 ? `+${eur(-m.open)} €` : '0 €'}
-                </span>
-              </div>
-            ))}
-          </div>
-        </Card>
+        />
 
         {/* Aktivität — teilt sich die Breite mit den Titeln */}
         <Card className="flex flex-col animate-rise" style={{ animationDelay: '200ms' }}>
@@ -776,6 +760,123 @@ function PollTile({ poll, moreCount = 0, onVote, className = '' }) {
           )}
         </div>
       </div>
+    </Card>
+  )
+}
+
+/* ── Mitglieder-Kachel ───────────────────────────────────────────────────
+   War vorher eine Wolke aus Namens-Chips: jede unterschiedlich breit, die
+   Zeilen zerfranst, jeder Name gleich laut — bei zwölf Mitgliedern eine Wand
+   ohne Aussage. Jetzt drei klar getrennte Ebenen:
+     1. Kopfzahl + Verteilungsbalken → wie steht der Club insgesamt da,
+     2. die drei höchsten offenen Posten in gleich hohen Rasterzeilen mit
+        rechtsbündigen, tabellarischen Beträgen → wer braucht eine Erinnerung,
+     3. der Rest als Avatar-Stapel → wer noch dazugehört, ohne Lärm.
+   Beträge laufen über eurBalance, damit ein Guthaben auch hier „+ 20,00 €"
+   heißt und nicht als negative Schuld erscheint. */
+function MembersTile({ members, onClick, style }) {
+  const list = members.list || []
+  const debtors = list.filter((m) => m.open > 0).sort((a, b) => b.open - a.open)
+  const settled = list.filter((m) => m.open === 0)
+  const credited = list.filter((m) => m.open < 0)
+  const top = debtors.slice(0, 3)
+
+  // Der Avatar-Stapel zeigt alle, die nicht schon namentlich oben stehen. Die
+  // Aufschlüsselung steht bereits im Kopf — hier reicht die reine Anzahl,
+  // sonst wird die Zeile abgeschnitten.
+  const rest = list.filter((m) => !top.includes(m))
+
+  return (
+    <Card
+      tone="cream"
+      onClick={onClick}
+      className="flex cursor-pointer flex-col animate-rise transition hover:brightness-[0.99]"
+      style={style}
+    >
+      <div className="flex items-center justify-between">
+        <div className="text-[12px] font-semibold text-ink">Mitglieder</div>
+        <span className="text-[11px] font-semibold text-amber">Alle ansehen →</span>
+      </div>
+
+      {/* Kopfzahl in derselben Display-Type wie Kasse und Schulden */}
+      <div className="mt-2.5 flex items-end gap-3">
+        <div className="font-display text-5xl font-medium leading-none tracking-tight tnum text-ink">
+          {members.count}
+        </div>
+        <div className="pb-0.5 text-[12px] leading-[1.35] text-ink-soft">
+          <div>{debtors.length} mit offenen Posten</div>
+          <div>{settled.length + credited.length} ohne Schulden</div>
+        </div>
+      </div>
+
+      {/* Verteilung als ein schmaler Balken — gleiche Reihenfolge wie die
+          beiden Zeilen darüber, damit die Farben eindeutig zuzuordnen sind. */}
+      <div className="mt-3 flex h-1.5 gap-[3px]">
+        {debtors.length > 0 && (
+          <div
+            className="basis-0 rounded-full"
+            style={{ flexGrow: debtors.length, background: pal.terra }}
+          />
+        )}
+        {settled.length + credited.length > 0 && (
+          <div
+            className="basis-0 rounded-full"
+            style={{ flexGrow: settled.length + credited.length, background: pal.sage }}
+          />
+        )}
+      </div>
+
+      {top.length > 0 ? (
+        <div className="mt-5">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-ink-soft">
+            Höchste offene Posten
+          </div>
+          <ul className="mt-2 space-y-1">
+            {top.map((m, i) => (
+              <li
+                key={i}
+                className="grid grid-cols-[24px_1fr_auto] items-center gap-2.5 rounded-xl bg-bg/50 px-2 py-1.5"
+              >
+                <Avatar name={m.full || m.name} size={24} />
+                <span className="truncate text-[12.5px] font-medium text-ink">{m.name}</span>
+                <span
+                  className="font-mono text-[12.5px] font-semibold tnum"
+                  style={{ color: balanceColor(m.open) }}
+                >
+                  {eurBalance(m.open)} €
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <div className="mt-5 rounded-xl bg-bg/50 px-3 py-2.5 text-[12px] font-semibold text-sage">
+          Alle schuldenfrei 🎉
+        </div>
+      )}
+
+      <div className="flex-1" />
+
+      {rest.length > 0 && (
+        <div className="mt-4 flex items-center gap-2 border-t border-ink/10 pt-3">
+          <div className="flex shrink-0 -space-x-1.5">
+            {rest.slice(0, 5).map((m, i) => (
+              <Avatar key={i} name={m.full || m.name} size={22} ring={pal.cream} />
+            ))}
+            {rest.length > 5 && (
+              <span
+                className="grid h-[22px] w-[22px] place-items-center rounded-full bg-bg text-[9px] font-semibold text-ink-soft"
+                style={{ boxShadow: `0 0 0 2px ${pal.cream}` }}
+              >
+                +{rest.length - 5}
+              </span>
+            )}
+          </div>
+          <span className="min-w-0 flex-1 truncate text-[11px] text-ink-soft">
+            {rest.length} weitere
+          </span>
+        </div>
+      )}
     </Card>
   )
 }

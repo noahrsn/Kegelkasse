@@ -492,6 +492,24 @@ export async function listMemberDebts(groupId) {
   }))
 }
 
+/* Saldo eines einzelnen Mitglieds — offene Posten abzüglich Guthaben, also
+   dieselbe Zahl, die Dashboard und Mitgliederliste zeigen. Ein negativer Saldo
+   ist ein Guthaben. */
+export async function getMemberBalance(groupId, userId) {
+  const { data, error } = await supabase
+    .from('member_debts')
+    .select('open_amount, credit, next_due')
+    .eq('group_id', groupId)
+    .eq('user_id', userId)
+    .maybeSingle()
+  if (error) throw error
+  return {
+    open: Number(data?.open_amount) || 0,
+    credit: Number(data?.credit) || 0,
+    nextDue: data?.next_due ?? null,
+  }
+}
+
 /* Offene Einzelposten eines Mitglieds (Detail-Sheet / Profil). */
 export async function listOpenDebts(groupId, userId) {
   const { data, error } = await supabase

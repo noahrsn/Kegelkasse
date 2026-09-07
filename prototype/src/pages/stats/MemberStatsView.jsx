@@ -124,7 +124,13 @@ export default function MemberStatsView({ data, self = false, showHeader = true 
                 unit="€"
                 tone={Number(d.open_debt) > 0 ? 'terra' : 'sage'}
               />
-              <KpiTile label="Guthaben" value={eur(d.credit)} unit="€" tone="sage" />
+              {/* Guthaben steht überall mit „+" — nie als negative Schuld. */}
+              <KpiTile
+                label="Guthaben"
+                value={Number(d.credit) > 0 ? `+ ${eur(d.credit)}` : eur(0)}
+                unit="€"
+                tone={Number(d.credit) > 0 ? 'sage' : 'ink'}
+              />
               <KpiTile
                 label="Verspätungsstrafen"
                 value={d.late_fee_count}

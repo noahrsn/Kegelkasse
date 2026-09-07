@@ -205,8 +205,10 @@ export function statsMember(userId = 'u1') {
     early: 0,
     late_fee_count: statsLeaderboards.late_fees.find((r) => r.user_id === m.id)?.value ?? 0,
     late_fee_amount: statsLeaderboards.late_fees.find((r) => r.user_id === m.id)?.fee_amount ?? 0,
-    open_debt: m.debt,
-    credit: 0,
+    // Wie in der echten Abfrage: open_debt ist immer >= 0, ein Guthaben steht
+    // separat in credit — ein negativer Saldo im Mock ist genau das.
+    open_debt: Math.max(0, m.debt),
+    credit: Math.max(0, -m.debt),
     club_avg: { penalty_total: 107.04, penalty_per_session: 7.42, attended: 14.4, rinnen: 34.3 },
     timeline: statsTimeline().map((t) => ({
       m: t.m,
