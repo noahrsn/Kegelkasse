@@ -77,6 +77,7 @@ function EventView({
   vm,
   myStatus,
   note,
+  rsvpLocked = false,
   onRespond,
   onSaveNote,
   onAddGuest,
@@ -209,14 +210,19 @@ function EventView({
       {/* Meine Rückmeldung */}
       <Card>
         <div className="text-[12px] font-semibold text-ink-soft">Deine Rückmeldung</div>
+        {rsvpLocked && (
+          <p className="mt-1 text-[12px] text-ink-dim">
+            Du bist inaktiv gesetzt und nimmst an Terminen nicht mehr teil.
+          </p>
+        )}
         <div className="mt-3 grid grid-cols-3 gap-2">
-          <RsvpBtn active={myStatus === 'yes'} tone="sage" disabled={busy || cancelled} onClick={() => respond('yes')}>
+          <RsvpBtn active={myStatus === 'yes'} tone="sage" disabled={busy || cancelled || rsvpLocked} onClick={() => respond('yes')}>
             ✓ Zusagen
           </RsvpBtn>
-          <RsvpBtn active={myStatus === 'maybe'} tone="amber" disabled={busy || cancelled} onClick={() => respond('maybe')}>
+          <RsvpBtn active={myStatus === 'maybe'} tone="amber" disabled={busy || cancelled || rsvpLocked} onClick={() => respond('maybe')}>
             ? Vielleicht
           </RsvpBtn>
-          <RsvpBtn active={myStatus === 'no'} tone="terra" disabled={busy || cancelled} onClick={() => respond('no')}>
+          <RsvpBtn active={myStatus === 'no'} tone="terra" disabled={busy || cancelled || rsvpLocked} onClick={() => respond('no')}>
             ✕ Absagen
           </RsvpBtn>
         </div>
@@ -424,7 +430,7 @@ function toGuests(arr, own = false) {
 /* ── Echt-Variante (Supabase) ────────────────────────────────────────────── */
 function LiveEvent({ eventId }) {
   const navigate = useNavigate()
-  const { activeGroupId, role, user, profile } = useAuth()
+  const { activeGroupId, role, user, profile, isInactive } = useAuth()
   const canManage = role === 'admin' || role === 'präsident'
 
   const [event, setEvent] = useState(null)
@@ -649,7 +655,8 @@ function LiveEvent({ eventId }) {
         }}
         onToggleCancel={canManage ? toggleCancel : null}
         onDeleteSeries={canManage && event.series_id ? onDeleteSeries : null}
-        onStartSession={started && !cancelled && vm.isBowling ? startSession : null}
+        rsvpLocked={isInactive}
+        onStartSession={started && !cancelled && vm.isBowling && !isInactive ? startSession : null}
         busy={busy}
       />
     </>

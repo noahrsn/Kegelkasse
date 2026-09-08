@@ -66,7 +66,11 @@ export default function TreasuryImport() {
 
   useEffect(() => {
     if (mockMode || !activeGroupId) return
-    listMembers(activeGroupId).then(setMembers).catch((e) => console.error(e))
+    // Mit Inaktiven: wer beim Ausscheiden noch etwas offen hatte, überweist
+    // später — die Zahlung muss zuordenbar bleiben.
+    listMembers(activeGroupId, { includeInactive: true })
+      .then(setMembers)
+      .catch((e) => console.error(e))
   }, [mockMode, activeGroupId])
 
   const onPick = async (e) => {

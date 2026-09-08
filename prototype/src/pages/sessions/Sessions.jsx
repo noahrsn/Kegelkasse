@@ -31,7 +31,7 @@ function fmtEventWhen(iso) {
 
 export default function Sessions() {
   const navigate = useNavigate()
-  const { mockMode, activeGroupId } = useAuth()
+  const { mockMode, activeGroupId, isInactive } = useAuth()
 
   const [list, setList] = useState(mockMode ? mockSessions : null)
   const [next, setNext] = useState(null) // { id, title, when, presentIds, guests, yesNames }
@@ -127,11 +127,15 @@ export default function Sessions() {
       <PageTitle
         kicker="Kegelabende"
         title="Übersicht"
-        action={<Button onClick={() => navigate('/sessions/new')}>Leeren starten</Button>}
+        action={
+          isInactive ? null : (
+            <Button onClick={() => navigate('/sessions/new')}>Leeren starten</Button>
+          )
+        }
       />
 
       {/* Nächsten Termin direkt starten */}
-      {next && (
+      {next && !isInactive && (
         <Card tone="navy" className="space-y-4">
           <div className="flex items-center gap-3">
             <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white/10 text-xl">

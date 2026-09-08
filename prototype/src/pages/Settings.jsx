@@ -9,6 +9,7 @@ import {
   updateGroup,
   listMembers,
   updateMemberRole,
+  setMemberActive,
   removeMember,
   listPenalties,
   resetInvite,
@@ -38,7 +39,7 @@ const ACCESS = {
   penalties: ['admin', 'kassenwart'],
   events: ['admin', 'präsident'],
   rulebook: ['admin', 'präsident'],
-  members: ['admin'],
+  members: ['admin', 'präsident', 'kassenwart'],
   invite: ['admin', 'präsident'],
 }
 
@@ -120,7 +121,14 @@ export default function Settings() {
             }}
           />
         )}
-        {tab === 'members' && <MembersTab mockMode={mockMode} groupId={activeGroupId} canEdit={mockMode || role === 'admin'} />}
+        {tab === 'members' && (
+          <MembersTab
+            mockMode={mockMode}
+            groupId={activeGroupId}
+            canEdit={mockMode || role === 'admin'}
+            canSetActive={mockMode || ['admin', 'präsident', 'kassenwart'].includes(role)}
+          />
+        )}
         {tab === 'invite' && (
           <Card>
             <InviteBox
@@ -459,7 +467,7 @@ function Rulebook({ group, onSave }) {
   )
 }
 
-function MembersTab({ mockMode, groupId, canEdit }) {
+function MembersTab({ mockMode, groupId, canEdit, canSetActive }) {
   const { user } = useAuth()
   const [list, setList] = useState(
     mockMode ? mockMembers.map((m) => ({ id: m.id, userId: m.id, name: m.name, role: m.role })) : null,
@@ -468,9 +476,33 @@ function MembersTab({ mockMode, groupId, canEdit }) {
 
   const load = () => {
     if (mockMode || !groupId) return
-    listMembers(groupId).then(setList)
+    // Hier ist die einzige Stelle, an der Inaktive vollständig sichtbar sind —
+    // sonst käme man nicht mehr an den Schalter, um sie zurückzuholen.
+    listMembers(groupId, { includeInactive: true }).then(setList)
   }
   useEffect(load, [mockMode, groupId])
+
+  async function toggleActive(m) {
+    const next = !!m.isInactive
+    if (!next && !window.confirm(
+      `${m.name} inaktiv setzen? Er bekommt dann keinen Monatsbeitrag und keine ` +
+      `Strafen mehr, steht nicht mehr in Terminen und Kegelabenden. Offene ` +
+      `Schulden bleiben bestehen, die Statistik behält ihn.`,
+    )) return
+    setList((l) => l.map((x) => (x.userId === m.userId ? { ...x, isInactive: !next } : x)))
+    if (mockMode) return
+    setSavingId(m.id)
+    try {
+      await setMemberActive(groupId, m.userId, next)
+      load()
+    } catch (e) {
+      console.error(e)
+      alert(e.message || 'Umschalten fehlgeschlagen')
+      load()
+    } finally {
+      setSavingId(null)
+    }
+  }
 
   async function changeRole(memberId, role) {
     setList((l) => l.map((m) => (m.id === memberId ? { ...m, role } : m)))
@@ -503,37 +535,96 @@ function MembersTab({ mockMode, groupId, canEdit }) {
 
   if (!list) return <Card><div className="py-6 text-center text-sm text-ink-dim">Lädt…</div></Card>
 
+  const active = list.filter((m) => !m.isInactive)
+  const inactive = list.filter((m) => m.isInactive)
+
+  /* Eine Zeile bricht auf dem Telefon bewusst um: Name oben, Rolle und
+     Aktionen darunter. Nebeneinander wäre auf 360 px alles gequetscht. */
+  const row = (m, last, children) => (
+    <div
+      key={m.id}
+      className={cx('flex flex-wrap items-center gap-2 p-3', !last && 'border-b border-card-edge')}
+    >
+      <Avatar name={m.name} size={36} />
+      <span className="min-w-0 flex-1 truncate text-[14px] font-medium">{m.name}</span>
+      {savingId === m.id && <span className="text-[11px] text-ink-dim">…</span>}
+      <div className="flex w-full items-center justify-end gap-2 sm:w-auto">{children}</div>
+    </div>
+  )
+
   return (
     <div className="space-y-5">
       <Card className="p-0">
-        {list.map((m, i) => (
-          <div key={m.id} className={cx('flex items-center gap-3 p-3', i < list.length - 1 && 'border-b border-card-edge')}>
-            <Avatar name={m.name} size={36} />
-            <span className="flex-1 text-[14px] font-medium">{m.name}</span>
-            {savingId === m.id && <span className="text-[11px] text-ink-dim">…</span>}
-            <Select
-              value={m.role}
-              disabled={!canEdit}
-              onChange={(e) => changeRole(m.id, e.target.value)}
-              className="w-32 py-2 text-[13px] disabled:opacity-60"
-            >
-              {Object.entries(ROLE_LABEL).map(([k, v]) => (
-                <option key={k} value={k}>{v}</option>
-              ))}
-            </Select>
-            {canEdit && m.userId !== user?.id && (
-              <button
-                onClick={() => remove(m)}
-                disabled={savingId === m.id}
-                className="text-[12px] font-semibold text-terra hover:underline"
-                title="Mitglied entfernen"
+        {active.map((m, i) =>
+          row(m, i === active.length - 1, (
+            <>
+              <Select
+                value={m.role}
+                disabled={!canEdit}
+                onChange={(e) => changeRole(m.id, e.target.value)}
+                className="w-32 py-2 text-[13px] disabled:opacity-60"
               >
-                Entfernen
-              </button>
-            )}
-          </div>
-        ))}
+                {Object.entries(ROLE_LABEL).map(([k, v]) => (
+                  <option key={k} value={k}>{v}</option>
+                ))}
+              </Select>
+              {canSetActive && m.userId !== user?.id && (
+                <button
+                  onClick={() => toggleActive(m)}
+                  disabled={savingId === m.id}
+                  className="text-[12px] font-semibold text-ink-soft hover:underline"
+                  title="Nimmt nicht mehr am Clubleben teil, bleibt in der Statistik"
+                >
+                  Inaktiv setzen
+                </button>
+              )}
+              {canEdit && m.userId !== user?.id && (
+                <button
+                  onClick={() => remove(m)}
+                  disabled={savingId === m.id}
+                  className="text-[12px] font-semibold text-terra hover:underline"
+                  title="Mitglied entfernen — löscht auch die Historie"
+                >
+                  Entfernen
+                </button>
+              )}
+            </>
+          )),
+        )}
       </Card>
+
+      {inactive.length > 0 && (
+        <div>
+          <h3 className="mb-2 text-[13px] font-semibold text-ink-soft">Inaktive Mitglieder</h3>
+          <Card className="p-0 opacity-70">
+            {inactive.map((m, i) =>
+              row(m, i === inactive.length - 1, (
+                <>
+                  <span className="text-[11px] text-ink-dim">
+                    {m.inactiveSince
+                      ? `seit ${new Date(m.inactiveSince).toLocaleDateString('de-DE')}`
+                      : 'inaktiv'}
+                  </span>
+                  {canSetActive && (
+                    <button
+                      onClick={() => toggleActive(m)}
+                      disabled={savingId === m.id}
+                      className="text-[12px] font-semibold text-sage hover:underline"
+                    >
+                      Zurückholen
+                    </button>
+                  )}
+                </>
+              )),
+            )}
+          </Card>
+          <p className="mt-2 text-[11px] leading-relaxed text-ink-dim">
+            Inaktive nehmen an Terminen, Kegelabenden und Abstimmungen nicht mehr teil und
+            bekommen weder Monatsbeitrag noch neue Strafen. Offene Schulden bleiben bestehen,
+            in der Statistik stehen sie weiter mit ihrer Historie.
+          </p>
+        </div>
+      )}
 
       <div>
         <h3 className="mb-2 text-[13px] font-semibold text-ink-soft">Vorab angelegte Mitglieder</h3>

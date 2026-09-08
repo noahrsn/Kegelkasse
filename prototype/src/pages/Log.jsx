@@ -16,6 +16,8 @@ const ACTION = {
   rsvp_response: { tag: 'Termin', tone: 'navy', verb: 'meldete sich zu einem Termin' },
   rsvp_late: { tag: 'Absage', tone: 'terra', verb: 'sagte verspätet ab' },
   monthly_fee: { tag: 'Beitrag', tone: 'sage', verb: 'Monatsbeitrag gebucht' },
+  member_deactivated: { tag: 'Mitglied', tone: 'amber', verb: 'setzte ein Mitglied inaktiv' },
+  member_reactivated: { tag: 'Mitglied', tone: 'sage', verb: 'holte ein Mitglied zurück' },
 }
 const fallback = { tag: 'Aktivität', tone: 'neutral', verb: '' }
 

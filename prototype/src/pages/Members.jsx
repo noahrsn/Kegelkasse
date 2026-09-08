@@ -51,7 +51,10 @@ export default function Members() {
   const load = () => {
     if (mockMode || !activeGroupId) return
     Promise.all([
-      listMembers(activeGroupId),
+      // Inaktive kommen mit — sie fliegen unten wieder raus, sobald ihr Konto
+      // ausgeglichen ist. Solange etwas offen ist, darf der Kassenwart sie
+      // nicht aus den Augen verlieren.
+      listMembers(activeGroupId, { includeInactive: true }),
       listMemberDebts(activeGroupId),
     ])
       .then(([mem, debts]) => {
@@ -65,6 +68,7 @@ export default function Members() {
               role: m.role,
               iban: m.iban,
               isPlaceholder: m.isPlaceholder,
+              isInactive: m.isInactive,
               debt: d ? d.open : 0,
               openCount: d ? d.openCount : 0,
               penalties: d ? d.penalties : 0,
@@ -82,15 +86,14 @@ export default function Members() {
 
   useEffect(load, [mockMode, activeGroupId])
 
-  const data = list || []
+  // Inaktive stehen nur noch drin, solange ihr Saldo nicht null ist.
+  const data = (list || []).filter((m) => !m.isInactive || m.debt !== 0)
   const sorted = [...data].sort((a, b) =>
     sort === 'debt' ? b.debt - a.debt : a.name.localeCompare(b.name),
   )
   // Nur die positiven Salden summieren: Guthaben ist bereits gezahltes Geld und
-  // würde die offene Forderung des Clubs sonst künstlich kleinrechnen — es steht
-  // deshalb als eigene Zeile daneben statt im Saldo zu verschwinden.
+  // würde die offene Forderung des Clubs sonst künstlich kleinrechnen.
   const totalDebt = data.reduce((a, m) => a + Math.max(0, m.debt), 0)
-  const totalCredit = data.reduce((a, m) => a + Math.max(0, -m.debt), 0)
 
   return (
     <div className="space-y-5">
@@ -110,11 +113,6 @@ export default function Members() {
         <Card className="col-span-2 text-center">
           <div className="font-display text-3xl font-medium tnum text-terra">{eur(totalDebt)}</div>
           <div className="text-[11px] text-ink-dim">offene Schulden €</div>
-          {totalCredit > 0 && (
-            <div className="mt-1 text-[11px] font-semibold text-sage">
-              + {eur(totalCredit)} € Guthaben
-            </div>
-          )}
         </Card>
       </div>
 
@@ -196,6 +194,7 @@ function MemberRow({ member: m, onClick }) {
         <div className="truncate text-[12px] leading-snug text-ink-dim">
           {ROLE_LABEL[m.role]}
           {m.isPlaceholder && <span className="text-amber"> · Nicht registriert</span>}
+          {m.isInactive && <span className="text-ink-dim"> · Inaktiv</span>}
         </div>
       </div>
 
@@ -264,7 +263,11 @@ function MemberSheet({ member, onClose, canManage, mockMode, groupId, onChanged 
         open={member != null && !penaltyOpen}
         onClose={onClose}
         title={member.name}
-        subtitle={ROLE_LABEL[member.role] + (member.isPlaceholder ? ' · Nicht registriert' : '')}
+        subtitle={
+          ROLE_LABEL[member.role] +
+          (member.isPlaceholder ? ' · Nicht registriert' : '') +
+          (member.isInactive ? ' · Inaktiv' : '')
+        }
         footer={
           member.debt > 0 && canManage ? (
             <Button variant="sage" className="w-full" disabled={busy} onClick={markPaid}>

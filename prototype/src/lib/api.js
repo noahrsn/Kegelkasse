@@ -80,20 +80,38 @@ export async function insertEvent(groupId, createdBy, row) {
   if (error) throw error
 }
 
-export async function listMembers(groupId) {
+/* Mitglieder einer Gruppe. Inaktive sind standardmäßig NICHT dabei — überall
+   dort, wo es um das laufende Clubleben geht (Kegelabend, Termine, Auswahl-
+   listen), sollen sie nicht mehr auftauchen. Wer sie braucht (Club-Einstel-
+   lungen, Zahlungsabgleich, Schuldnerliste), fordert sie ausdrücklich an. */
+export async function listMembers(groupId, { includeInactive = false } = {}) {
   const { data, error } = await supabase
     .from('group_members')
-    .select('id, role, user_id, iban, profiles(first_name, last_name, is_placeholder)')
+    .select('id, role, user_id, iban, inactive_since, profiles(first_name, last_name, is_placeholder)')
     .eq('group_id', groupId)
   if (error) throw error
-  return (data ?? []).map((m) => ({
-    id: m.id,
-    userId: m.user_id,
-    role: m.role,
-    iban: m.iban || '',
-    name: m.profiles ? `${m.profiles.first_name} ${m.profiles.last_name}`.trim() : '—',
-    isPlaceholder: !!m.profiles?.is_placeholder,
-  }))
+  return (data ?? [])
+    .map((m) => ({
+      id: m.id,
+      userId: m.user_id,
+      role: m.role,
+      iban: m.iban || '',
+      name: m.profiles ? `${m.profiles.first_name} ${m.profiles.last_name}`.trim() : '—',
+      isPlaceholder: !!m.profiles?.is_placeholder,
+      inactiveSince: m.inactive_since,
+      isInactive: m.inactive_since != null,
+    }))
+    .filter((m) => includeInactive || !m.isInactive)
+}
+
+/* Mitglied inaktiv setzen bzw. zurückholen (Admin, Präsident, Kassenwart). */
+export async function setMemberActive(groupId, userId, active) {
+  const { error } = await supabase.rpc('set_member_active', {
+    p_group_id: groupId,
+    p_user_id: userId,
+    p_active: active,
+  })
+  if (error) throw error
 }
 
 export async function updateMemberRole(memberId, role) {

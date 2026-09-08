@@ -28,6 +28,8 @@ const ACTION_VERB = {
   debt_cancelled: 'stornierte einen Posten',
   rsvp_response: 'meldete sich zu einem Termin',
   rsvp_late: 'sagte verspätet ab',
+  member_deactivated: 'setzte ein Mitglied inaktiv',
+  member_reactivated: 'holte ein Mitglied zurück',
 }
 const ACTION_TONE = {
   session_approved: 'sage',
@@ -37,6 +39,8 @@ const ACTION_TONE = {
   debt_cancelled: 'amber',
   rsvp_response: 'navy',
   rsvp_late: 'terra',
+  member_deactivated: 'amber',
+  member_reactivated: 'sage',
 }
 
 /* Mock-Poll in die Form von get_polls bringen (analog Polls-Seite). */
@@ -115,7 +119,7 @@ function buildMock() {
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const { mockMode, activeGroupId, role, user, profile } = useAuth()
+  const { mockMode, activeGroupId, role, user, profile, isInactive } = useAuth()
   const canManage = role === 'admin' || role === 'kassenwart'
   const [vm, setVm] = useState(() => (mockMode ? buildMock() : null))
   const [importStatus, setImportStatus] = useState(null)
@@ -196,7 +200,9 @@ export default function Dashboard() {
     if (mockMode || !activeGroupId) return
     let alive = true
     Promise.all([
-      listMembers(activeGroupId),
+      // Inaktive kommen mit, fallen unten aber raus, sobald sie nichts mehr
+      // offen haben — dieselbe Regel wie in der Mitgliederliste.
+      listMembers(activeGroupId, { includeInactive: true }),
       listMemberDebts(activeGroupId),
       getNextEvent(activeGroupId).catch(() => null),
       getTreasury(activeGroupId).catch(() => null),
@@ -280,11 +286,14 @@ export default function Dashboard() {
             : null,
           members: {
             count: mem.length,
-            list: mem.map((m) => ({
-              name: m.name.split(' ')[0],
-              full: m.name,
-              open: openOf(m.userId),
-            })),
+            list: mem
+              .map((m) => ({
+                name: m.name.split(' ')[0],
+                full: m.name,
+                open: openOf(m.userId),
+                isInactive: m.isInactive,
+              }))
+              .filter((m) => !m.isInactive || m.open !== 0),
           },
         })
       })
@@ -302,7 +311,7 @@ export default function Dashboard() {
     )
   }
 
-  const topPoll = pickTopPoll(polls, justVotedId)
+  const topPoll = isInactive ? null : pickTopPoll(polls, justVotedId)
 
   const dateStr = new Date().toLocaleDateString('de-DE', {
     weekday: 'long',
@@ -840,7 +849,10 @@ function MembersTile({ members, onClick, style }) {
             className="grid grid-cols-[22px_1fr_auto] items-center gap-2.5 py-[3px]"
           >
             <Avatar name={m.full || m.name} size={22} />
-            <span className="truncate text-[12.5px] font-medium text-ink">{m.name}</span>
+            <span className="min-w-0 truncate text-[12.5px] font-medium text-ink">
+              {m.name}
+              {m.isInactive && <span className="font-normal text-ink-dim"> · inaktiv</span>}
+            </span>
             {/* Ausgeglichene Salden treten zurück, damit die Aufmerksamkeit
                 bei den offenen Beträgen und den Guthaben bleibt. */}
             <span

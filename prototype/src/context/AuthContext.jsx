@@ -121,6 +121,7 @@ function MockProvider({ children }) {
     activeGroupId,
     activeGroup,
     role: activeGroup?.role ?? null,
+    isInactive: false,
     setActiveGroup: setActive,
     signOut: async () => {},
     refresh: async () => {},
@@ -202,7 +203,10 @@ function SupabaseProvider({ children }) {
               .select('id, first_name, last_name')
               .eq('id', uid)
               .maybeSingle(),
-            supabase.from('group_members').select('role, groups(id, name)').eq('user_id', uid),
+            supabase
+              .from('group_members')
+              .select('role, inactive_since, groups(id, name)')
+              .eq('user_id', uid),
           ]),
         )
 
@@ -213,7 +217,14 @@ function SupabaseProvider({ children }) {
 
         const list = (mems ?? [])
           .filter((m) => m.groups)
-          .map((m) => ({ id: m.groups.id, name: m.groups.name, role: m.role }))
+          .map((m) => ({
+            id: m.groups.id,
+            name: m.groups.name,
+            role: m.role,
+            // Inaktive bleiben Mitglied und sehen den Club weiter — sie dürfen
+            // nur nichts mehr auslösen. Deshalb hier ein Flag statt Rauswurf.
+            inactive: m.inactive_since != null,
+          }))
 
         if (stale()) return list
 
@@ -448,6 +459,7 @@ function SupabaseProvider({ children }) {
     activeGroupId,
     activeGroup,
     role: activeGroup?.role ?? null,
+    isInactive: !!activeGroup?.inactive,
     setActiveGroup: setActiveGroupId,
     signOut,
     refresh,

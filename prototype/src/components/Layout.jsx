@@ -56,6 +56,22 @@ export default function Layout({ children }) {
   )
 }
 
+/* Wer inaktiv gesetzt wurde, sieht den Club weiter, kann aber nichts mehr
+   auslösen. Ohne diesen Hinweis wirken die fehlenden Knöpfe wie ein Fehler. */
+function InactiveBanner() {
+  const { isInactive } = useAuth()
+  if (!isInactive) return null
+  return (
+    <div className="mb-5 rounded-[20px] border border-card-edge bg-amber-bg px-4 py-3">
+      <div className="text-[13px] font-semibold text-ink">Du bist in diesem Club inaktiv gesetzt.</div>
+      <p className="mt-1 text-[12px] leading-relaxed text-ink-soft">
+        Du nimmst an Terminen, Kegelabenden und Abstimmungen nicht mehr teil und bekommst weder
+        Monatsbeitrag noch neue Strafen. Offene Posten kannst du weiter einsehen und bezahlen.
+      </p>
+    </div>
+  )
+}
+
 function Shell({ children }) {
   const [drawer, setDrawer] = useState(false)
 
@@ -106,6 +122,7 @@ function Shell({ children }) {
         </header>
 
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-5 pb-28 sm:px-6 lg:py-8 lg:pb-10">
+          <InactiveBanner />
           {children}
         </main>
 

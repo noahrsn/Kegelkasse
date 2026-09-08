@@ -21,7 +21,7 @@ function normalizeMock(p) {
 
 export default function Polls() {
   const navigate = useNavigate()
-  const { mockMode, activeGroupId, role } = useAuth()
+  const { mockMode, activeGroupId, role, isInactive } = useAuth()
   const canManage = role === 'admin' || role === 'präsident'
 
   const [polls, setPolls] = useState(mockMode ? seed.map(normalizeMock) : null)
@@ -46,6 +46,7 @@ export default function Polls() {
   const closed = data.filter((p) => p.closed)
 
   const startVote = (poll) => {
+    if (isInactive) return
     setError(null)
     setPicks(poll.my_options || [])
     setVoting(poll)
@@ -127,7 +128,14 @@ export default function Polls() {
           {open.length > 0 && (
             <Section title="Offen">
               {open.map((p) => (
-                <PollCard key={p.id} poll={p} onVote={() => startVote(p)} canManage={canManage} onClosePoll={() => onClose(p)} />
+                <PollCard
+                  key={p.id}
+                  poll={p}
+                  onVote={() => startVote(p)}
+                  canManage={canManage}
+                  onClosePoll={() => onClose(p)}
+                  voteLocked={isInactive}
+                />
               ))}
             </Section>
           )}
@@ -201,7 +209,7 @@ function Section({ title, children }) {
   )
 }
 
-function PollCard({ poll, onVote, canManage, onClosePoll }) {
+function PollCard({ poll, onVote, canManage, onClosePoll, voteLocked = false }) {
   const showResults = poll.show_results
   const counted = poll.options.filter((o) => o.votes != null)
   const total = poll.total != null ? poll.total : counted.reduce((a, o) => a + (o.votes || 0), 0)
@@ -224,7 +232,7 @@ function PollCard({ poll, onVote, canManage, onClosePoll }) {
           </div>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1.5">
-          {!poll.closed && (
+          {!poll.closed && !voteLocked && (
             <Button size="sm" onClick={onVote}>
               {poll.voted ? 'Ändern' : 'Abstimmen'}
             </Button>
