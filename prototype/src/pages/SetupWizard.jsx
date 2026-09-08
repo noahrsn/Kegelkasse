@@ -24,8 +24,10 @@ export default function SetupWizard() {
 
   const [form, setForm] = useState({
     name: '',
+    treasuryMode: 'account', // 'account' | 'cash' | 'both'
     monthlyFee: '5.00',
     openingBalance: '0.00',
+    cashOpeningBalance: '0.00',
     feeDay: '1',
     iban: '',
     paypal: '',
@@ -50,8 +52,10 @@ export default function SetupWizard() {
         setForm((f) => ({
           ...f,
           name: g.name ?? f.name,
+          treasuryMode: g.treasury_mode ?? f.treasuryMode,
           monthlyFee: g.monthly_fee ?? f.monthlyFee,
           openingBalance: g.treasury_opening_balance ?? f.openingBalance,
+          cashOpeningBalance: g.cash_opening_balance ?? f.cashOpeningBalance,
           feeDay: g.fee_day ?? f.feeDay,
           iban: g.payment_iban ?? '',
           paypal: g.payment_paypal ?? '',
@@ -75,10 +79,14 @@ export default function SetupWizard() {
     try {
       await updateGroup(activeGroupId, {
         name: form.name.trim(),
+        treasury_mode: form.treasuryMode || 'account',
         monthly_fee: Number(form.monthlyFee) || 0,
         treasury_opening_balance: Number(form.openingBalance) || 0,
+        cash_opening_balance: Number(form.cashOpeningBalance) || 0,
         fee_day: Number(form.feeDay) || 1,
-        payment_iban: form.iban || null,
+        // Ohne Konto keine IBAN — sonst steht im Profil eine Nummer, auf die
+        // niemand überweisen soll.
+        payment_iban: form.treasuryMode === 'cash' ? null : form.iban || null,
         payment_paypal: form.paypal || null,
         late_payment_fee: Number(form.lateFee) || 0,
         rulebook_content: form.rulebook || '',
@@ -184,21 +192,53 @@ function StepClub({ form, set }) {
 }
 
 function StepFinance({ form, set }) {
+  const hasBank = form.treasuryMode !== 'cash'
+  const hasCash = form.treasuryMode !== 'account'
   return (
     <div>
       <Intro>Lege Beitrag und Zahlungsdaten fest. Alles optional und später änderbar.</Intro>
       <Card className="space-y-4">
+        <Field label="Wo liegt das Geld?" hint="Später jederzeit änderbar.">
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              ['account', 'Konto'],
+              ['cash', 'Barkasse'],
+              ['both', 'Beides'],
+            ].map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => set('treasuryMode')(key)}
+                className={cx(
+                  'rounded-2xl py-3 text-[13px] font-semibold transition',
+                  form.treasuryMode === key ? 'bg-ink text-bg' : 'bg-bg text-ink-soft',
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Monatsbeitrag (€)">
             <Input type="number" step="0.5" value={form.monthlyFee} onChange={set('monthlyFee')} />
           </Field>
-          <Field label="Eröffnungssaldo (€)">
-            <Input type="number" value={form.openingBalance} onChange={set('openingBalance')} />
-          </Field>
+          {hasBank && (
+            <Field label={hasCash ? 'Startsaldo Konto (€)' : 'Eröffnungssaldo (€)'}>
+              <Input type="number" value={form.openingBalance} onChange={set('openingBalance')} />
+            </Field>
+          )}
+          {hasCash && (
+            <Field label={hasBank ? 'Startbestand Barkasse (€)' : 'Anfangsbestand (€)'}>
+              <Input type="number" value={form.cashOpeningBalance} onChange={set('cashOpeningBalance')} />
+            </Field>
+          )}
         </div>
-        <Field label="IBAN">
-          <Input placeholder="DE.." className="font-mono" value={form.iban} onChange={set('iban')} />
-        </Field>
+        {hasBank && (
+          <Field label="IBAN">
+            <Input placeholder="DE.." className="font-mono" value={form.iban} onChange={set('iban')} />
+          </Field>
+        )}
         <Field label="PayPal-Link">
           <Input placeholder="paypal.me/.." value={form.paypal} onChange={set('paypal')} />
         </Field>

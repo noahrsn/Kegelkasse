@@ -154,8 +154,11 @@ function mockGroupShape() {
     fee_day: mockClub.feeDay,
     payment_iban: mockClub.iban,
     payment_paypal: mockClub.paypal,
+    treasury_mode: mockClub.treasuryMode || 'account',
     treasury_opening_balance: mockClub.openingBalance,
     treasury_opening_balance_date: mockClub.openingBalanceDate,
+    cash_opening_balance: mockClub.cashOpeningBalance ?? 0,
+    cash_opening_balance_date: mockClub.cashOpeningBalanceDate ?? null,
     payment_deadline_type: mockClub.paymentDeadlineType,
     payment_deadline_days: mockClub.paymentDeadlineDays,
     late_payment_fee: mockClub.latePaymentFee,
@@ -261,8 +264,11 @@ function Finance({ group, onSave }) {
       fee_day: group.fee_day ?? '',
       payment_iban: group.payment_iban ?? '',
       payment_paypal: group.payment_paypal ?? '',
+      treasury_mode: group.treasury_mode ?? 'account',
       treasury_opening_balance: group.treasury_opening_balance ?? '',
       treasury_opening_balance_date: group.treasury_opening_balance_date ?? '',
+      cash_opening_balance: group.cash_opening_balance ?? '',
+      cash_opening_balance_date: group.cash_opening_balance_date ?? '',
       payment_deadline_type: group.payment_deadline_type ?? 'days_before_next_event',
       payment_deadline_days: group.payment_deadline_days ?? '',
       late_payment_fee: group.late_payment_fee ?? '',
@@ -277,16 +283,54 @@ function Finance({ group, onSave }) {
     fee_day: Number(v.fee_day) || 1,
     payment_iban: v.payment_iban || null,
     payment_paypal: v.payment_paypal || null,
+    treasury_mode: v.treasury_mode || 'account',
     treasury_opening_balance: Number(v.treasury_opening_balance) || 0,
     treasury_opening_balance_date: v.treasury_opening_balance_date || null,
+    cash_opening_balance: Number(v.cash_opening_balance) || 0,
+    cash_opening_balance_date: v.cash_opening_balance_date || null,
     payment_deadline_type: v.payment_deadline_type,
     payment_deadline_days: Number(v.payment_deadline_days) || 0,
     late_payment_fee: Number(v.late_payment_fee) || 0,
     charge_absent_avg: !!v.charge_absent_avg,
     round_up_penalties: !!v.round_up_penalties,
   })
+  // Welche Kassen führt der Club? Danach richtet sich, welche Felder überhaupt
+  // Sinn ergeben — eine IBAN ohne Konto ist nur Verwirrung.
+  const hasBank = ed.val.treasury_mode !== 'cash'
+  const hasCash = ed.val.treasury_mode !== 'account'
   return (
     <div className="space-y-4">
+      <Card className="space-y-4">
+        <div className="text-[12px] font-semibold text-ink-soft">Wo liegt das Geld?</div>
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            ['account', 'Konto'],
+            ['cash', 'Barkasse'],
+            ['both', 'Beides'],
+          ].map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => ed.field('treasury_mode')(key)}
+              className={cx(
+                'rounded-2xl py-3 text-[13px] font-semibold transition',
+                ed.val.treasury_mode === key ? 'bg-ink text-bg' : 'bg-bg text-ink-soft',
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <p className="rounded-2xl bg-bg p-3 text-[12px] text-ink-soft">
+          {ed.val.treasury_mode === 'account' &&
+            'Alles läuft über das Vereinskonto. Zahlungen kommen über den CSV-Import des Kontoauszugs herein.'}
+          {ed.val.treasury_mode === 'cash' &&
+            'Alles läuft über die Barkasse. Der CSV-Import entfällt — Zahlungen markierst du direkt beim Mitglied als bezahlt.'}
+          {ed.val.treasury_mode === 'both' &&
+            'Konto und Barkasse werden getrennt geführt. Jede Buchung gehört zu einer der beiden Kassen; der Kassenstand zeigt beide einzeln und in Summe. Bargeld einzahlen geht als Umbuchung.'}
+        </p>
+      </Card>
+
       <Card className="space-y-4">
         <Field label="Monatsbeitrag (€)"><Input type="number" step="0.5" value={ed.val.monthly_fee} onChange={ed.field('monthly_fee')} /></Field>
         <Field label="Wann wird der Beitrag gebucht?">
@@ -307,12 +351,36 @@ function Finance({ group, onSave }) {
             Monat nichts gebucht.
           </p>
         )}
-        <Field label="IBAN"><Input value={ed.val.payment_iban} onChange={ed.field('payment_iban')} className="font-mono" /></Field>
+        {hasBank && (
+          <Field label="IBAN"><Input value={ed.val.payment_iban} onChange={ed.field('payment_iban')} className="font-mono" /></Field>
+        )}
         <Field label="PayPal-Link"><Input value={ed.val.payment_paypal} onChange={ed.field('payment_paypal')} /></Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Eröffnungssaldo (€)"><Input type="number" value={ed.val.treasury_opening_balance} onChange={ed.field('treasury_opening_balance')} /></Field>
-          <Field label="Saldo-Stichtag"><Input type="date" value={ed.val.treasury_opening_balance_date || ''} onChange={ed.field('treasury_opening_balance_date')} /></Field>
-        </div>
+      </Card>
+
+      {/* Anfangsbestände: je geführter Kasse einer. Der Kassenstand ist immer
+          die Summe aus beiden plus allen Buchungen. */}
+      <Card className="space-y-4">
+        <div className="text-[12px] font-semibold text-ink-soft">Anfangsbestand</div>
+        {hasBank && (
+          <div className="grid grid-cols-2 gap-3">
+            <Field label={hasCash ? 'Konto (€)' : 'Eröffnungssaldo (€)'}>
+              <Input type="number" step="0.01" value={ed.val.treasury_opening_balance} onChange={ed.field('treasury_opening_balance')} />
+            </Field>
+            <Field label="Stichtag">
+              <Input type="date" value={ed.val.treasury_opening_balance_date || ''} onChange={ed.field('treasury_opening_balance_date')} />
+            </Field>
+          </div>
+        )}
+        {hasCash && (
+          <div className="grid grid-cols-2 gap-3">
+            <Field label={hasBank ? 'Barkasse (€)' : 'Anfangsbestand (€)'}>
+              <Input type="number" step="0.01" value={ed.val.cash_opening_balance} onChange={ed.field('cash_opening_balance')} />
+            </Field>
+            <Field label="Stichtag">
+              <Input type="date" value={ed.val.cash_opening_balance_date || ''} onChange={ed.field('cash_opening_balance_date')} />
+            </Field>
+          </div>
+        )}
       </Card>
       <Card className="space-y-4">
         <div className="text-[12px] font-semibold text-ink-soft">Zahlungsfristen & Verspätung</div>
@@ -363,7 +431,8 @@ function Finance({ group, onSave }) {
           />
         </div>
       </Card>
-      <CsvReminderCard group={group} />
+      {/* Ohne Konto gibt es keinen Kontoauszug, den man importieren könnte. */}
+      {hasBank && <CsvReminderCard group={group} />}
       <SaveBar onDiscard={ed.discard} onSave={() => ed.save(transform)} saving={ed.saving} saved={ed.saved} />
     </div>
   )

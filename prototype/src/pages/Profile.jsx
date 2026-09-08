@@ -79,8 +79,11 @@ export default function Profile() {
 
   const open = debts || []
   // Saldo = offene Posten minus Guthaben. Negativ heißt Guthaben und wird als
-  // „+ 20,00 €" angezeigt, nie als „-20,00 €".
-  const gross = open.reduce((a, d) => a + (d.amount || 0), 0)
+  // „+ 20,00 €" angezeigt, nie als „-20,00 €". Je Posten zählt der Rest nach
+  // Teilzahlung — schon gezahltes Geld darf nicht zweimal auftauchen. Im
+  // Mock-Modus gibt es das Feld nicht, dann zählt der volle Betrag.
+  const restOf = (d) => (d.open != null ? d.open : d.amount || 0)
+  const gross = open.reduce((a, d) => a + restOf(d), 0)
   const total = gross - credit
   const name = mockMode ? currentUser.name : profile?.name || '—'
   const email = mockMode ? currentUser.email : user?.email || ''
@@ -170,7 +173,7 @@ export default function Profile() {
               open.map((d, i) => (
                 <div key={i} className="flex items-center justify-between rounded-xl bg-bg/50 px-3 py-2 text-[13px]">
                   <span>{d.description}</span>
-                  <span className="font-mono font-semibold tnum">{eur(d.amount)} €</span>
+                  <span className="font-mono font-semibold tnum">{eur(restOf(d))} €</span>
                 </div>
               ))
             )}

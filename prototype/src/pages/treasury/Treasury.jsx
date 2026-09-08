@@ -17,7 +17,10 @@ const CAT = {
   guest_income: { label: 'Gastkegler', short: 'Gast', tone: 'sage' },
   other_income: { label: 'Sonst. Einnahme', short: 'Sonst.', tone: 'sage' },
   other_expense: { label: 'Sonst. Ausgabe', short: 'Sonst.', tone: 'terra' },
+  cash_transfer: { label: 'Umbuchung', short: 'Umb.', tone: 'neutral' },
 }
+
+const ACCOUNT_LABEL = { bank: 'Konto', cash: 'Barkasse' }
 
 function sameMonth(dateStr) {
   if (!dateStr) return false
@@ -30,11 +33,15 @@ export default function Treasury() {
   const navigate = useNavigate()
   const { mockMode, activeGroupId } = useAuth()
   const [filter, setFilter] = useState('all')
+  const [account, setAccount] = useState('all') // 'all' | 'bank' | 'cash'
 
   const [summary, setSummary] = useState(
     mockMode
       ? {
+          mode: 'account',
           balance: club.treasuryBalance,
+          bank_balance: club.treasuryBalance,
+          cash_balance: 0,
           opening_balance: club.openingBalance,
           opening_date: club.openingBalanceDate,
           income_30d: 312.4,
@@ -70,9 +77,24 @@ export default function Treasury() {
       })
   }, [mockMode, activeGroupId])
 
+  const mode = summary?.mode || 'account'
+  const cashBalance = Number(summary?.cash_balance) || 0
+  const bankBalance = Number(summary?.bank_balance) || 0
+  // Beide Kassen einzeln zeigen, sobald der Club sie führt — und auch dann,
+  // wenn in der gerade nicht geführten Kasse noch Geld liegt (nach einem
+  // Umschalten). Der Gesamtbestand soll nie unter falschem Namen dastehen.
+  const showSplit =
+    mode === 'both' ||
+    (mode === 'account' && cashBalance !== 0) ||
+    (mode === 'cash' && bankBalance !== 0)
+  const hasBank = mode !== 'cash'
+
   const data = list || []
-  const shown = data.filter((t) => (filter === 'all' ? true : filter === 'in' ? t.amount > 0 : t.amount < 0))
-  const stale = !sameMonth(summary?.last_csv_import)
+  const shown = data
+    .filter((t) => (account === 'all' ? true : t.account === account))
+    .filter((t) => (filter === 'all' ? true : filter === 'in' ? t.amount > 0 : t.amount < 0))
+  // Ohne Konto gibt es keinen Kontoauszug — dann auch keinen Import-Hinweis.
+  const stale = hasBank && !sameMonth(summary?.last_csv_import)
 
   return (
     <div className="space-y-5">
@@ -81,9 +103,11 @@ export default function Treasury() {
         title="Vereinskasse"
         action={
           <div className="flex gap-2">
-            <Button variant="soft" onClick={() => navigate('/treasury/import')}>
-              CSV-Import
-            </Button>
+            {hasBank && (
+              <Button variant="soft" onClick={() => navigate('/treasury/import')}>
+                CSV-Import
+              </Button>
+            )}
             <Button onClick={() => navigate('/treasury/new')}>+ Buchung</Button>
           </div>
         }
@@ -93,12 +117,24 @@ export default function Treasury() {
       <Card className="overflow-hidden">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="min-w-0">
-            <div className="text-[12px] font-semibold text-ink-soft">Aktueller Kassenstand</div>
+            <div className="text-[12px] font-semibold text-ink-soft">
+              {mode === 'cash' && !showSplit ? 'Bestand der Barkasse' : 'Aktueller Kassenstand'}
+            </div>
             {/* Mobil bewusst kleiner — vierstellige Beträge sprengen sonst die Karte. */}
             <div className="mt-1 font-display text-[2rem] font-medium leading-tight tracking-tight tnum sm:text-5xl lg:text-6xl">
               {eur(summary?.balance ?? 0)}{' '}
               <span className="text-xl font-normal text-ink-dim sm:text-3xl">€</span>
             </div>
+            {showSplit && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                <span className="rounded-full bg-bg px-3 py-1 text-[12px] font-semibold text-ink-soft">
+                  Konto <span className="font-mono tnum text-ink">{eur(bankBalance)} €</span>
+                </span>
+                <span className="rounded-full bg-bg px-3 py-1 text-[12px] font-semibold text-ink-soft">
+                  Barkasse <span className="font-mono tnum text-ink">{eur(cashBalance)} €</span>
+                </span>
+              </div>
+            )}
           </div>
           <div className="flex w-full gap-2 sm:w-auto sm:gap-3">
             <div className="min-w-0 flex-1 rounded-2xl bg-sage-bg px-3 py-2.5 sm:flex-none sm:px-4 sm:py-3">
@@ -150,6 +186,30 @@ export default function Treasury() {
           />
         </div>
 
+        {/* Kassenfilter — nur sinnvoll, wenn es zwei Kassen gibt. */}
+        {showSplit && (
+          <div className="mb-3 flex flex-wrap gap-2">
+            {[
+              ['all', 'Alle Kassen'],
+              ['bank', 'Konto'],
+              ['cash', 'Barkasse'],
+            ].map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setAccount(key)}
+                className={cx(
+                  'rounded-full px-3 py-1.5 text-[12px] font-semibold transition',
+                  account === key
+                    ? 'bg-ink text-bg'
+                    : 'border border-card-edge bg-card text-ink-soft hover:text-ink',
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {list == null ? (
           <Card>
             <div className="py-8 text-center text-sm text-ink-dim">Lädt…</div>
@@ -196,6 +256,11 @@ export default function Treasury() {
                         <span className="sm:hidden">{cat.short || cat.label}</span>
                         <span className="hidden sm:inline">{cat.label}</span>
                       </Badge>
+                      {showSplit && (
+                        <Badge tone="neutral" className="shrink-0">
+                          {ACCOUNT_LABEL[t.account] || ACCOUNT_LABEL.bank}
+                        </Badge>
+                      )}
                     </div>
                   </div>
                   {t.member && (

@@ -1098,6 +1098,46 @@ In Wizard und Einstellungen sind die Avatar-Buttons bislang Platzhalter; sie wer
 
 ---
 
+## Phase 13 — Barkasse & Einzelposten bezahlt markieren ✅
+
+**Ziel:** Nicht jeder Club führt ein Vereinskonto. Wer die Kasse als Schatulle
+auf dem Kegelabend führt, muss die App genauso nutzen können — und wer beides
+hat, will beides getrennt sehen.
+
+> **Status — umgesetzt ✅:** Migration `034_cash_box_and_single_debt_payment.sql`
+> + Frontend (Einstellungen, Kassenbuch, Mitglied-Detail).
+
+### Kassenführung
+
+- **Einstellung je Club** (`groups.treasury_mode`, Einstellungen → Finanzen):
+  `account` (nur Konto, Voreinstellung), `cash` (nur Barkasse) oder `both`.
+- **Jede Buchung gehört zu einer Kasse** (`transactions.account` = `bank` |
+  `cash`). Der Kassenstand ist immer die Summe beider Kassen plus deren
+  Anfangsbestände — ein Umschalten des Modus verschiebt kein Geld und lässt
+  keins verschwinden, es ändert nur, was die App anbietet.
+- **Zwei Anfangsbestände:** `treasury_opening_balance` (Konto) und
+  `cash_opening_balance` (Barkasse), jeweils mit Stichtag.
+- **Umbuchung** zwischen den Kassen (`transfer_cash`, Kategorie `cash_transfer`):
+  ein Buchungspaar mit gemeinsamer `transfer_id`, das sich zu null summiert und
+  bewusst **nicht** in die Einnahme-/Ausgabe-Kennzahlen einfließt — sonst zählte
+  jeder Gang zur Bank als Umsatz.
+- **Ohne Konto kein Kontoauszug:** Im Modus `cash` verschwinden CSV-Import,
+  Import-Banner (`treasury_import_status`) und die IBAN aus der Oberfläche.
+
+### Einzelne Posten begleichen
+
+- `mark_debt_paid(debt_id, account)` bucht **einen** offenen Posten (Strafe,
+  Monatsbeitrag, Verspätungsstrafe …) als Einnahme in der gewählten Kasse —
+  bisher ging nur „alles auf einmal" (`mark_member_paid`).
+- Im Mitglied-Detail hat jeder offene Posten „Bezahlt" und „Storno"; bei zwei
+  Kassen steht darüber die Wahl „Zahlung in bar / Konto". Teilzahlungen aus dem
+  CSV-Abgleich zeigen den Restbetrag und den bereits gezahlten Anteil.
+- **Storno angezahlter Posten:** `cancel_debt` verwirft den bereits gezahlten
+  Anteil nicht mehr, sondern gibt ihn als Guthaben (`member_credits`) zurück —
+  das sofort gegen die übrigen offenen Posten verrechnet wird.
+
+---
+
 ## Reihenfolge der Umsetzung
 
 ```

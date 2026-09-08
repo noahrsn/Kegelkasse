@@ -392,6 +392,12 @@ REVOKE EXECUTE ON FUNCTION public.import_transactions(UUID, JSONB) FROM anon, pu
 GRANT  EXECUTE ON FUNCTION public.import_transactions(UUID, JSONB) TO authenticated;
 
 -- ── (6) member_debts: Teilzahlung + Guthaben (Saldo darf negativ = Guthaben) ─
+-- Erst löschen: die neue Spalte `credit` steht vor `next_due`, und CREATE OR
+-- REPLACE VIEW darf bestehende Spalten weder umbenennen noch umsortieren.
+-- Ohne das lässt sich die Migrationskette auf einer leeren Datenbank nicht
+-- anwenden. Die View hängt an keinem anderen Objekt, das Löschen ist folgenlos.
+DROP VIEW IF EXISTS public.member_debts;
+
 CREATE OR REPLACE VIEW public.member_debts
 WITH (security_invoker = true) AS
 SELECT

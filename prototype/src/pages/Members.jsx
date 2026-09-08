@@ -3,14 +3,16 @@ import { Link } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { Card, Button, PageTitle, Avatar, Field, Input, Textarea } from '../components/ui'
 import { Sheet } from '../components/Modal'
-import { eur, eurBalance, balanceColor, balanceLabel, pal, ROLE_LABEL } from '../design/calm'
+import { cx, eur, eurBalance, balanceColor, balanceLabel, pal, ROLE_LABEL } from '../design/calm'
 import { useAuth } from '../context/AuthContext.jsx'
 import {
+  getGroup,
   listMembers,
   listMemberDebts,
   listOpenDebts,
   splitOpenDebts,
   markMemberPaid,
+  markDebtPaid,
   bookManualPenalty,
   cancelDebt,
   sendInviteEmail,
@@ -47,10 +49,22 @@ export default function Members() {
   const [sort, setSort] = useState('debt') // debt | name
   const [sel, setSel] = useState(null)
   const [inviteOpen, setInviteOpen] = useState(false)
+  // 'account' | 'cash' | 'both' — entscheidet, ob beim Bezahlen nach der Kasse
+  // gefragt wird.
+  const [treasuryMode, setTreasuryMode] = useState('account')
 
-  const load = () => {
+  useEffect(() => {
     if (mockMode || !activeGroupId) return
-    Promise.all([
+    getGroup(activeGroupId)
+      .then((g) => setTreasuryMode(g?.treasury_mode || 'account'))
+      .catch((e) => console.error(e))
+  }, [mockMode, activeGroupId])
+
+  // Gibt die frisch geladene Liste zurück, damit das offene Sheet danach die
+  // aktualisierten Zahlen seines Mitglieds übernehmen kann.
+  const load = () => {
+    if (mockMode || !activeGroupId) return Promise.resolve(null)
+    return Promise.all([
       // Inaktive kommen mit — sie fliegen unten wieder raus, sobald ihr Konto
       // ausgeglichen ist. Solange etwas offen ist, darf der Kassenwart sie
       // nicht aus den Augen verlieren.
@@ -59,32 +73,36 @@ export default function Members() {
     ])
       .then(([mem, debts]) => {
         const byUser = new Map(debts.map((d) => [d.userId, d]))
-        setList(
-          mem.map((m) => {
-            const d = byUser.get(m.userId)
-            return {
-              userId: m.userId,
-              name: m.name,
-              role: m.role,
-              iban: m.iban,
-              isPlaceholder: m.isPlaceholder,
-              isInactive: m.isInactive,
-              debt: d ? d.open : 0,
-              openCount: d ? d.openCount : 0,
-              penalties: d ? d.penalties : 0,
-              fees: d ? d.fees : 0,
-              nextDue: d ? d.nextDue : null,
-            }
-          }),
-        )
+        const next = mem.map((m) => {
+          const d = byUser.get(m.userId)
+          return {
+            userId: m.userId,
+            name: m.name,
+            role: m.role,
+            iban: m.iban,
+            isPlaceholder: m.isPlaceholder,
+            isInactive: m.isInactive,
+            debt: d ? d.open : 0,
+            openCount: d ? d.openCount : 0,
+            penalties: d ? d.penalties : 0,
+            fees: d ? d.fees : 0,
+            nextDue: d ? d.nextDue : null,
+          }
+        })
+        setList(next)
+        return next
       })
       .catch((e) => {
         console.error(e)
         setList([])
+        return null
       })
   }
 
-  useEffect(load, [mockMode, activeGroupId])
+  useEffect(() => {
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mockMode, activeGroupId])
 
   // Inaktive stehen nur noch drin, solange ihr Saldo nicht null ist.
   const data = (list || []).filter((m) => !m.isInactive || m.debt !== 0)
@@ -148,9 +166,15 @@ export default function Members() {
         canManage={canManage}
         mockMode={mockMode}
         groupId={activeGroupId}
-        onChanged={() => {
-          load()
-          setSel(null)
+        treasuryMode={treasuryMode}
+        onChanged={async ({ close = true } = {}) => {
+          const fresh = await load()
+          if (close) {
+            setSel(null)
+          } else if (fresh) {
+            // Sheet bleibt offen — dann muss auch der Saldo oben stimmen.
+            setSel((cur) => fresh.find((m) => m.userId === cur?.userId) ?? cur)
+          }
         }}
       />
 
@@ -206,55 +230,80 @@ function MemberRow({ member: m, onClick }) {
 }
 
 /* ── Mitglied-Detail mit Kassenwart-Aktionen ─────────────────────────────── */
-function MemberSheet({ member, onClose, canManage, mockMode, groupId, onChanged }) {
+/* Jeder Posten lässt sich einzeln begleichen oder stornieren; der Fußzeilen-
+   Knopf erledigt weiterhin alles auf einmal. Nach einer Einzelaktion bleibt
+   das Sheet offen — sonst müsste man sich für jeden Posten neu durchklicken. */
+function MemberSheet({ member, onClose, canManage, mockMode, groupId, treasuryMode, onChanged }) {
   const [items, setItems] = useState(null)
-  const [busy, setBusy] = useState(false)
+  // Welche Aktion läuft gerade? null | 'all' | <debtId>. Bewusst kein boolesches
+  // `busy`: das blieb nach einer erfolgreichen Aktion stehen und hat sämtliche
+  // Knöpfe im Sheet dauerhaft deaktiviert — auch das Storno.
+  const [busy, setBusy] = useState(null)
   const [penaltyOpen, setPenaltyOpen] = useState(false)
+  // Bei zwei Kassen: Wohin fließt das Geld? Wer von Hand als bezahlt markiert,
+  // hat meistens Bargeld in der Hand — Kontozahlungen kommen über den Import.
+  const [account, setAccount] = useState(treasuryMode === 'account' ? 'bank' : 'cash')
   // Die Aufteilung kommt aus derselben Postenliste, die unten ohnehin steht —
   // keine zweite Abfrage.
   const split = items ? splitOpenDebts(items) : null
 
-  useEffect(() => {
-    if (!member || mockMode) {
-      setItems(null)
-      return
-    }
-    setItems(null)
-    listOpenDebts(groupId, member.userId)
+  const uid = member?.userId ?? null
+  const askAccount = canManage && treasuryMode === 'both'
+
+  const loadItems = () => {
+    if (!uid || mockMode) return Promise.resolve()
+    return listOpenDebts(groupId, uid)
       .then(setItems)
       .catch((e) => {
         console.error(e)
         setItems([])
       })
-  }, [member, mockMode, groupId])
+  }
+
+  useEffect(() => {
+    setAccount(treasuryMode === 'account' ? 'bank' : 'cash')
+  }, [treasuryMode])
+
+  useEffect(() => {
+    setBusy(null)
+    setItems(null)
+    loadItems()
+    // loadItems haengt an genau diesen Werten — bewusst nicht in den Deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uid, mockMode, groupId])
 
   if (!member) return <Sheet open={false} onClose={onClose} title="" />
 
-  const markPaid = async () => {
-    if (mockMode) return onChanged()
-    setBusy(true)
+  /* Eine Kassenwart-Aktion ausführen. `busy` wird immer zurückgesetzt — daran
+     ist das Storno bisher gescheitert. */
+  const run = async (key, fn, { close = false } = {}) => {
+    if (mockMode) return onChanged({ close: true })
+    setBusy(key)
     try {
-      await markMemberPaid(groupId, member.userId)
-      onChanged()
+      await fn()
+      await loadItems()
+      onChanged({ close })
     } catch (e) {
       console.error(e)
       alert(e.message || 'Fehlgeschlagen')
-      setBusy(false)
+    } finally {
+      setBusy(null)
     }
   }
 
-  const storno = async (debtId) => {
-    if (mockMode) return
+  // Die Kasse nur mitschicken, wenn wirklich gewählt wurde. Sonst entscheidet
+  // die Datenbank anhand der Club-Einstellung — die ist verlässlicher als ein
+  // hier womöglich veralteter Modus.
+  const payAccount = () => (askAccount ? account : null)
+
+  const markPaid = () =>
+    run('all', () => markMemberPaid(groupId, member.userId, payAccount()), { close: true })
+
+  const payItem = (debtId) => run(debtId, () => markDebtPaid(debtId, payAccount()))
+
+  const storno = (debtId) => {
     if (!window.confirm('Diesen Posten stornieren?')) return
-    setBusy(true)
-    try {
-      await cancelDebt(debtId, 'Storno durch Kassenwart')
-      onChanged()
-    } catch (e) {
-      console.error(e)
-      alert(e.message || 'Fehlgeschlagen')
-      setBusy(false)
-    }
+    return run(debtId, () => cancelDebt(debtId, 'Storno durch Kassenwart'))
   }
 
   return (
@@ -270,8 +319,8 @@ function MemberSheet({ member, onClose, canManage, mockMode, groupId, onChanged 
         }
         footer={
           member.debt > 0 && canManage ? (
-            <Button variant="sage" className="w-full" disabled={busy} onClick={markPaid}>
-              {eur(member.debt)} € als bezahlt markieren
+            <Button variant="sage" className="w-full" disabled={busy != null} onClick={markPaid}>
+              {busy === 'all' ? 'Wird gebucht…' : `${eur(member.debt)} € als bezahlt markieren`}
             </Button>
           ) : (
             <Button variant="soft" className="w-full" onClick={onClose}>
@@ -328,8 +377,30 @@ function MemberSheet({ member, onClose, canManage, mockMode, groupId, onChanged 
           {/* Offene Posten (Echtmodus) */}
           {!mockMode && (
             <div className="rounded-2xl bg-bg p-3">
-              <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-dim">
-                Offene Posten
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-dim">
+                  Offene Posten
+                </div>
+                {askAccount && items?.length > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] text-ink-dim">Zahlung in</span>
+                    {[
+                      ['cash', 'bar'],
+                      ['bank', 'Konto'],
+                    ].map(([key, label]) => (
+                      <button
+                        key={key}
+                        onClick={() => setAccount(key)}
+                        className={cx(
+                          'rounded-full px-2.5 py-1 text-[11px] font-semibold transition',
+                          account === key ? 'bg-ink text-bg' : 'bg-card text-ink-soft',
+                        )}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               {items == null ? (
                 <div className="py-2 text-center text-[12px] text-ink-dim">Lädt…</div>
@@ -338,23 +409,36 @@ function MemberSheet({ member, onClose, canManage, mockMode, groupId, onChanged 
               ) : (
                 <div className="space-y-1.5">
                   {items.map((d) => (
-                    <div key={d.id} className="flex items-center gap-2 rounded-xl bg-card px-3 py-2 text-[13px]">
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate">{d.description || DEBT_TYPE[d.type] || 'Posten'}</div>
-                        <div className="text-[11px] text-ink-dim">
-                          {DEBT_TYPE[d.type] || d.type}
-                          {d.dueDate ? ` · fällig ${fmtDate(d.dueDate)}` : ''}
+                    <div key={d.id} className="rounded-xl bg-card px-3 py-2 text-[13px]">
+                      <div className="flex items-center gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate">{d.description || DEBT_TYPE[d.type] || 'Posten'}</div>
+                          <div className="text-[11px] text-ink-dim">
+                            {DEBT_TYPE[d.type] || d.type}
+                            {d.dueDate ? ` · fällig ${fmtDate(d.dueDate)}` : ''}
+                            {d.paidAmount > 0 ? ` · ${eur(d.paidAmount)} € angezahlt` : ''}
+                          </div>
                         </div>
+                        <span className="font-mono font-semibold tnum">{eur(d.open)} €</span>
                       </div>
-                      <span className="font-mono font-semibold tnum">{eur(d.amount)} €</span>
+
                       {canManage && (
-                        <button
-                          onClick={() => storno(d.id)}
-                          disabled={busy}
-                          className="text-[12px] font-semibold text-terra hover:underline"
-                        >
-                          Storno
-                        </button>
+                        <div className="mt-2 flex items-center gap-2">
+                          <button
+                            onClick={() => payItem(d.id)}
+                            disabled={busy != null}
+                            className="flex-1 rounded-lg bg-sage-bg py-1.5 text-[12px] font-semibold text-sage transition disabled:opacity-40"
+                          >
+                            {busy === d.id ? '…' : 'Bezahlt'}
+                          </button>
+                          <button
+                            onClick={() => storno(d.id)}
+                            disabled={busy != null}
+                            className="rounded-lg px-3 py-1.5 text-[12px] font-semibold text-terra transition hover:bg-terra-bg disabled:opacity-40"
+                          >
+                            Storno
+                          </button>
+                        </div>
                       )}
                     </div>
                   ))}
@@ -382,7 +466,7 @@ function MemberSheet({ member, onClose, canManage, mockMode, groupId, onChanged 
         groupId={groupId}
         onBooked={() => {
           setPenaltyOpen(false)
-          onChanged()
+          onChanged({ close: true })
         }}
       />
     </>

@@ -543,7 +543,9 @@ export function splitOpenDebts(items = []) {
   }
 }
 
-/* Offene Einzelposten eines Mitglieds (Detail-Sheet / Profil). */
+/* Offene Einzelposten eines Mitglieds (Detail-Sheet / Profil).
+   `open` ist der noch offene Rest — Teilzahlungen aus dem CSV-Abgleich oder
+   verrechnetes Guthaben haben den Posten dann schon angeknabbert. */
 export async function listOpenDebts(groupId, userId) {
   const { data, error } = await supabase
     .from('debts')
@@ -554,16 +556,21 @@ export async function listOpenDebts(groupId, userId) {
     .eq('cancelled', false)
     .order('created_at', { ascending: true })
   if (error) throw error
-  return (data ?? []).map((d) => ({
-    id: d.id,
-    type: d.type,
-    amount: Number(d.amount) || 0,
-    // Restbetrag nach Teilzahlung — Grundlage jeder Summe, damit schon
-    // gezahltes Geld nicht ein zweites Mal in der Aufteilung auftaucht.
-    open: (Number(d.amount) || 0) - (Number(d.paid_amount) || 0),
-    description: d.description,
-    dueDate: d.due_date,
-  }))
+  return (data ?? []).map((d) => {
+    const amount = Number(d.amount) || 0
+    const paid = Number(d.paid_amount) || 0
+    return {
+      id: d.id,
+      type: d.type,
+      amount,
+      paidAmount: paid,
+      // Restbetrag nach Teilzahlung — Grundlage jeder Summe, damit schon
+      // gezahltes Geld nicht ein zweites Mal in der Aufteilung auftaucht.
+      open: Math.max(0, amount - paid),
+      description: d.description,
+      dueDate: d.due_date,
+    }
+  })
 }
 
 /* Kassenstand + Kennzahlen (RPC, für alle Mitglieder lesbar). */
@@ -603,14 +610,29 @@ export async function listTransactions(groupId) {
     // (z. B. bei Gastkegler-Einnahmen ohne Mitgliedszuordnung).
     member: t.member_name || t.counterparty || null,
     source: t.source,
+    account: t.account || 'bank',
+    transferId: t.transfer_id || null,
   }))
 }
 
-/* Offene Schulden eines Mitglieds als bezahlt buchen (RPC). Rückgabe: Summe. */
-export async function markMemberPaid(groupId, userId) {
+/* Offene Schulden eines Mitglieds als bezahlt buchen (RPC). Rückgabe: Summe.
+   `account`: 'bank' | 'cash' | null (dann entscheidet die Club-Einstellung). */
+export async function markMemberPaid(groupId, userId, account = null) {
   const { data, error } = await supabase.rpc('mark_member_paid', {
     p_group_id: groupId,
     p_user_id: userId,
+    p_account: account,
+  })
+  if (error) throw error
+  return Number(data) || 0
+}
+
+/* Einen einzelnen Posten (Strafe, Beitrag …) als bezahlt buchen (RPC).
+   Rückgabe: der gebuchte Restbetrag. */
+export async function markDebtPaid(debtId, account = null) {
+  const { data, error } = await supabase.rpc('mark_debt_paid', {
+    p_debt_id: debtId,
+    p_account: account,
   })
   if (error) throw error
   return Number(data) || 0
@@ -628,13 +650,30 @@ export async function bookManualPenalty(groupId, userId, amount, description) {
   return data
 }
 
-/* Manuelle Kassenbuchung (RPC). amount: Einnahme positiv, Ausgabe negativ. */
-export async function bookTransaction(groupId, { date, category, amount, description }) {
+/* Manuelle Kassenbuchung (RPC). amount: Einnahme positiv, Ausgabe negativ.
+   account: 'bank' | 'cash' | null (dann entscheidet die Club-Einstellung). */
+export async function bookTransaction(groupId, { date, category, amount, description, account }) {
   const { data, error } = await supabase.rpc('book_transaction', {
     p_group_id: groupId,
     p_date: date,
     p_category: category,
     p_amount: amount,
+    p_description: description || null,
+    p_account: account || null,
+  })
+  if (error) throw error
+  return data
+}
+
+/* Geld zwischen Konto und Barkasse umbuchen (RPC).
+   direction: 'to_bank' = Bargeld einzahlen, 'to_cash' = Bargeld abheben.
+   Entsteht als Buchungspaar — der Gesamtbestand ändert sich nicht. */
+export async function transferCash(groupId, { direction, amount, date, description }) {
+  const { data, error } = await supabase.rpc('transfer_cash', {
+    p_group_id: groupId,
+    p_direction: direction,
+    p_amount: amount,
+    p_date: date || null,
     p_description: description || null,
   })
   if (error) throw error
