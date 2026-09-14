@@ -616,7 +616,8 @@ export async function listTransactions(groupId) {
 }
 
 /* Offene Schulden eines Mitglieds als bezahlt buchen (RPC). Rückgabe: Summe.
-   `account`: 'bank' | 'cash' | null (dann entscheidet die Club-Einstellung). */
+   Die Kasse ergibt sich aus der Club-Einstellung — ein Club führt entweder ein
+   Konto oder eine Barkasse, nie beides. */
 export async function markMemberPaid(groupId, userId, account = null) {
   const { data, error } = await supabase.rpc('mark_member_paid', {
     p_group_id: groupId,
@@ -651,7 +652,7 @@ export async function bookManualPenalty(groupId, userId, amount, description) {
 }
 
 /* Manuelle Kassenbuchung (RPC). amount: Einnahme positiv, Ausgabe negativ.
-   account: 'bank' | 'cash' | null (dann entscheidet die Club-Einstellung). */
+   Die Kasse ergibt sich aus der Club-Einstellung. */
 export async function bookTransaction(groupId, { date, category, amount, description, account }) {
   const { data, error } = await supabase.rpc('book_transaction', {
     p_group_id: groupId,
@@ -665,19 +666,81 @@ export async function bookTransaction(groupId, { date, category, amount, descrip
   return data
 }
 
-/* Geld zwischen Konto und Barkasse umbuchen (RPC).
-   direction: 'to_bank' = Bargeld einzahlen, 'to_cash' = Bargeld abheben.
-   Entsteht als Buchungspaar — der Gesamtbestand ändert sich nicht. */
-export async function transferCash(groupId, { direction, amount, date, description }) {
-  const { data, error } = await supabase.rpc('transfer_cash', {
+/* ── Barkasse: Kassieren, Kassensturz, Status ──────────────────────────────
+   Nur für Clubs mit Barkasse. Im Konto-Modus kommen Zahlungen über den
+   CSV-Import herein — dort wäre eine Kassierrunde eine Doppelbuchung, und die
+   Datenbank weist sie entsprechend ab. */
+
+/* Eine ganze Kassierrunde auf einmal buchen (RPC).
+   entries: [{ userId, amount, debtIds? }] — `debtIds` begleicht genau diese
+   Posten, ohne die Liste zählt „älteste Fälligkeit zuerst". Rückgabe:
+   { total, members, credit, late_fees }. */
+export async function collectCash(groupId, entries, { date, note } = {}) {
+  const { data, error } = await supabase.rpc('collect_cash', {
     p_group_id: groupId,
-    p_direction: direction,
-    p_amount: amount,
+    p_entries: entries.map((e) => ({
+      user_id: e.userId,
+      amount: e.amount,
+      ...(e.debtIds?.length ? { debt_ids: e.debtIds } : {}),
+    })),
     p_date: date || null,
-    p_description: description || null,
+    p_note: note || null,
   })
   if (error) throw error
   return data
+}
+
+/* Kassensturz: gezählten Bestand melden (RPC). Eine Differenz zum
+   rechnerischen Bestand wird als Buchung festgehalten.
+   Rückgabe: { expected, counted, difference }. */
+export async function cashCount(groupId, counted, note) {
+  const { data, error } = await supabase.rpc('cash_count', {
+    p_group_id: groupId,
+    p_counted: counted,
+    p_note: note || null,
+  })
+  if (error) throw error
+  return data
+}
+
+/* Was steht zum Kassieren an? (RPC, nur Kassenwart/Admin einer Barkasse —
+   sonst kommt open_total 0 zurück.) */
+export async function getCollectStatus(groupId) {
+  const { data, error } = await supabase.rpc('collect_status', { p_group_id: groupId })
+  if (error) throw error
+  return data
+}
+
+/* Alle offenen Posten des Clubs, nach Mitglied gebündelt — die Datengrundlage
+   der Kassierrunde. Eine Abfrage statt einer je Mitglied. */
+export async function listGroupOpenDebts(groupId) {
+  const { data, error } = await supabase
+    .from('debts')
+    .select('id, user_id, type, amount, paid_amount, description, due_date, created_at')
+    .eq('group_id', groupId)
+    .eq('paid', false)
+    .eq('cancelled', false)
+    .order('due_date', { ascending: true, nullsFirst: false })
+    .order('created_at', { ascending: true })
+  if (error) throw error
+  const byUser = new Map()
+  for (const d of data ?? []) {
+    const amount = Number(d.amount) || 0
+    const paid = Number(d.paid_amount) || 0
+    const open = Math.max(0, amount - paid)
+    if (open <= 0) continue
+    if (!byUser.has(d.user_id)) byUser.set(d.user_id, [])
+    byUser.get(d.user_id).push({
+      id: d.id,
+      type: d.type,
+      amount,
+      paidAmount: paid,
+      open,
+      description: d.description,
+      dueDate: d.due_date,
+    })
+  }
+  return byUser
 }
 
 /* Einzelnen Schuldposten stornieren (RPC). */

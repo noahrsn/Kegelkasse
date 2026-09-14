@@ -20,6 +20,7 @@ import SessionReview from './pages/sessions/SessionReview'
 import Treasury from './pages/treasury/Treasury'
 import TreasuryImport from './pages/treasury/TreasuryImport'
 import TreasuryNew from './pages/treasury/TreasuryNew'
+import TreasuryCollect from './pages/treasury/TreasuryCollect'
 import Penalties from './pages/Penalties'
 import Rulebook from './pages/Rulebook'
 import Members from './pages/Members'
@@ -78,6 +79,7 @@ export default function App() {
       <Route path="/sessions/:id/review" element={<Protected><SessionReview /></Protected>} />
       <Route path="/treasury" element={<Protected><Treasury /></Protected>} />
       <Route path="/treasury/import" element={<Protected><TreasuryImport /></Protected>} />
+      <Route path="/treasury/collect" element={<Protected><TreasuryCollect /></Protected>} />
       <Route path="/treasury/new" element={<Protected><TreasuryNew /></Protected>} />
       <Route path="/penalties" element={<Protected><Penalties /></Protected>} />
       <Route path="/rulebook" element={<Protected><Rulebook /></Protected>} />

@@ -256,6 +256,70 @@ function General({ group, onSave }) {
   )
 }
 
+/* Die beiden Betriebsarten der Kasse. Beschreibung und Merkmale stehen hier
+   beieinander, weil die Wahl mehr verstellt als ein Etikett: sie entscheidet,
+   wie Geld überhaupt in die Kasse kommt. */
+const TREASURY_MODES = [
+  {
+    key: 'account',
+    icon: '🏦',
+    title: 'Vereinskonto',
+    desc: 'Mitglieder überweisen auf das Vereinskonto.',
+    points: [
+      'Zahlungen kommen über den CSV-Import des Kontoauszugs herein',
+      'IBAN steht im Profil jedes Mitglieds',
+      'Verspätungsstrafen entstehen beim Import',
+    ],
+  },
+  {
+    key: 'cash',
+    icon: '💰',
+    title: 'Barkasse',
+    desc: 'Das Geld liegt in der Kassenbox, kassiert wird vor Ort.',
+    points: [
+      'Kassierrunde: einmal durch die Runde, alle Zahlungen auf einen Schlag',
+      'Kassensturz vergleicht gezählten mit rechnerischem Bestand',
+      'Kein Kontoauszug, keine IBAN — Fristen laufen trotzdem weiter',
+    ],
+  },
+]
+
+function ModeOption({ icon, title, desc, points, active, onSelect }) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={active}
+      className={cx(
+        'rounded-2xl border p-4 text-left transition',
+        active ? 'border-ink bg-bg' : 'border-card-edge bg-card hover:bg-bg',
+      )}
+    >
+      <div className="flex items-center gap-2">
+        <span className="text-lg">{icon}</span>
+        <span className="text-[14px] font-semibold">{title}</span>
+        <span
+          className={cx(
+            'ml-auto grid h-5 w-5 place-items-center rounded-full border text-[10px] font-bold',
+            active ? 'border-ink bg-ink text-bg' : 'border-card-edge text-transparent',
+          )}
+        >
+          ✓
+        </span>
+      </div>
+      <div className="mt-1 text-[12px] text-ink-soft">{desc}</div>
+      <ul className="mt-2.5 space-y-1">
+        {points.map((t) => (
+          <li key={t} className="flex gap-1.5 text-[11px] leading-snug text-ink-dim">
+            <span aria-hidden>·</span>
+            <span>{t}</span>
+          </li>
+        ))}
+      </ul>
+    </button>
+  )
+}
+
 function Finance({ group, onSave }) {
   const ed = useEditor(
     {
@@ -281,7 +345,9 @@ function Finance({ group, onSave }) {
     monthly_fee: Number(v.monthly_fee) || 0,
     fee_booking_mode: v.fee_booking_mode || 'fixed_day',
     fee_day: Number(v.fee_day) || 1,
-    payment_iban: v.payment_iban || null,
+    // Ohne Konto keine IBAN: sonst stünde im Profil weiter eine Nummer, auf die
+    // niemand überweisen soll.
+    payment_iban: v.treasury_mode === 'cash' ? null : v.payment_iban || null,
     payment_paypal: v.payment_paypal || null,
     treasury_mode: v.treasury_mode || 'account',
     treasury_opening_balance: Number(v.treasury_opening_balance) || 0,
@@ -294,41 +360,26 @@ function Finance({ group, onSave }) {
     charge_absent_avg: !!v.charge_absent_avg,
     round_up_penalties: !!v.round_up_penalties,
   })
-  // Welche Kassen führt der Club? Danach richtet sich, welche Felder überhaupt
-  // Sinn ergeben — eine IBAN ohne Konto ist nur Verwirrung.
+  // Ein Club führt entweder ein Konto ODER eine Barkasse. Daran hängt nicht nur
+  // ein Etikett, sondern der halbe Geldweg: mit Konto kommen Zahlungen über den
+  // Kontoauszug herein, ohne Konto werden sie eingesammelt. Entsprechend
+  // verschwinden die Felder der jeweils anderen Welt.
   const hasBank = ed.val.treasury_mode !== 'cash'
-  const hasCash = ed.val.treasury_mode !== 'account'
+  const hasCash = !hasBank
   return (
     <div className="space-y-4">
-      <Card className="space-y-4">
-        <div className="text-[12px] font-semibold text-ink-soft">Wo liegt das Geld?</div>
-        <div className="grid grid-cols-3 gap-2">
-          {[
-            ['account', 'Konto'],
-            ['cash', 'Barkasse'],
-            ['both', 'Beides'],
-          ].map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => ed.field('treasury_mode')(key)}
-              className={cx(
-                'rounded-2xl py-3 text-[13px] font-semibold transition',
-                ed.val.treasury_mode === key ? 'bg-ink text-bg' : 'bg-bg text-ink-soft',
-              )}
-            >
-              {label}
-            </button>
+      <Card className="space-y-3">
+        <div className="text-[12px] font-semibold text-ink-soft">Wie führt ihr eure Kasse?</div>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {TREASURY_MODES.map((m) => (
+            <ModeOption
+              key={m.key}
+              {...m}
+              active={ed.val.treasury_mode === m.key}
+              onSelect={() => ed.field('treasury_mode')(m.key)}
+            />
           ))}
         </div>
-        <p className="rounded-2xl bg-bg p-3 text-[12px] text-ink-soft">
-          {ed.val.treasury_mode === 'account' &&
-            'Alles läuft über das Vereinskonto. Zahlungen kommen über den CSV-Import des Kontoauszugs herein.'}
-          {ed.val.treasury_mode === 'cash' &&
-            'Alles läuft über die Barkasse. Der CSV-Import entfällt — Zahlungen markierst du direkt beim Mitglied als bezahlt.'}
-          {ed.val.treasury_mode === 'both' &&
-            'Konto und Barkasse werden getrennt geführt. Jede Buchung gehört zu einer der beiden Kassen; der Kassenstand zeigt beide einzeln und in Summe. Bargeld einzahlen geht als Umbuchung.'}
-        </p>
       </Card>
 
       <Card className="space-y-4">
@@ -357,30 +408,33 @@ function Finance({ group, onSave }) {
         <Field label="PayPal-Link"><Input value={ed.val.payment_paypal} onChange={ed.field('payment_paypal')} /></Field>
       </Card>
 
-      {/* Anfangsbestände: je geführter Kasse einer. Der Kassenstand ist immer
-          die Summe aus beiden plus allen Buchungen. */}
+      {/* Anfangsbestand der geführten Kasse. Der Kassenstand ist immer dieser
+          Betrag plus alle Buchungen ab dem Stichtag. */}
       <Card className="space-y-4">
-        <div className="text-[12px] font-semibold text-ink-soft">Anfangsbestand</div>
-        {hasBank && (
-          <div className="grid grid-cols-2 gap-3">
-            <Field label={hasCash ? 'Konto (€)' : 'Eröffnungssaldo (€)'}>
-              <Input type="number" step="0.01" value={ed.val.treasury_opening_balance} onChange={ed.field('treasury_opening_balance')} />
-            </Field>
-            <Field label="Stichtag">
-              <Input type="date" value={ed.val.treasury_opening_balance_date || ''} onChange={ed.field('treasury_opening_balance_date')} />
-            </Field>
-          </div>
-        )}
-        {hasCash && (
-          <div className="grid grid-cols-2 gap-3">
-            <Field label={hasBank ? 'Barkasse (€)' : 'Anfangsbestand (€)'}>
-              <Input type="number" step="0.01" value={ed.val.cash_opening_balance} onChange={ed.field('cash_opening_balance')} />
-            </Field>
-            <Field label="Stichtag">
-              <Input type="date" value={ed.val.cash_opening_balance_date || ''} onChange={ed.field('cash_opening_balance_date')} />
-            </Field>
-          </div>
-        )}
+        <div className="text-[12px] font-semibold text-ink-soft">
+          {hasCash ? 'Anfangsbestand der Barkasse' : 'Anfangsbestand'}
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label={hasCash ? 'In der Kasse (€)' : 'Eröffnungssaldo (€)'}>
+            <Input
+              type="number"
+              step="0.01"
+              value={hasCash ? ed.val.cash_opening_balance : ed.val.treasury_opening_balance}
+              onChange={ed.field(hasCash ? 'cash_opening_balance' : 'treasury_opening_balance')}
+            />
+          </Field>
+          <Field label="Stichtag">
+            <Input
+              type="date"
+              value={
+                (hasCash ? ed.val.cash_opening_balance_date : ed.val.treasury_opening_balance_date) || ''
+              }
+              onChange={ed.field(
+                hasCash ? 'cash_opening_balance_date' : 'treasury_opening_balance_date',
+              )}
+            />
+          </Field>
+        </div>
       </Card>
       <Card className="space-y-4">
         <div className="text-[12px] font-semibold text-ink-soft">Zahlungsfristen & Verspätung</div>
@@ -431,17 +485,18 @@ function Finance({ group, onSave }) {
           />
         </div>
       </Card>
-      {/* Ohne Konto gibt es keinen Kontoauszug, den man importieren könnte. */}
-      {hasBank && <CsvReminderCard group={group} />}
+      <CsvReminderCard group={group} cash={hasCash} />
       <SaveBar onDiscard={ed.discard} onSave={() => ed.save(transform)} saving={ed.saving} saved={ed.saved} />
     </div>
   )
 }
 
-/* Club-weite Erinnerung an den Kontoauszug. Bewusst NICHT im Profil, sondern
-   hier: sie richtet sich an das Amt (Kassenwart/Präsident/Admin), nicht an eine
-   Person. Speichert sofort per RPC, hängt also nicht an der SaveBar oben. */
-function CsvReminderCard({ group }) {
+/* Club-weite Erinnerung, wenn eine Frist verstrichen ist und das Geld fehlt.
+   Bewusst NICHT im Profil, sondern hier: sie richtet sich an das Amt
+   (Kassenwart/Präsident/Admin), nicht an eine Person. Derselbe Schalter, zwei
+   Anlässe — je nachdem, wie der Club seine Kasse führt. Speichert sofort per
+   RPC, hängt also nicht an der SaveBar oben. */
+function CsvReminderCard({ group, cash }) {
   const { mockMode, activeGroupId } = useAuth()
   const [on, setOn] = useState(group?.notify_csv_import ?? true)
 
@@ -460,8 +515,12 @@ function CsvReminderCard({ group }) {
       <Toggle
         checked={on}
         onChange={toggle}
-        label="An fehlenden Kontoauszug erinnern"
-        hint="Ist eine Zahlungsfrist verstrichen, ohne dass ein Kontoauszug bis zu diesem Datum importiert wurde, bekommen Kassenwart, Präsident und Admin am Tag danach und dann alle 2 Tage eine Erinnerung."
+        label={cash ? 'An offenes Kassieren erinnern' : 'An fehlenden Kontoauszug erinnern'}
+        hint={
+          cash
+            ? 'Ist eine Zahlungsfrist verstrichen und steht noch Geld aus, bekommen Kassenwart, Präsident und Admin am Tag danach und dann alle 2 Tage eine Erinnerung.'
+            : 'Ist eine Zahlungsfrist verstrichen, ohne dass ein Kontoauszug bis zu diesem Datum importiert wurde, bekommen Kassenwart, Präsident und Admin am Tag danach und dann alle 2 Tage eine Erinnerung.'
+        }
       />
     </Card>
   )

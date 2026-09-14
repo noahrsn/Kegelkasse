@@ -1098,40 +1098,86 @@ In Wizard und Einstellungen sind die Avatar-Buttons bislang Platzhalter; sie wer
 
 ---
 
-## Phase 13 — Barkasse & Einzelposten bezahlt markieren ✅
+## Phase 13 — Konto ODER Barkasse, Einzelposten bezahlt markieren ✅
 
 **Ziel:** Nicht jeder Club führt ein Vereinskonto. Wer die Kasse als Schatulle
-auf dem Kegelabend führt, muss die App genauso nutzen können — und wer beides
-hat, will beides getrennt sehen.
+zum Kegelabend mitbringt, muss die App genauso gut nutzen können — nicht als
+abgespeckte Fassung des Konto-Clubs, sondern mit den Werkzeugen, die Bargeld
+wirklich braucht.
 
-> **Status — umgesetzt ✅:** Migration `034_cash_box_and_single_debt_payment.sql`
-> + Frontend (Einstellungen, Kassenbuch, Mitglied-Detail).
+> **Status — umgesetzt ✅:** Migrationen `034_cash_box_and_single_debt_payment.sql`
+> und `035_cash_box_collecting.sql` + Frontend (Einstellungen, Setup-Wizard,
+> Kassenbuch, Kassierrunde, Dashboard, Mitglied-Detail).
 
-### Kassenführung
+### Zwei Betriebsarten, keine dritte
 
 - **Einstellung je Club** (`groups.treasury_mode`, Einstellungen → Finanzen):
-  `account` (nur Konto, Voreinstellung), `cash` (nur Barkasse) oder `both`.
-- **Jede Buchung gehört zu einer Kasse** (`transactions.account` = `bank` |
-  `cash`). Der Kassenstand ist immer die Summe beider Kassen plus deren
-  Anfangsbestände — ein Umschalten des Modus verschiebt kein Geld und lässt
-  keins verschwinden, es ändert nur, was die App anbietet.
-- **Zwei Anfangsbestände:** `treasury_opening_balance` (Konto) und
-  `cash_opening_balance` (Barkasse), jeweils mit Stichtag.
-- **Umbuchung** zwischen den Kassen (`transfer_cash`, Kategorie `cash_transfer`):
-  ein Buchungspaar mit gemeinsamer `transfer_id`, das sich zu null summiert und
-  bewusst **nicht** in die Einnahme-/Ausgabe-Kennzahlen einfließt — sonst zählte
-  jeder Gang zur Bank als Umsatz.
+  `account` (Vereinskonto, Voreinstellung) oder `cash` (Barkasse). Ein früher
+  vorhandener Mischmodus („beides") ist entfallen: er hat jede Maske um die
+  Frage „in welche Kasse?" erweitert, ohne dass ihn ein Club gebraucht hätte.
+- Weil die Kasse eines Clubs damit eindeutig ist, fragt **keine** Oberfläche
+  mehr danach — `resolve_account()` leitet sie aus der Einstellung ab, und jede
+  Buchung trägt sie in `transactions.account` (`bank` | `cash`).
+- **Anfangsbestand** je Betriebsart: `treasury_opening_balance` (Konto) bzw.
+  `cash_opening_balance` (Barkasse), jeweils mit Stichtag. Ein Umschalten
+  verschiebt kein Geld; liegt in der stillgelegten Kasse noch etwas, weist das
+  Kassenbuch beide Bestände getrennt aus, statt sie unter falschem Namen zu
+  summieren.
 - **Ohne Konto kein Kontoauszug:** Im Modus `cash` verschwinden CSV-Import,
-  Import-Banner (`treasury_import_status`) und die IBAN aus der Oberfläche.
+  Import-Banner (`treasury_import_status`) und die IBAN aus der Oberfläche —
+  auch aus den Benachrichtigungen, die sonst zum Überweisen auffordern würden.
+
+### Kassieren — die Kassierrunde
+
+Der Kern des Barkassen-Betriebs: beim Kegelabend geht die Kasse rum, und der
+Kassenwart muss mitkommen.
+
+- **`/treasury/collect`** listet alle Mitglieder mit offenem Saldo, der größte
+  zuerst. **Ein Tap auf den Betrag hakt die volle Summe ab** — der Normalfall
+  kostet keine Rückfrage, ein zweiter Tap nimmt das Häkchen zurück.
+- **Nichts wird sofort gebucht.** Die Runde sammelt Häkchen (im `localStorage`
+  je Club, damit ein Seitenwechsel sie nicht wegwirft); erst „Runde buchen"
+  schreibt alles auf einmal in die Datenbank. Wer sich vertippt, verliert damit
+  ein Häkchen und keine Buchung.
+- **Ein Tap auf den Namen** öffnet das Sheet für alles Übrige: Teilbetrag,
+  Schein-Chips (5/10/20/50) mit **Rückgeld-Anzeige** und das Abhaken einzelner
+  Posten — wer nur seine Strafen zahlt, wählt sie an, und der Betrag folgt der
+  Auswahl.
+- **`collect_cash(group, entries, date, note)`** bucht die Runde als *eine*
+  Datenbank-Transaktion: je Mitglied eine Einnahme in der Barkasse, die Posten
+  werden beglichen (ausgewählte gezielt, sonst älteste Fälligkeit zuerst),
+  Überzahlung wird Guthaben. Entweder geht die ganze Runde durch oder keine
+  Buchung.
+- **Dashboard-Karte** für Kassenwart/Admin, sobald Geld aussteht
+  (`collect_status`) — sie tritt an die Stelle des Import-Banners.
+
+### Kassensturz
+
+- **`cash_count(group, counted, note)`** vergleicht den gezählten mit dem
+  rechnerischen Bestand und hält eine Differenz als Buchung fest
+  (`other_income` / `other_expense`, Beschreibung „Kassensturz · Differenz"),
+  statt den Bestand still zu überschreiben. Im Kassenbuch als eigene Karte.
+
+### Verspätungsstrafen ohne Kontoauszug
+
+- Bisher hing `charge_late_fees()` allein am CSV-Import. Eine Barkasse
+  importiert nie etwas — die Frist liefe ins Leere. Jetzt bewertet
+  `charge_late_fees_cash_all()` die Fristen aller Barkassen-Clubs **täglich per
+  Cron** (`charge_late_fees_cash_daily`, 01:10); zusätzlich läuft die Bewertung
+  am Ende jeder Kassierrunde, damit eine gerade eingesammelte Zahlung sofort
+  zählt. Die Funktion ist je Frist idempotent, mehrfache Läufe schaden nicht.
+- Die Vorstands-Mahnung zur verstrichenen Frist gibt es in zwei Ausführungen:
+  `csv_import_reminder` für Konto-Clubs, `cash_collect_reminder` für
+  Barkassen-Clubs. Beide hängen am selben Schalter (`groups.notify_csv_import`,
+  Einstellungen → Finanzen).
 
 ### Einzelne Posten begleichen
 
-- `mark_debt_paid(debt_id, account)` bucht **einen** offenen Posten (Strafe,
-  Monatsbeitrag, Verspätungsstrafe …) als Einnahme in der gewählten Kasse —
-  bisher ging nur „alles auf einmal" (`mark_member_paid`).
-- Im Mitglied-Detail hat jeder offene Posten „Bezahlt" und „Storno"; bei zwei
-  Kassen steht darüber die Wahl „Zahlung in bar / Konto". Teilzahlungen aus dem
-  CSV-Abgleich zeigen den Restbetrag und den bereits gezahlten Anteil.
+- `mark_debt_paid(debt_id)` bucht **einen** offenen Posten (Strafe,
+  Monatsbeitrag, Verspätungsstrafe …) als Einnahme — bisher ging nur „alles auf
+  einmal" (`mark_member_paid`).
+- Im Mitglied-Detail hat jeder offene Posten „Bezahlt" und „Storno".
+  Teilzahlungen zeigen den Restbetrag und den bereits gezahlten Anteil.
 - **Storno angezahlter Posten:** `cancel_debt` verwirft den bereits gezahlten
   Anteil nicht mehr, sondern gibt ihn als Guthaben (`member_credits`) zurück —
   das sofort gegen die übrigen offenen Posten verrechnet wird.

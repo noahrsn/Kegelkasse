@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, Button, Badge, PageTitle, Avatar, Tabs, Empty } from '../../components/ui'
+import { Card, Button, Badge, PageTitle, Avatar, Tabs, Empty, Input } from '../../components/ui'
 import { eur, pal, cx } from '../../design/calm'
 import { useAuth } from '../../context/AuthContext.jsx'
-import { getTreasury, listTransactions } from '../../lib/api.js'
+import { getTreasury, listTransactions, cashCount } from '../../lib/api.js'
 import { cleanDescription } from '../../lib/csv.js'
 import { club, transactions as mockTx } from '../../mock/data'
 
@@ -78,23 +78,20 @@ export default function Treasury() {
   }, [mockMode, activeGroupId])
 
   const mode = summary?.mode || 'account'
+  const cash = mode === 'cash'
   const cashBalance = Number(summary?.cash_balance) || 0
   const bankBalance = Number(summary?.bank_balance) || 0
-  // Beide Kassen einzeln zeigen, sobald der Club sie führt — und auch dann,
-  // wenn in der gerade nicht geführten Kasse noch Geld liegt (nach einem
-  // Umschalten). Der Gesamtbestand soll nie unter falschem Namen dastehen.
-  const showSplit =
-    mode === 'both' ||
-    (mode === 'account' && cashBalance !== 0) ||
-    (mode === 'cash' && bankBalance !== 0)
-  const hasBank = mode !== 'cash'
+  // Ein Club führt genau eine Kasse. Beide getrennt auszuweisen lohnt nur nach
+  // einem Umschalten, wenn in der stillgelegten Kasse noch Geld liegt — der
+  // Gesamtbestand soll nie unter falschem Namen dastehen.
+  const showSplit = cash ? bankBalance !== 0 : cashBalance !== 0
 
   const data = list || []
   const shown = data
     .filter((t) => (account === 'all' ? true : t.account === account))
     .filter((t) => (filter === 'all' ? true : filter === 'in' ? t.amount > 0 : t.amount < 0))
   // Ohne Konto gibt es keinen Kontoauszug — dann auch keinen Import-Hinweis.
-  const stale = hasBank && !sameMonth(summary?.last_csv_import)
+  const stale = !cash && !sameMonth(summary?.last_csv_import)
 
   return (
     <div className="space-y-5">
@@ -103,12 +100,20 @@ export default function Treasury() {
         title="Vereinskasse"
         action={
           <div className="flex gap-2">
-            {hasBank && (
+            {cash ? (
+              <Button variant="soft" onClick={() => navigate('/treasury/new')}>
+                + Buchung
+              </Button>
+            ) : (
               <Button variant="soft" onClick={() => navigate('/treasury/import')}>
                 CSV-Import
               </Button>
             )}
-            <Button onClick={() => navigate('/treasury/new')}>+ Buchung</Button>
+            {cash ? (
+              <Button onClick={() => navigate('/treasury/collect')}>Kassieren</Button>
+            ) : (
+              <Button onClick={() => navigate('/treasury/new')}>+ Buchung</Button>
+            )}
           </div>
         }
       />
@@ -118,7 +123,7 @@ export default function Treasury() {
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="min-w-0">
             <div className="text-[12px] font-semibold text-ink-soft">
-              {mode === 'cash' && !showSplit ? 'Bestand der Barkasse' : 'Aktueller Kassenstand'}
+              {cash && !showSplit ? 'In der Barkasse' : 'Aktueller Kassenstand'}
             </div>
             {/* Mobil bewusst kleiner — vierstellige Beträge sprengen sonst die Karte. */}
             <div className="mt-1 font-display text-[2rem] font-medium leading-tight tracking-tight tnum sm:text-5xl lg:text-6xl">
@@ -152,6 +157,19 @@ export default function Treasury() {
           </div>
         </div>
       </Card>
+
+      {/* Kassensturz — nur für die Barkasse: Bargeld muss man zählen. */}
+      {cash && (
+        <CashCountCard
+          groupId={activeGroupId}
+          mockMode={mockMode}
+          expected={cashBalance}
+          onCounted={() => {
+            getTreasury(activeGroupId).then(setSummary).catch((e) => console.error(e))
+            listTransactions(activeGroupId).then(setList).catch((e) => console.error(e))
+          }}
+        />
+      )}
 
       {/* Staleness-Hinweis */}
       {stale && (
@@ -283,5 +301,118 @@ export default function Treasury() {
         )}
       </div>
     </div>
+  )
+}
+
+/* ── Kassensturz ────────────────────────────────────────────────────────────
+   Die Barkasse ist das einzige Konto, das man verlieren kann. Gezählt wird
+   von Hand, und weil eine Differenz fast immer eine vergessene Buchung ist,
+   wird sie als Buchung festgehalten statt den Bestand still zu überschreiben. */
+function CashCountCard({ groupId, mockMode, expected, onCounted }) {
+  const [open, setOpen] = useState(false)
+  const [counted, setCounted] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [result, setResult] = useState(null)
+  const [error, setError] = useState(null)
+
+  const val = Number(String(counted).replace(',', '.'))
+  const diff = Number.isFinite(val) ? Math.round((val - expected) * 100) / 100 : null
+
+  const submit = async () => {
+    if (!Number.isFinite(val) || val < 0) {
+      setError('Bitte den gezählten Bestand eingeben.')
+      return
+    }
+    setError(null)
+    if (mockMode) {
+      setOpen(false)
+      return
+    }
+    setBusy(true)
+    try {
+      const res = await cashCount(groupId, val)
+      setResult(res)
+      setOpen(false)
+      setCounted('')
+      onCounted?.()
+    } catch (e) {
+      console.error(e)
+      setError(e.message || 'Kassensturz fehlgeschlagen.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!open) {
+    return (
+      <Card className="flex flex-wrap items-center gap-3 py-3">
+        <span className="text-lg">🧾</span>
+        <div className="min-w-0 flex-1 text-[12px] text-ink-soft">
+          {result ? (
+            <>
+              <strong className="text-ink">Kassensturz gebucht.</strong>{' '}
+              {Number(result.difference) === 0
+                ? 'Gezählt und gerechnet stimmen überein.'
+                : `Differenz ${eur(Number(result.difference))} € ist als Buchung festgehalten.`}
+            </>
+          ) : (
+            <>
+              <strong className="text-ink">Kassensturz.</strong> Rechnerisch liegen{' '}
+              <span className="font-mono tnum">{eur(expected)} €</span> in der Kasse.
+            </>
+          )}
+        </div>
+        <Button variant="soft" size="sm" onClick={() => { setResult(null); setOpen(true) }}>
+          Zählen
+        </Button>
+      </Card>
+    )
+  }
+
+  return (
+    <Card className="space-y-3">
+      <div className="text-[12px] font-semibold text-ink-soft">Kassensturz</div>
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="min-w-[8rem] flex-1">
+          <div className="text-[11px] text-ink-dim">Gezählt (€)</div>
+          <Input
+            autoFocus
+            type="number"
+            step="0.01"
+            min="0"
+            inputMode="decimal"
+            placeholder="0,00"
+            value={counted}
+            onChange={(e) => setCounted(e.target.value)}
+            className="mt-1 font-mono"
+          />
+        </div>
+        <div className="min-w-[8rem] flex-1">
+          <div className="text-[11px] text-ink-dim">Rechnerisch</div>
+          <div className="mt-1 font-mono text-[15px] font-semibold tnum">{eur(expected)} €</div>
+        </div>
+      </div>
+      {counted !== '' && diff != null && (
+        <div
+          className="rounded-2xl bg-bg px-4 py-2.5 text-[12px] font-semibold"
+          style={{ color: diff === 0 ? pal.sage : diff > 0 ? pal.sage : pal.terra }}
+        >
+          {diff === 0
+            ? 'Stimmt genau — es wird nichts gebucht.'
+            : diff > 0
+              ? `${eur(diff)} € mehr in der Kasse — wird als sonstige Einnahme gebucht.`
+              : `${eur(-diff)} € fehlen — wird als sonstige Ausgabe gebucht.`}
+        </div>
+      )}
+      {error && <div className="rounded-2xl bg-terra-bg px-4 py-2.5 text-[12px] text-terra">{error}</div>}
+      <div className="flex gap-2">
+        <Button variant="soft" onClick={() => { setOpen(false); setError(null) }}>
+          Abbrechen
+        </Button>
+        <Button className="flex-1" disabled={busy} onClick={submit}>
+          {busy ? 'Bucht…' : 'Bestand übernehmen'}
+        </Button>
+      </div>
+    </Card>
   )
 }

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Card, Button, PageTitle, Field, Input, Textarea } from '../../components/ui'
 import { cx } from '../../design/calm'
 import { useAuth } from '../../context/AuthContext.jsx'
-import { bookTransaction, transferCash, getGroup } from '../../lib/api.js'
+import { bookTransaction, getGroup } from '../../lib/api.js'
 
 const categories = [
   { key: 'member_payment', label: 'Mitgliedszahlung', type: 'in' },
@@ -18,7 +18,7 @@ const today = new Date().toISOString().slice(0, 10)
 export default function TreasuryNew() {
   const navigate = useNavigate()
   const { mockMode, activeGroupId } = useAuth()
-  const [type, setType] = useState('out') // 'in' | 'out' | 'transfer'
+  const [type, setType] = useState('out') // 'in' | 'out'
   const [cat, setCat] = useState('event_expense')
   const [amount, setAmount] = useState('')
   const [date, setDate] = useState(today)
@@ -26,26 +26,21 @@ export default function TreasuryNew() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
 
-  // Kassenführung des Clubs: 'account' | 'cash' | 'both'.
+  // Kassenführung des Clubs: 'account' | 'cash'. Die Buchung landet immer in
+  // der geführten Kasse — gefragt werden muss danach nie.
   const [mode, setMode] = useState(mockMode ? 'account' : null)
-  const [account, setAccount] = useState('bank')
-  const [direction, setDirection] = useState('to_bank') // Barkasse → Konto
 
   useEffect(() => {
     if (mockMode || !activeGroupId) return
     getGroup(activeGroupId)
-      .then((g) => {
-        const m = g?.treasury_mode || 'account'
-        setMode(m)
-        setAccount(m === 'cash' ? 'cash' : 'bank')
-      })
+      .then((g) => setMode(g?.treasury_mode || 'account'))
       .catch((e) => {
         console.error(e)
         setMode('account')
       })
   }, [mockMode, activeGroupId])
 
-  const both = mode === 'both'
+  const cash = mode === 'cash'
 
   const submit = async (e) => {
     e.preventDefault()
@@ -58,21 +53,14 @@ export default function TreasuryNew() {
     if (mockMode) return navigate('/treasury')
     setBusy(true)
     try {
-      if (type === 'transfer') {
-        await transferCash(activeGroupId, { direction, amount: val, date, description: desc })
-      } else {
-        // Ausgabe negativ, Einnahme positiv.
-        const signed = type === 'out' ? -Math.abs(val) : Math.abs(val)
-        await bookTransaction(activeGroupId, {
-          date,
-          category: cat,
-          amount: signed,
-          description: desc,
-          // Nur bei zwei Kassen ist die Wahl echt; sonst entscheidet die
-          // Club-Einstellung in der Datenbank.
-          account: both ? account : null,
-        })
-      }
+      // Ausgabe negativ, Einnahme positiv.
+      const signed = type === 'out' ? -Math.abs(val) : Math.abs(val)
+      await bookTransaction(activeGroupId, {
+        date,
+        category: cat,
+        amount: signed,
+        description: desc,
+      })
       navigate('/treasury')
     } catch (err) {
       console.error(err)
@@ -83,23 +71,22 @@ export default function TreasuryNew() {
 
   return (
     <div className="space-y-5">
-      <PageTitle kicker="Kassenbuch" title="Manuelle Buchung" />
+      <PageTitle kicker={cash ? 'Barkasse' : 'Kassenbuch'} title="Manuelle Buchung" />
 
       <form className="space-y-4" onSubmit={submit}>
-        {/* Ein / Aus — und bei zwei Kassen zusätzlich die Umbuchung */}
+        {/* Ein / Aus */}
         <Card>
-          <div className={cx('grid gap-2', both ? 'grid-cols-3' : 'grid-cols-2')}>
+          <div className="grid grid-cols-2 gap-2">
             {[
               ['in', 'Einnahme', 'sage'],
               ['out', 'Ausgabe', 'terra'],
-              ...(both ? [['transfer', 'Umbuchung', 'ink']] : []),
             ].map(([k, label, tone]) => (
               <button
                 key={k}
                 type="button"
                 onClick={() => {
                   setType(k)
-                  if (k !== 'transfer') setCat(categories.find((c) => c.type === k).key)
+                  setCat(categories.find((c) => c.type === k).key)
                 }}
                 className={cx(
                   'rounded-2xl py-4 text-[14px] font-semibold transition',
@@ -137,86 +124,43 @@ export default function TreasuryNew() {
             </Field>
           </div>
 
-          {type === 'transfer' ? (
-            <Field label="Richtung" hint="Der Gesamtbestand ändert sich dabei nicht.">
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {[
-                  ['to_bank', 'Barkasse → Konto', 'Bargeld eingezahlt'],
-                  ['to_cash', 'Konto → Barkasse', 'Bargeld abgehoben'],
-                ].map(([k, label, hint]) => (
+          <Field label="Kategorie">
+            <div className="flex flex-wrap gap-2">
+              {categories
+                .filter((c) => c.type === type)
+                .map((c) => (
                   <button
-                    key={k}
+                    key={c.key}
                     type="button"
-                    onClick={() => setDirection(k)}
+                    onClick={() => setCat(c.key)}
                     className={cx(
-                      'rounded-2xl px-4 py-3 text-left transition',
-                      direction === k ? 'bg-ink text-bg' : 'bg-bg text-ink-soft',
+                      'rounded-full px-3.5 py-2 text-[13px] font-semibold transition',
+                      cat === c.key ? 'bg-ink text-bg' : 'bg-bg text-ink-soft',
                     )}
                   >
-                    <div className="text-[13px] font-semibold">{label}</div>
-                    <div className={cx('text-[11px]', direction === k ? 'text-bg/70' : 'text-ink-dim')}>
-                      {hint}
-                    </div>
+                    {c.label}
                   </button>
                 ))}
-              </div>
-            </Field>
-          ) : (
-            <>
-              {both && (
-                <Field label="Kasse">
-                  <div className="flex gap-2">
-                    {[
-                      ['bank', 'Konto'],
-                      ['cash', 'Barkasse'],
-                    ].map(([k, label]) => (
-                      <button
-                        key={k}
-                        type="button"
-                        onClick={() => setAccount(k)}
-                        className={cx(
-                          'rounded-full px-4 py-2 text-[13px] font-semibold transition',
-                          account === k ? 'bg-ink text-bg' : 'bg-bg text-ink-soft',
-                        )}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </Field>
-              )}
-
-              <Field label="Kategorie">
-                <div className="flex flex-wrap gap-2">
-                  {categories
-                    .filter((c) => c.type === type)
-                    .map((c) => (
-                      <button
-                        key={c.key}
-                        type="button"
-                        onClick={() => setCat(c.key)}
-                        className={cx(
-                          'rounded-full px-3.5 py-2 text-[13px] font-semibold transition',
-                          cat === c.key ? 'bg-ink text-bg' : 'bg-bg text-ink-soft',
-                        )}
-                      >
-                        {c.label}
-                      </button>
-                    ))}
-                </div>
-              </Field>
-            </>
-          )}
+            </div>
+          </Field>
 
           <Field label="Beschreibung">
             <Textarea
               rows={3}
-              placeholder={type === 'transfer' ? 'z. B. Kassensturz Juni' : 'z. B. Bahngebühren Juni'}
+              placeholder="z. B. Bahngebühren Juni"
               value={desc}
               onChange={(e) => setDesc(e.target.value)}
             />
           </Field>
         </Card>
+
+        {cash && cat === 'member_payment' && (
+          <p className="rounded-2xl bg-bg p-3 text-[12px] text-ink-soft">
+            Für Zahlungen von Mitgliedern ist „Kassieren" der bessere Weg: dort werden die offenen
+            Posten gleich mit beglichen. Eine Buchung hier landet nur im Kassenbuch und lässt die
+            Schulden stehen.
+          </p>
+        )}
 
         {error && <div className="rounded-2xl bg-terra-bg px-4 py-3 text-[13px] text-terra">{error}</div>}
 
@@ -225,7 +169,7 @@ export default function TreasuryNew() {
             Abbrechen
           </Button>
           <Button type="submit" size="lg" className="flex-1" disabled={busy || mode == null}>
-            {busy ? 'Speichert…' : type === 'transfer' ? 'Umbuchen' : 'Buchung speichern'}
+            {busy ? 'Speichert…' : 'Buchung speichern'}
           </Button>
         </div>
       </form>

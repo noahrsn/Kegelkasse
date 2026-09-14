@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { Card, Button, PageTitle, Avatar, Field, Input, Textarea } from '../components/ui'
 import { Sheet } from '../components/Modal'
-import { cx, eur, eurBalance, balanceColor, balanceLabel, pal, ROLE_LABEL } from '../design/calm'
+import { eur, eurBalance, balanceColor, balanceLabel, pal, ROLE_LABEL } from '../design/calm'
 import { useAuth } from '../context/AuthContext.jsx'
 import {
   getGroup,
@@ -49,8 +49,8 @@ export default function Members() {
   const [sort, setSort] = useState('debt') // debt | name
   const [sel, setSel] = useState(null)
   const [inviteOpen, setInviteOpen] = useState(false)
-  // 'account' | 'cash' | 'both' — entscheidet, ob beim Bezahlen nach der Kasse
-  // gefragt wird.
+  // 'account' | 'cash' — der Club führt genau eine Kasse. Hier entscheidet das
+  // nur noch über die Wortwahl: bar kassiert oder überwiesen.
   const [treasuryMode, setTreasuryMode] = useState('account')
 
   useEffect(() => {
@@ -240,15 +240,12 @@ function MemberSheet({ member, onClose, canManage, mockMode, groupId, treasuryMo
   // Knöpfe im Sheet dauerhaft deaktiviert — auch das Storno.
   const [busy, setBusy] = useState(null)
   const [penaltyOpen, setPenaltyOpen] = useState(false)
-  // Bei zwei Kassen: Wohin fließt das Geld? Wer von Hand als bezahlt markiert,
-  // hat meistens Bargeld in der Hand — Kontozahlungen kommen über den Import.
-  const [account, setAccount] = useState(treasuryMode === 'account' ? 'bank' : 'cash')
+  const cash = treasuryMode === 'cash'
   // Die Aufteilung kommt aus derselben Postenliste, die unten ohnehin steht —
   // keine zweite Abfrage.
   const split = items ? splitOpenDebts(items) : null
 
   const uid = member?.userId ?? null
-  const askAccount = canManage && treasuryMode === 'both'
 
   const loadItems = () => {
     if (!uid || mockMode) return Promise.resolve()
@@ -259,10 +256,6 @@ function MemberSheet({ member, onClose, canManage, mockMode, groupId, treasuryMo
         setItems([])
       })
   }
-
-  useEffect(() => {
-    setAccount(treasuryMode === 'account' ? 'bank' : 'cash')
-  }, [treasuryMode])
 
   useEffect(() => {
     setBusy(null)
@@ -291,15 +284,12 @@ function MemberSheet({ member, onClose, canManage, mockMode, groupId, treasuryMo
     }
   }
 
-  // Die Kasse nur mitschicken, wenn wirklich gewählt wurde. Sonst entscheidet
-  // die Datenbank anhand der Club-Einstellung — die ist verlässlicher als ein
-  // hier womöglich veralteter Modus.
-  const payAccount = () => (askAccount ? account : null)
-
+  // Die Kasse bestimmt die Datenbank aus der Club-Einstellung — verlässlicher
+  // als ein hier womöglich veralteter Modus.
   const markPaid = () =>
-    run('all', () => markMemberPaid(groupId, member.userId, payAccount()), { close: true })
+    run('all', () => markMemberPaid(groupId, member.userId), { close: true })
 
-  const payItem = (debtId) => run(debtId, () => markDebtPaid(debtId, payAccount()))
+  const payItem = (debtId) => run(debtId, () => markDebtPaid(debtId))
 
   const storno = (debtId) => {
     if (!window.confirm('Diesen Posten stornieren?')) return
@@ -381,25 +371,8 @@ function MemberSheet({ member, onClose, canManage, mockMode, groupId, treasuryMo
                 <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-dim">
                   Offene Posten
                 </div>
-                {askAccount && items?.length > 0 && (
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[11px] text-ink-dim">Zahlung in</span>
-                    {[
-                      ['cash', 'bar'],
-                      ['bank', 'Konto'],
-                    ].map(([key, label]) => (
-                      <button
-                        key={key}
-                        onClick={() => setAccount(key)}
-                        className={cx(
-                          'rounded-full px-2.5 py-1 text-[11px] font-semibold transition',
-                          account === key ? 'bg-ink text-bg' : 'bg-card text-ink-soft',
-                        )}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
+                {cash && items?.length > 0 && (
+                  <span className="text-[11px] text-ink-dim">Zahlung geht in die Barkasse</span>
                 )}
               </div>
               {items == null ? (

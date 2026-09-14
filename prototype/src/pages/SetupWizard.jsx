@@ -24,7 +24,7 @@ export default function SetupWizard() {
 
   const [form, setForm] = useState({
     name: '',
-    treasuryMode: 'account', // 'account' | 'cash' | 'both'
+    treasuryMode: 'account', // 'account' = Vereinskonto | 'cash' = Barkasse
     monthlyFee: '5.00',
     openingBalance: '0.00',
     cashOpeningBalance: '0.00',
@@ -193,28 +193,34 @@ function StepClub({ form, set }) {
 
 function StepFinance({ form, set }) {
   const hasBank = form.treasuryMode !== 'cash'
-  const hasCash = form.treasuryMode !== 'account'
+  const hasCash = !hasBank
   return (
     <div>
       <Intro>Lege Beitrag und Zahlungsdaten fest. Alles optional und später änderbar.</Intro>
       <Card className="space-y-4">
-        <Field label="Wo liegt das Geld?" hint="Später jederzeit änderbar.">
-          <div className="grid grid-cols-3 gap-2">
+        <Field label="Wie führt ihr eure Kasse?" hint="Später jederzeit änderbar.">
+          <div className="grid gap-2 sm:grid-cols-2">
             {[
-              ['account', 'Konto'],
-              ['cash', 'Barkasse'],
-              ['both', 'Beides'],
-            ].map(([key, label]) => (
+              ['account', '🏦', 'Vereinskonto', 'Mitglieder überweisen, Zahlungen kommen über den Kontoauszug herein.'],
+              ['cash', '💰', 'Barkasse', 'Das Geld liegt in der Kassenbox — kassiert wird beim Kegelabend.'],
+            ].map(([key, icon, label, desc]) => (
               <button
                 key={key}
                 type="button"
                 onClick={() => set('treasuryMode')(key)}
+                aria-pressed={form.treasuryMode === key}
                 className={cx(
-                  'rounded-2xl py-3 text-[13px] font-semibold transition',
-                  form.treasuryMode === key ? 'bg-ink text-bg' : 'bg-bg text-ink-soft',
+                  'rounded-2xl border p-4 text-left transition',
+                  form.treasuryMode === key
+                    ? 'border-ink bg-bg'
+                    : 'border-card-edge bg-card hover:bg-bg',
                 )}
               >
-                {label}
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">{icon}</span>
+                  <span className="text-[14px] font-semibold">{label}</span>
+                </div>
+                <div className="mt-1 text-[12px] text-ink-soft">{desc}</div>
               </button>
             ))}
           </div>
@@ -223,16 +229,13 @@ function StepFinance({ form, set }) {
           <Field label="Monatsbeitrag (€)">
             <Input type="number" step="0.5" value={form.monthlyFee} onChange={set('monthlyFee')} />
           </Field>
-          {hasBank && (
-            <Field label={hasCash ? 'Startsaldo Konto (€)' : 'Eröffnungssaldo (€)'}>
-              <Input type="number" value={form.openingBalance} onChange={set('openingBalance')} />
-            </Field>
-          )}
-          {hasCash && (
-            <Field label={hasBank ? 'Startbestand Barkasse (€)' : 'Anfangsbestand (€)'}>
-              <Input type="number" value={form.cashOpeningBalance} onChange={set('cashOpeningBalance')} />
-            </Field>
-          )}
+          <Field label={hasCash ? 'Startbestand der Kasse (€)' : 'Eröffnungssaldo (€)'}>
+            <Input
+              type="number"
+              value={hasCash ? form.cashOpeningBalance : form.openingBalance}
+              onChange={set(hasCash ? 'cashOpeningBalance' : 'openingBalance')}
+            />
+          </Field>
         </div>
         {hasBank && (
           <Field label="IBAN">

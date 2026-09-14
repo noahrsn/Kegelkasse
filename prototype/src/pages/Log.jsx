@@ -12,6 +12,8 @@ const ACTION = {
   payment_received: { tag: 'Kasse', tone: 'sage', verb: 'Zahlung verbucht' },
   penalty_booked: { tag: 'Strafe', tone: 'terra', verb: 'buchte eine Strafe' },
   transaction_booked: { tag: 'Kasse', tone: 'navy', verb: 'buchte eine Transaktion' },
+  cash_collected: { tag: 'Barkasse', tone: 'sage', verb: 'kassierte eine Runde ab' },
+  cash_counted: { tag: 'Barkasse', tone: 'navy', verb: 'machte Kassensturz' },
   debt_cancelled: { tag: 'Storno', tone: 'amber', verb: 'stornierte einen Posten' },
   rsvp_response: { tag: 'Termin', tone: 'navy', verb: 'meldete sich zu einem Termin' },
   rsvp_late: { tag: 'Absage', tone: 'terra', verb: 'sagte verspätet ab' },

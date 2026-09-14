@@ -13,6 +13,7 @@ import {
   listOpenDebts,
   splitOpenDebts,
   getImportStatus,
+  getCollectStatus,
   getPolls,
   castVote,
   getClubAwards,
@@ -123,6 +124,8 @@ export default function Dashboard() {
   const canManage = role === 'admin' || role === 'kassenwart'
   const [vm, setVm] = useState(() => (mockMode ? buildMock() : null))
   const [importStatus, setImportStatus] = useState(null)
+  // Barkasse: was steht zum Kassieren an? (Konto-Clubs bekommen open_total 0.)
+  const [collect, setCollect] = useState(null)
   const [polls, setPolls] = useState(() => (mockMode ? pollSeed.map(normalizeMockPoll) : []))
   const [justVotedId, setJustVotedId] = useState(null)
   const [awards, setAwards] = useState(() => (mockMode ? mockAwards : null))
@@ -190,6 +193,9 @@ export default function Dashboard() {
     let alive = true
     getImportStatus(activeGroupId)
       .then((s) => alive && setImportStatus(s))
+      .catch((e) => console.error(e))
+    getCollectStatus(activeGroupId)
+      .then((s) => alive && setCollect(s))
       .catch((e) => console.error(e))
     return () => {
       alive = false
@@ -331,6 +337,42 @@ export default function Dashboard() {
           </h1>
         </div>
       </header>
+
+      {/* Barkasse: Geld steht aus und muss eingesammelt werden (nur Kassenwart/
+          Admin). Die Karte tritt an die Stelle des Import-Banners — ohne Konto
+          gibt es nichts zu importieren, aber sehr wohl etwas zu kassieren. */}
+      {collect?.open_total > 0 && (
+        <Card
+          tone={collect.overdue_members > 0 ? 'amber' : undefined}
+          onClick={() => navigate('/treasury/collect')}
+          className="flex cursor-pointer items-center gap-4 animate-rise transition hover:brightness-[0.99]"
+        >
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-bg/70 text-xl">
+            💰
+          </span>
+          <div className="min-w-0 flex-1">
+            <div
+              className="text-[13px] font-semibold"
+              style={{ color: collect.overdue_members > 0 ? pal.amber : undefined }}
+            >
+              {eur(collect.open_total)} € offen bei {collect.open_members} Mitglied
+              {collect.open_members === 1 ? '' : 'ern'}
+            </div>
+            <div className="mt-0.5 text-[12px] text-ink-soft">
+              {collect.overdue_members > 0
+                ? `${eur(collect.overdue_total)} € davon überfällig${
+                    collect.overdue_due
+                      ? ` seit ${new Date(collect.overdue_due).toLocaleDateString('de-DE')}`
+                      : ''
+                  }. Einmal durch die Runde und alles abhaken.`
+                : 'Einmal durch die Runde: Zahlungen abhaken und in einem Rutsch buchen.'}
+            </div>
+          </div>
+          <Badge tone={collect.overdue_members > 0 ? 'amber' : 'sage'} className="bg-bg/70">
+            Kassieren →
+          </Badge>
+        </Card>
+      )}
 
       {/* Stichtag erreicht — Kontoauszug-Import nötig (nur Kassenwart/Admin) */}
       {importStatus?.needs_import && (
