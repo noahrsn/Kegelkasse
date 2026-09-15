@@ -35,6 +35,12 @@ const METRICS = [
     zeroNote: 'ohne verlorenes Spiel',
   },
   {
+    key: 'goals', label: 'Tore', color: pal.navy, zeroCollapse: true,
+    format: (v) => String(v),
+    note: 'Tore aus dem Fußball-Spiel — ohne Gastkegler. Wer oben steht, ist Torschützenkönig.',
+    zeroNote: 'ohne Tor',
+  },
+  {
     key: 'late', label: 'Nachzügler', color: pal.terra, zeroCollapse: true,
     format: (v) => `${v} ×`, note: 'Wie oft jemand als Nachzügler erfasst wurde.',
     zeroNote: 'nie zu spät',

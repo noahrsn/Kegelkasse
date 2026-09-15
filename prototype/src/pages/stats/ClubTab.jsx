@@ -17,6 +17,7 @@ const METRICS = [
   { key: 'participants', label: 'Teilnehmer', color: pal.navy, format: (v) => String(v) },
   { key: 'rinnen', label: 'Pudel', color: pal.sage, format: (v) => String(v) },
   { key: 'games', label: 'Spiele', color: pal.amber, format: (v) => String(v) },
+  { key: 'goals', label: 'Tore', color: pal.navy, format: (v) => String(v) },
 ]
 
 function fmtDate(d) {
@@ -171,6 +172,7 @@ export default function ClubTab({ groupId, range, mockMode }) {
           <RecordRow icon="💸" label="Teuerster Abend" rec={ov.records?.costliest} unit="€" />
           <RecordRow icon="👥" label="Vollster Abend" rec={ov.records?.fullest} unit="Leute" />
           <RecordRow icon="🌊" label="Meiste Pudel" rec={ov.records?.rinnen} unit="" />
+          <RecordRow icon="⚽" label="Meiste Tore" rec={ov.records?.goals} unit="" />
         </div>
       </Card>
 

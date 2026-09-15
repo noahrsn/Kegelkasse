@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useLocation, useParams } from 'react-router-dom'
 import { Card, Button, Avatar, Badge, Input, Field } from '../../components/ui'
 import { Sheet } from '../../components/Modal'
-import { cx, eur, pal } from '../../design/calm'
+import { cx, eur, pal, creamLight, navyInk } from '../../design/calm'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { listPenalties, listMembers, getSession, saveSession, deleteSession } from '../../lib/api.js'
 import { members as mockMembers, penalties as mockPenalties } from '../../mock/data'
@@ -107,6 +107,11 @@ export default function SessionRecord() {
   const [teamLosers, setTeamLosers] = useState([]) // roster-ids
   const [teamAmount, setTeamAmount] = useState('')
   const [progressive, setProgressive] = useState({ active: false, amount: 0.25 })
+  // Fußball: das erste Spiel ohne Geld. Solange es läuft, bekommt jedes Tor
+  // einen Schützen aus der Runde. `active` ist reiner UI-Zustand — gezählt wird
+  // in roster[].goals, und das reist über den normalen Autosave mit.
+  const [football, setFootball] = useState({ active: false })
+  const [scorerOpen, setScorerOpen] = useState(false)
 
   // Auto-Speichern (Verlustschutz): jede Änderung wird debounced als Draft in die
   // DB geschrieben. savedId ist die persistierte Draft-ID (anfangs die Route-ID,
@@ -164,6 +169,7 @@ export default function SessionRecord() {
             early: p.is_early_leave,
             earlyAvg: p.is_early_leave ? Number(p.avg_amount) || 0 : 0,
             earlyAtSeq: null,
+            goals: Number(p.goals) || 0,
             entries: (p.penalties || []).flatMap((sp) =>
               Array.from({ length: sp.count }, () => ({
                 id: entrySeq++,
@@ -306,6 +312,7 @@ export default function SessionRecord() {
         early: false,
         earlyAtSeq: null,
         earlyAvg: 0,
+        goals: 0,
         entries: [],
       },
     ])
@@ -404,6 +411,30 @@ export default function SessionRecord() {
       }),
     )
   }
+  /* ── Fußball ──────────────────────────────────────────────────────────────
+   * Ein Tor ist kein Geld, sondern ein Zähler je Teilnehmer. Deshalb kein
+   * Entry und keine Katalogposition: das Tor soll in der Endsumme des Abends
+   * nichts verändern, aber in der Statistik zählen. */
+  const startFootball = () => {
+    setFootball({ active: true })
+    setGamesOpen(false)
+  }
+  const endFootball = () => {
+    setFootball({ active: false })
+    setScorerOpen(false)
+    setGamesOpen(false)
+  }
+  const addGoal = (idx, delta = 1) =>
+    setRoster((r) =>
+      r.map((p, i) => (i === idx ? { ...p, goals: Math.max(0, (p.goals || 0) + delta) } : p)),
+    )
+  const goalsTotal = roster.reduce((a, p) => a + (p.goals || 0), 0)
+  // Wer gerade vorn liegt — die Zahl, die beim Spielen interessiert.
+  const topScorer = roster.reduce(
+    (best, p) => ((p.goals || 0) > (best?.goals || 0) ? p : best),
+    null,
+  )
+
   const advanceProgressive = () => setProgressive((g) => ({ ...g, amount: round2(g.amount + 0.25) }))
   const progBekommen = () => {
     applyProgressive([active], progressive.amount)
@@ -428,6 +459,7 @@ export default function SessionRecord() {
       is_late: !!p.late,
       is_early_leave: !!p.early,
       avg_amount: p.late ? p.lateAvg || 0 : p.early ? earlyAvgLive(p) : null,
+      goals: p.goals || 0,
       penalties: aggregatePenalties(p.entries),
     }))
 
@@ -522,6 +554,28 @@ export default function SessionRecord() {
       console.error(e)
     }
   }, [mockMode, progKey, progressive])
+
+  // Ob Fußball läuft, ist wie beim 3,50-€-Spiel reiner UI-Fortschritt: die Tore
+  // selbst stecken im (server-)gespeicherten Roster.
+  const fbKey = savedId ? `kegel:football:${savedId}` : null
+  useEffect(() => {
+    if (mockMode || !fbKey) return
+    try {
+      const raw = localStorage.getItem(fbKey)
+      if (raw) setFootball(JSON.parse(raw))
+    } catch (e) {
+      console.error(e)
+    }
+  }, [mockMode, fbKey])
+  useEffect(() => {
+    if (mockMode || !fbKey) return
+    try {
+      if (football.active) localStorage.setItem(fbKey, JSON.stringify(football))
+      else localStorage.removeItem(fbKey)
+    } catch (e) {
+      console.error(e)
+    }
+  }, [mockMode, fbKey, football])
 
   // Speichern / Einreichen.
   const persist = async (status) => {
@@ -635,6 +689,41 @@ export default function SessionRecord() {
       </button>
       )}
 
+      {isEditor && football.active && (
+        <div className="overflow-hidden rounded-2xl border border-navy bg-navy-surface text-white">
+          <button
+            type="button"
+            onClick={() => setScorerOpen(true)}
+            className="flex w-full items-center gap-3 px-4 py-3 text-left transition active:scale-[0.99]"
+          >
+            <span className="text-2xl">⚽</span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[14px] font-semibold">
+                Fußball läuft · {goalsTotal} {goalsTotal === 1 ? 'Tor' : 'Tore'}
+              </span>
+              <span className="block truncate text-[12px] opacity-75">
+                {topScorer && topScorer.goals > 0
+                  ? `Vorn: ${topScorer.name} (${topScorer.goals})`
+                  : 'Tippen und Torschützen eintragen'}
+              </span>
+            </span>
+            <span
+              className="shrink-0 rounded-full px-4 py-2 text-[13px] font-semibold"
+              style={{ background: creamLight, color: navyInk }}
+            >
+              + Tor
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={endFootball}
+            className="w-full border-t border-white/15 py-1.5 text-[11px] font-semibold opacity-70"
+          >
+            Spiel beenden
+          </button>
+        </div>
+      )}
+
       {isEditor && progressive.active && (
         <div className="flex items-center justify-between gap-3 rounded-2xl border border-amber bg-amber-bg px-4 py-2.5">
           <span className="text-[12px] text-ink-soft">
@@ -681,6 +770,7 @@ export default function SessionRecord() {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="truncate font-semibold">{p.name}</span>
+                  {p.goals > 0 && <Badge tone="navy">⚽ {p.goals}</Badge>}
                   {p.late && <Badge tone="amber">Nachzügler</Badge>}
                   {p.early && <Badge tone="amber">Geht früher</Badge>}
                   {p.isGuest && <Badge tone="cream">Gast</Badge>}
@@ -916,6 +1006,70 @@ export default function SessionRecord() {
         </div>
       </Sheet>
 
+      {/* Torschützen */}
+      <Sheet
+        open={scorerOpen}
+        onClose={() => setScorerOpen(false)}
+        title="Wer hat getroffen?"
+        subtitle={`${goalsTotal} ${goalsTotal === 1 ? 'Tor' : 'Tore'} in diesem Spiel`}
+        footer={
+          <Button className="w-full" onClick={() => setScorerOpen(false)}>
+            Fertig
+          </Button>
+        }
+      >
+        <div className="space-y-2">
+          {roster.map((p, i) => (
+            <div
+              key={p.id}
+              className={cx(
+                'flex items-center gap-3 rounded-2xl border p-2.5',
+                p.goals > 0 ? 'border-navy bg-navy-bg' : 'border-card-edge',
+              )}
+            >
+              <button
+                type="button"
+                onClick={() => addGoal(i)}
+                className="flex min-w-0 flex-1 items-center gap-3 text-left"
+              >
+                <Avatar name={p.name} size={36} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-semibold">{p.name}</span>
+                  <span className="block text-[11px] text-ink-dim">
+                    {p.goals > 0
+                      ? `${p.goals} ${p.goals === 1 ? 'Tor' : 'Tore'}`
+                      : p.early
+                        ? 'Schon gegangen'
+                        : 'Noch kein Tor'}
+                  </span>
+                </span>
+              </button>
+              {p.goals > 0 && (
+                <button
+                  type="button"
+                  onClick={() => addGoal(i, -1)}
+                  aria-label={`Ein Tor von ${p.name} zurücknehmen`}
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-card text-[15px] font-bold text-ink-soft"
+                >
+                  −
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => addGoal(i)}
+                aria-label={`Tor für ${p.name}`}
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-ink text-[15px] font-bold text-bg transition active:scale-95"
+              >
+                +
+              </button>
+            </div>
+          ))}
+        </div>
+        <p className="mt-3 text-[12px] text-ink-dim">
+          Tore kosten nichts — sie zählen nur für die Statistik und den Torschützenkönig.
+        </p>
+      </Sheet>
+
       {/* Spiele-Menü */}
       <Sheet
         open={gamesOpen}
@@ -946,6 +1100,32 @@ export default function SessionRecord() {
               setGameForm('teams')
             }}
           />
+          {football.active ? (
+            <div className="rounded-2xl border border-navy bg-navy-bg p-3">
+              <div className="flex items-center gap-3">
+                <span className="grid h-10 w-10 place-items-center rounded-xl bg-card text-lg">⚽</span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[14px] font-semibold">Fußball läuft</div>
+                  <div className="text-[12px] text-ink-soft">
+                    {goalsTotal} {goalsTotal === 1 ? 'Tor' : 'Tore'} erfasst
+                  </div>
+                </div>
+                <Button variant="soft" onClick={endFootball}>
+                  Beenden
+                </Button>
+              </div>
+              <p className="mt-2 text-[11px] text-ink-dim">
+                Torschützen trägst du über das Banner oben in der Liste ein.
+              </p>
+            </div>
+          ) : (
+            <GameOption
+              icon="⚽"
+              title="Fußball"
+              desc="Starten · Torschützen zählen (ohne Strafe)"
+              onClick={startFootball}
+            />
+          )}
           {progressive.active ? (
             <div className="rounded-2xl border border-amber bg-amber-bg p-3">
               <div className="flex items-center gap-3">

@@ -1184,6 +1184,51 @@ Kassenwart muss mitkommen.
 
 ---
 
+## Phase 14 — Fußball: Torschützen zählen ✅
+
+**Ziel:** Ein Spiel, bei dem es nicht ums Geld geht. „Fußball" wird im
+Kegelabend gestartet; solange es läuft, bekommt jedes Tor einen Schützen aus der
+Runde. Daraus wird eine eigene Kennzahl — bis hin zum Torschützenkönig.
+
+> **Status — umgesetzt ✅:** Migration `036_football_goals.sql` + Frontend
+> (Kegelabend erfassen, Einreichung prüfen, Statistik).
+
+### Warum keine Katalogposition
+
+Die drei bisherigen Spiele (Einzel, 2 Teams, 3,50 €) sind Schnell-**Strafen**:
+sie tragen einen Betrag und laufen als Katalogposition durch Erfassung,
+Genehmigung und Kassenbuch. Ein Tor kostet nichts. Es ist deshalb ein Zähler je
+Teilnehmer — `session_participants.goals` — und verändert die Endsumme eines
+Abends um keinen Cent. Der Zähler reist ohne Sonderbehandlung durch den
+bestehenden Speicherweg: `save_session` schreibt die Teilnehmerliste bei jedem
+Autosave neu und nimmt `goals` einfach mit.
+
+### Erfassung
+
+- **Starten** im Spiele-Menü („⚽ Fußball"). Ob das Spiel läuft, ist reiner
+  UI-Zustand und liegt wie beim 3,50-€-Spiel im `localStorage` je Entwurf.
+- **Banner** über der Teilnehmerliste, solange gespielt wird: es zeigt den
+  Spielstand samt Führendem, und der ganze Streifen ist der Knopf — beim Kegeln
+  zählt Trefferfläche, nicht Feinmotorik.
+- **Torschützen-Sheet:** alle Anwesenden mit ihrem Stand, „+" zählt hoch, „−"
+  nimmt zurück. Es bleibt offen, weil Tore selten einzeln fallen.
+- **Gäste** dürfen treffen (sie stehen ja mit auf der Bahn), tauchen aber wie
+  überall sonst nicht in der Statistik auf.
+- In der Teilnehmerkarte und in der Einreichungsprüfung steht ⚽ n **neben** der
+  Summe, nie darin.
+
+### Statistik
+
+- **Rangliste „Tore"** (`stats_leaderboard`, Kennzahl `goals`) — wer oben steht,
+  ist Torschützenkönig.
+- **Titel „Torschützenkönig"** (`awards_compute`, Ehre statt Gag) — teilt sich
+  wie jeder Titel bis zu drei Köpfe und wird monatlich mit-geschnappschusst.
+- **Mitglied:** Tore als Kennzahl und im Clubvergleich (`stats_member`).
+- **Club:** Tore in der Verlaufskurve (`stats_timeline`), als Summe im Zeitraum
+  und als Rekord-Abend „Meiste Tore" (`stats_overview`).
+
+---
+
 ## Reihenfolge der Umsetzung
 
 ```

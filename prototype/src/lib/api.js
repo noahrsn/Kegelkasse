@@ -220,7 +220,7 @@ export async function getSession(sessionId) {
        group:groups(charge_absent_avg, round_up_penalties),
        recorder:recorded_by(first_name, last_name),
        participants:session_participants(
-         id, user_id, guest_name, is_guest, is_late, is_early_leave, avg_amount, guest_paid,
+         id, user_id, guest_name, is_guest, is_late, is_early_leave, avg_amount, guest_paid, goals,
          profiles(first_name, last_name),
          penalties:session_penalties(id, catalog_id, count, amount,
            penalties_catalog(name, icon))

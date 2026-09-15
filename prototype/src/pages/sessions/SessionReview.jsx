@@ -45,6 +45,7 @@ function fromDb(s) {
       paid: p.guest_paid,
       late: p.is_late,
       early: p.is_early_leave,
+      goals: Number(p.goals) || 0,
       penaltySum,
       avgCharge,
       charge,
@@ -70,6 +71,7 @@ function fromDb(s) {
   }))
   const showAbsent = approved && chargeAbsent && absentList.length > 0 && absentAvg > 0
 
+  const goalsTotal = participants.reduce((a, p) => a + p.goals, 0)
   const participantsTotal = participants.reduce((a, p) => a + p.charge, 0)
   const absentTotal = showAbsent ? absentAvg * absentList.length : 0
 
@@ -79,6 +81,7 @@ function fromDb(s) {
     status: s.status,
     recordedBy: fullName(s.recorder),
     participants,
+    goalsTotal,
     absentList,
     absentAvg,
     showAbsent,
@@ -192,6 +195,11 @@ export default function SessionReview() {
         <div className="text-right">
           <div className="font-display text-3xl font-medium tnum">{eur(detail.total)} €</div>
           <div className="text-[11px] text-ink-soft">Gesamtsumme</div>
+          {detail.goalsTotal > 0 && (
+            <div className="mt-1 text-[11px] text-ink-soft">
+              ⚽ {detail.goalsTotal} {detail.goalsTotal === 1 ? 'Tor' : 'Tore'}
+            </div>
+          )}
         </div>
       </Card>
 
@@ -211,6 +219,7 @@ export default function SessionReview() {
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <span className="font-semibold">{p.name}</span>
+                    {p.goals > 0 && <Badge tone="navy">⚽ {p.goals}</Badge>}
                     {p.late && <Badge tone="amber">Nachzügler</Badge>}
                     {p.early && <Badge tone="amber">Geht früher</Badge>}
                     {p.isGuest && <Badge tone="sage">{p.paid ? 'bar bezahlt' : 'Gast'}</Badge>}

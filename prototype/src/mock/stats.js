@@ -16,6 +16,7 @@ export const statsOverview = {
   penalty_per_head: 8.34,
   rinnen: 412,
   games: 63,
+  goals: 87,
   income: 2860.0,
   expense: 1740.5,
   lane_expense: 990.0,
@@ -24,30 +25,31 @@ export const statsOverview = {
     costliest: { session_id: 's1', date: '2026-04-18', value: 138.6 },
     fullest: { session_id: 's2', date: '2026-02-21', value: 11 },
     rinnen: { session_id: 's1', date: '2026-04-18', value: 47 },
+    goals: { session_id: 's2', date: '2026-02-21', value: 12 },
   },
 }
 
 /* Zwölf Monate bis heute — als Funktion, damit die Beschriftung mitwandert. */
 export function statsTimeline() {
   const vals = [
-    [1, 62.5, 7, 21, 3],
-    [2, 118.0, 16, 44, 6],
-    [1, 74.5, 9, 28, 4],
-    [2, 141.5, 18, 51, 8],
-    [1, 68.0, 8, 24, 3],
-    [2, 132.0, 17, 48, 7],
-    [1, 88.5, 9, 31, 5],
-    [2, 138.6, 19, 47, 9],
-    [1, 79.0, 8, 26, 4],
-    [2, 126.5, 16, 42, 7],
-    [1, 92.0, 9, 33, 5],
-    [2, 63.4, 8, 17, 2],
+    [1, 62.5, 7, 21, 3, 4],
+    [2, 118.0, 16, 44, 6, 9],
+    [1, 74.5, 9, 28, 4, 5],
+    [2, 141.5, 18, 51, 8, 12],
+    [1, 68.0, 8, 24, 3, 6],
+    [2, 132.0, 17, 48, 7, 11],
+    [1, 88.5, 9, 31, 5, 7],
+    [2, 138.6, 19, 47, 9, 10],
+    [1, 79.0, 8, 26, 4, 5],
+    [2, 126.5, 16, 42, 7, 8],
+    [1, 92.0, 9, 33, 5, 6],
+    [2, 63.4, 8, 17, 2, 4],
   ]
   const now = new Date()
-  return vals.map(([sessions, penalties, participants, rinnen, games], i) => {
+  return vals.map(([sessions, penalties, participants, rinnen, games, goals], i) => {
     const d = new Date(now.getFullYear(), now.getMonth() - 11 + i, 1)
     const m = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-    return { m, label: m, sessions, penalties, participants, rinnen, games }
+    return { m, label: m, sessions, penalties, participants, rinnen, games, goals }
   })
 }
 
@@ -101,6 +103,13 @@ export const statsLeaderboards = {
     row(3, 'u3', 'Karin Voss', 9, 8, 14, 18),
     row(4, 'u1', 'Noah Roosen', 7, 10, 17, 18),
   ],
+  goals: [
+    row(1, 'u2', 'Hans Meier', 23, 18, 15, 18),
+    row(2, 'u4', 'Martin Haas', 19, 21, 18, 18),
+    row(3, 'u1', 'Noah Roosen', 14, 11, 17, 18),
+    row(4, 'u6', 'Tobias Brandt', 9, 12, 16, 18),
+    row(5, 'u3', 'Karin Voss', 5, 3, 14, 18),
+  ],
   late: [
     row(1, 'u9', 'Jan Fischer', 6, 4, 9, 18),
     row(2, 'u5', 'Petra Lang', 3, 5, 12, 18),
@@ -142,6 +151,12 @@ export const statsAwards = [
     hint: 'Niedrigste Strafen je Abend', value: '3,25 € je Abend',
     holders: [{ user_id: 'u6', holder: 'Tobias Brandt', avatar_url: null }],
     runner_up: { holder: 'Anna Schulz', user_id: 'u8' }, reason: null, tied: 1,
+  },
+  {
+    type: 'Torschützenkönig', icon: '⚽', tone: 'navy', kind: 'honor', metric: 'goals',
+    hint: 'Meiste Tore im Fußball', value: '23 Tore',
+    holders: [{ user_id: 'u2', holder: 'Hans Meier', avatar_url: null }],
+    runner_up: { holder: 'Martin Haas', user_id: 'u4' }, reason: null, tied: 1,
   },
   {
     type: 'Pudelkönig', icon: '👑', tone: 'terra', kind: 'fun', metric: 'rinnen',
@@ -201,6 +216,7 @@ export function statsMember(userId = 'u1') {
     penalty_per_session: Math.round(((lb?.value ?? 96) / Math.max(1, attended)) * 100) / 100,
     rinnen: rin?.value ?? 28,
     games: statsLeaderboards.games.find((r) => r.user_id === m.id)?.value ?? 4,
+    goals: statsLeaderboards.goals.find((r) => r.user_id === m.id)?.value ?? 6,
     late: statsLeaderboards.late.find((r) => r.user_id === m.id)?.value ?? 0,
     early: 0,
     late_fee_count: statsLeaderboards.late_fees.find((r) => r.user_id === m.id)?.value ?? 0,
@@ -209,7 +225,10 @@ export function statsMember(userId = 'u1') {
     // separat in credit — ein negativer Saldo im Mock ist genau das.
     open_debt: Math.max(0, m.debt),
     credit: Math.max(0, -m.debt),
-    club_avg: { penalty_total: 107.04, penalty_per_session: 7.42, attended: 14.4, rinnen: 34.3 },
+    club_avg: {
+      penalty_total: 107.04, penalty_per_session: 7.42, attended: 14.4,
+      rinnen: 34.3, goals: 7.3,
+    },
     timeline: statsTimeline().map((t) => ({
       m: t.m,
       label: t.label,
