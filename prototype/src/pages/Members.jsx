@@ -3,8 +3,9 @@ import { Link } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { Card, Button, PageTitle, Avatar, Field, Input, Textarea } from '../components/ui'
 import { Sheet } from '../components/Modal'
-import { eur, eurBalance, balanceColor, balanceLabel, pal, ROLE_LABEL } from '../design/calm'
+import { eur, eurBalance, balanceColor, balanceLabel, pal } from '../design/calm'
 import { useAuth } from '../context/AuthContext.jsx'
+import { hasRole, roleLabels, CASH } from '../lib/roles.js'
 import {
   getGroup,
   listMembers,
@@ -32,15 +33,15 @@ function fmtDate(d) {
 }
 
 export default function Members() {
-  const { mockMode, activeGroupId, role } = useAuth()
-  const canManage = role === 'admin' || role === 'kassenwart'
+  const { mockMode, activeGroupId, roles } = useAuth()
+  const canManage = hasRole(roles, CASH)
 
   const [list, setList] = useState(
     mockMode
       ? seed.map((m) => ({
           userId: m.id,
           name: m.name,
-          role: m.role,
+          roles: m.roles ?? [m.role],
           debt: m.debt,
           iban: m.iban,
         }))
@@ -78,7 +79,7 @@ export default function Members() {
           return {
             userId: m.userId,
             name: m.name,
-            role: m.role,
+            roles: m.roles,
             iban: m.iban,
             isPlaceholder: m.isPlaceholder,
             isInactive: m.isInactive,
@@ -216,7 +217,7 @@ function MemberRow({ member: m, onClick }) {
       <div className="min-w-0 flex-1">
         <div className="truncate text-[15px] font-semibold leading-snug">{m.name}</div>
         <div className="truncate text-[12px] leading-snug text-ink-dim">
-          {ROLE_LABEL[m.role]}
+          {roleLabels(m.roles).join(' · ')}
           {m.isPlaceholder && <span className="text-amber"> · Nicht registriert</span>}
           {m.isInactive && <span className="text-ink-dim"> · Inaktiv</span>}
         </div>
@@ -303,7 +304,7 @@ function MemberSheet({ member, onClose, canManage, mockMode, groupId, treasuryMo
         onClose={onClose}
         title={member.name}
         subtitle={
-          ROLE_LABEL[member.role] +
+          roleLabels(member.roles).join(' · ') +
           (member.isPlaceholder ? ' · Nicht registriert' : '') +
           (member.isInactive ? ' · Inaktiv' : '')
         }

@@ -4,10 +4,11 @@ import { Card, Button, Avatar, Badge, PageTitle, Textarea, Field } from '../../c
 import { Sheet } from '../../components/Modal'
 import { cx, eur } from '../../design/calm'
 import { useAuth } from '../../context/AuthContext.jsx'
+import { hasRole, CASH } from '../../lib/roles.js'
 import { getSession, approveSession, rejectSession, reopenSession } from '../../lib/api.js'
 import { sessionDetail as mockDetail } from '../../mock/data'
 
-const APPROVE_ROLES = ['admin', 'kassenwart']
+// Rechte siehe lib/roles.js
 
 function fmtDate(d) {
   return new Date(d).toLocaleDateString('de-DE', { day: '2-digit', month: 'long', year: 'numeric' })
@@ -92,8 +93,8 @@ function fromDb(s) {
 export default function SessionReview() {
   const navigate = useNavigate()
   const { id } = useParams()
-  const { mockMode, role } = useAuth()
-  const canApprove = mockMode || APPROVE_ROLES.includes(role)
+  const { mockMode, roles } = useAuth()
+  const canApprove = mockMode || hasRole(roles, CASH)
 
   const [detail, setDetail] = useState(mockMode ? mockDetail : null)
   const [open, setOpen] = useState(() => new Set())

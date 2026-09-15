@@ -78,12 +78,8 @@ export function balanceLabel(n) {
   return v > 0 ? 'Offene Schulden' : 'Keine offenen Posten'
 }
 
-export const ROLE_LABEL = {
-  admin: 'Admin',
-  präsident: 'Präsident',
-  kassenwart: 'Kassenwart',
-  mitglied: 'Mitglied',
-}
+// Rollenbeschriftungen liegen bei der Rollenlogik, damit es nur eine Liste gibt.
+export { ROLE_LABEL } from '../lib/roles.js'
 
 // Tailwind-Klassen für farbige Chips/Badges
 export const tone = {

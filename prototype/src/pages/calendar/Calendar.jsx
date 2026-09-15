@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Card, Button, Badge, PageTitle, Avatar, Empty } from '../../components/ui'
 import { cx, pal } from '../../design/calm'
 import { useAuth } from '../../context/AuthContext.jsx'
+import { hasRole, BOARD } from '../../lib/roles.js'
 import { listEvents, listBirthdays } from '../../lib/api.js'
 import { birthdaysWithin } from '../../lib/birthday.js'
 import { events as mockEvents } from '../../mock/data'
@@ -53,8 +54,8 @@ function withPast(e) {
 
 export default function Calendar() {
   const navigate = useNavigate()
-  const { mockMode, activeGroupId, role } = useAuth()
-  const canManage = role === 'admin' || role === 'präsident'
+  const { mockMode, activeGroupId, roles } = useAuth()
+  const canManage = hasRole(roles, BOARD)
 
   const [list, setList] = useState(mockMode ? mockEvents.map(normalizeMock) : null)
   const [birthdays, setBirthdays] = useState([])

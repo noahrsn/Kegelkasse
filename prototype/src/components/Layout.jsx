@@ -12,13 +12,7 @@ import {
   markAllNotificationsRead,
 } from '../lib/api.js'
 import { notifications as mockNotifications } from '../mock/data'
-
-const roleLabels = {
-  admin: 'Admin',
-  präsident: 'Präsident',
-  kassenwart: 'Kassenwart',
-  mitglied: 'Mitglied',
-}
+import { roleLabels } from '../lib/roles.js'
 
 /* Primärnavigation (Desktop-Sidebar + Mobile Bottom-Bar) */
 const primary = [
@@ -297,7 +291,7 @@ function TopbarAvatar() {
 function UserCard() {
   const [open, setOpen] = useState(false)
   const navigate = useNavigate()
-  const { profile, role, signOut } = useAuth()
+  const { profile, roles, signOut } = useAuth()
 
   async function logout() {
     setOpen(false)
@@ -341,7 +335,7 @@ function UserCard() {
         <Avatar name={profile?.name || '—'} size={36} />
         <div className="flex-1 min-w-0">
           <div className="truncate text-[13px] font-semibold leading-tight">{profile?.name || '—'}</div>
-          <div className="text-[10px] font-semibold text-sage">{roleLabels[role] || 'Mitglied'}</div>
+          <div className="truncate text-[10px] font-semibold text-sage">{roleLabels(roles).join(' · ')}</div>
         </div>
         <span className="text-ink-dim">⋯</span>
       </button>

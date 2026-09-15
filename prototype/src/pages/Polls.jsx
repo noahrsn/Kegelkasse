@@ -4,6 +4,7 @@ import { Card, Button, Badge, PageTitle, Empty, Avatar } from '../components/ui'
 import { Sheet } from '../components/Modal'
 import { cx, pal } from '../design/calm'
 import { useAuth } from '../context/AuthContext.jsx'
+import { hasRole, BOARD } from '../lib/roles.js'
 import { getPolls, castVote, closePoll } from '../lib/api.js'
 import { polls as seed } from '../mock/data'
 
@@ -21,8 +22,8 @@ function normalizeMock(p) {
 
 export default function Polls() {
   const navigate = useNavigate()
-  const { mockMode, activeGroupId, role, isInactive } = useAuth()
-  const canManage = role === 'admin' || role === 'präsident'
+  const { mockMode, activeGroupId, roles, isInactive } = useAuth()
+  const canManage = hasRole(roles, BOARD)
 
   const [polls, setPolls] = useState(mockMode ? seed.map(normalizeMock) : null)
   const [voting, setVoting] = useState(null) // poll

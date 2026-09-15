@@ -4,6 +4,7 @@ import { Card, Button, PageTitle, Avatar, Empty, Badge, Input } from '../../comp
 import { Sheet } from '../../components/Modal'
 import { cx, eur, pal } from '../../design/calm'
 import { useAuth } from '../../context/AuthContext.jsx'
+import { hasRole, CASH } from '../../lib/roles.js'
 import {
   listMembers,
   listMemberDebts,
@@ -74,8 +75,8 @@ function fmtDate(d) {
 
 export default function TreasuryCollect() {
   const navigate = useNavigate()
-  const { mockMode, activeGroupId, role } = useAuth()
-  const canManage = mockMode || role === 'admin' || role === 'kassenwart'
+  const { mockMode, activeGroupId, roles } = useAuth()
+  const canManage = mockMode || hasRole(roles, CASH)
 
   const [rows, setRows] = useState(mockMode ? mockRows() : null)
   const [mode, setMode] = useState(mockMode ? 'cash' : null)

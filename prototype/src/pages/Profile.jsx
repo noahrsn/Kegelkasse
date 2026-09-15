@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Button, Badge, PageTitle, Avatar, Field, Input, Toggle } from '../components/ui'
-import { eur, eurBalance, balanceColor, pal, cx, ROLE_LABEL } from '../design/calm'
+import { eur, eurBalance, balanceColor, pal, cx } from '../design/calm'
+import { roleLabels } from '../lib/roles.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import {
   getGroup,
@@ -25,7 +26,7 @@ const mockTitles = awards.filter((a) => a.holder === 'Martin Haas' || a.type ===
 
 export default function Profile() {
   const navigate = useNavigate()
-  const { mockMode, activeGroupId, role, user, profile, signOut } = useAuth()
+  const { mockMode, activeGroupId, roles, user, profile, signOut } = useAuth()
   const [debts, setDebts] = useState(
     mockMode ? myDebts.filter((d) => !d.paid).map((d) => ({ description: d.desc, amount: d.amount })) : null,
   )
@@ -127,8 +128,10 @@ export default function Profile() {
         <div className="flex-1">
           <div className="font-display text-2xl font-medium">{name}</div>
           <div className="text-[13px] text-ink-soft">{email}</div>
-          <div className="mt-2 flex gap-2">
-            {role && <Badge tone="sage">{ROLE_LABEL[role] || 'Mitglied'}</Badge>}
+          <div className="mt-2 flex flex-wrap gap-2">
+            {roleLabels(roles).map((label) => (
+              <Badge key={label} tone="sage">{label}</Badge>
+            ))}
             <Badge tone="neutral">{club.name}</Badge>
           </div>
         </div>

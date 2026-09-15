@@ -268,14 +268,25 @@ CREATE TABLE group_members (
 );
 ```
 
-> **Rollen:** `admin` · `präsident` · `kassenwart` · `mitglied`
+> **Rollen** — seit Migration `039/040` hat ein Mitglied **mehrere** Rollen
+> (`group_members.roles`); `group_members.role` bleibt als ranghöchste Rolle für
+> die Anzeige und wird per Trigger synchron gehalten. Geprüft wird überall mit
+> `has_group_role(gruppe, rollenliste)`, nie mehr gegen eine einzelne Rolle.
 >
 > | Rolle | Strafen erfassen | Termin genehmigen | Schulden verwalten | Kassenbuch | Events | Regelwerk | Einst. (org.) | Einst. (fin.) |
 > |---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 > | `admin` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 > | `präsident` | ✓ | — | — | — | ✓ | ✓ | ✓ | — |
+> | `vizepräsident` | ✓ | — | — | — | ✓ | ✓ | ✓ | — |
 > | `kassenwart` | ✓ | ✓ | ✓ | ✓ | — | — | — | ✓ |
+> | `kassenprüfer` | ✓ | ✓ | ✓ | ✓ | — | — | — | ✓ |
+> | `geburtstagsbeauftragter` | ✓ | — | — | — | — | — | — | — |
 > | `mitglied` | ✓ | — | — | — | — | — | — | — |
+>
+> `vizepräsident` ist rechtlich gleich `präsident`, `kassenprüfer` gleich
+> `kassenwart`, `geburtstagsbeauftragter` gleich `mitglied`. Rollen vergibt nur
+> der Admin (`set_member_roles`) — und ein Club kann seinen **letzten Admin**
+> weder herabstufen noch entfernen (Trigger `group_members_keep_admin`).
 
 **Benachrichtigungen** — seit Migration `029_notifications_v2.sql` katalogbasiert statt
 spaltenbasiert (siehe Phase 9). Ein neuer Typ ist eine Zeile in `notification_types`, keine
@@ -652,13 +663,14 @@ Ein Account kann Mitglied in beliebig vielen Clubs sein. Nach dem Login landet d
 
 | Sektion | Zugriffsrecht |
 |---|---|
-| Allgemein (Name, Avatar) | Admin, Präsident |
-| Finanzen (Beitrag, IBAN, Verspätungsstrafe, Saldo) | Admin, Kassenwart |
-| Strafenkatalog | Admin, Kassenwart |
-| Regeltermine | Admin, Präsident |
-| Vereinsregelwerk | Admin, Präsident |
-| Mitglieder & Rollen | Admin |
-| Einladungslink | Admin, Präsident |
+| Allgemein (Name, Avatar) | Admin, Präsident, Vizepräsident |
+| Finanzen (Beitrag, IBAN, Verspätungsstrafe, Saldo) | Admin, Kassenwart, Kassenprüfer |
+| Strafenkatalog | Admin, Kassenwart, Kassenprüfer |
+| Regeltermine | Admin, Präsident, Vizepräsident |
+| Vereinsregelwerk | Admin, Präsident, Vizepräsident |
+| Mitglieder (Liste, inaktiv setzen) | Admin, Präsident, Vizepräsident, Kassenwart, Kassenprüfer |
+| Rollen vergeben, Mitglied entfernen | Admin |
+| Einladungslink | Admin, Präsident, Vizepräsident |
 
 Nicht berechtigte Sektionen werden ausgeblendet, nicht nur gesperrt.
 

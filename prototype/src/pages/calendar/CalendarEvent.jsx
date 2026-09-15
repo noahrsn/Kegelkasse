@@ -4,6 +4,7 @@ import { Card, Button, Badge, Avatar, Field, Textarea, Input } from '../../compo
 import { Sheet } from '../../components/Modal'
 import { cx, pal, creamLight } from '../../design/calm'
 import { useAuth } from '../../context/AuthContext.jsx'
+import { hasRole, BOARD } from '../../lib/roles.js'
 import {
   getEvent,
   listMembers,
@@ -430,8 +431,8 @@ function toGuests(arr, own = false) {
 /* ── Echt-Variante (Supabase) ────────────────────────────────────────────── */
 function LiveEvent({ eventId }) {
   const navigate = useNavigate()
-  const { activeGroupId, role, user, profile, isInactive } = useAuth()
-  const canManage = role === 'admin' || role === 'präsident'
+  const { activeGroupId, roles, user, profile, isInactive } = useAuth()
+  const canManage = hasRole(roles, BOARD)
 
   const [event, setEvent] = useState(null)
   const [members, setMembers] = useState([])

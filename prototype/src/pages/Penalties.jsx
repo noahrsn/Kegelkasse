@@ -4,11 +4,12 @@ import { Sheet } from '../components/Modal'
 import { cx, eur } from '../design/calm'
 import { penalties as seed } from '../mock/data'
 import { useAuth } from '../context/AuthContext.jsx'
+import { hasRole, CASH } from '../lib/roles.js'
 import { listPenalties, insertPenalty, updatePenalty } from '../lib/api.js'
 
 const ICONS = ['🎳', '🌊', '🎯', '⏰', '📱', '↔️', '🤬', '👟', '🍺', '🎂', '🥃', '💸']
 
-const EDIT_ROLES = ['admin', 'kassenwart']
+// Rechte siehe lib/roles.js
 
 // Feste Spielvarianten (Schnell-Strafen). Je Club genau eine Katalog-Zeile pro
 // Variante (game_kind); Betrag wird im Kegelabend berechnet/eingegeben, darum
@@ -53,8 +54,8 @@ function toDb(draft) {
 }
 
 export default function Penalties() {
-  const { mockMode, activeGroupId, role } = useAuth()
-  const canEdit = mockMode || EDIT_ROLES.includes(role)
+  const { mockMode, activeGroupId, roles } = useAuth()
+  const canEdit = mockMode || hasRole(roles, CASH)
 
   const [list, setList] = useState(mockMode ? seed : null)
   // Spiel-Einträge (game_kind) werden über das Kegelabend-„Spiele"-Menü genutzt

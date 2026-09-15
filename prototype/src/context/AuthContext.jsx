@@ -122,6 +122,7 @@ function MockProvider({ children }) {
     activeGroupId,
     activeGroup,
     role: activeGroup?.role ?? null,
+    roles: activeGroup?.roles ?? (activeGroup?.role ? [activeGroup.role] : []),
     isInactive: false,
     setActiveGroup: setActive,
     signOut: async () => {},
@@ -206,7 +207,7 @@ function SupabaseProvider({ children }) {
               .maybeSingle(),
             supabase
               .from('group_members')
-              .select('role, inactive_since, groups(id, name)')
+              .select('role, roles, inactive_since, groups(id, name)')
               .eq('user_id', uid),
           ]),
         )
@@ -222,6 +223,9 @@ function SupabaseProvider({ children }) {
             id: m.groups.id,
             name: m.groups.name,
             role: m.role,
+            // Ein Mitglied kann mehrere Rollen haben; role ist nur die
+            // ranghöchste davon und dient der Anzeige.
+            roles: m.roles ?? (m.role ? [m.role] : []),
             // Inaktive bleiben Mitglied und sehen den Club weiter — sie dürfen
             // nur nichts mehr auslösen. Deshalb hier ein Flag statt Rauswurf.
             inactive: m.inactive_since != null,
@@ -463,6 +467,7 @@ function SupabaseProvider({ children }) {
     activeGroupId,
     activeGroup,
     role: activeGroup?.role ?? null,
+    roles: activeGroup?.roles ?? (activeGroup?.role ? [activeGroup.role] : []),
     isInactive: !!activeGroup?.inactive,
     setActiveGroup: setActiveGroupId,
     signOut,

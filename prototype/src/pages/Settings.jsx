@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Card, Button, PageTitle, Field, Input, Select, Tabs, Avatar, Empty, Toggle } from '../components/ui'
-import { ROLE_LABEL, cx } from '../design/calm'
+import { cx } from '../design/calm'
+import { ROLE_LABEL, ROLES, roleLabels, hasRole, BOARD, CASH, BOARD_OR_CASH, ADMIN } from '../lib/roles.js'
 import { club as mockClub, members as mockMembers, penalties as mockPenalties } from '../mock/data'
 import { useAuth } from '../context/AuthContext.jsx'
 import {
   getGroup,
   updateGroup,
   listMembers,
-  updateMemberRole,
+  setMemberRoles,
   setMemberActive,
   removeMember,
   listPenalties,
@@ -34,21 +35,21 @@ const TABS = [
 
 // Zugriffsrechte je Sektion (Plan §Einstellungs-Hub).
 const ACCESS = {
-  general: ['admin', 'präsident'],
-  finance: ['admin', 'kassenwart'],
-  penalties: ['admin', 'kassenwart'],
-  events: ['admin', 'präsident'],
-  rulebook: ['admin', 'präsident'],
-  members: ['admin', 'präsident', 'kassenwart'],
-  invite: ['admin', 'präsident'],
+  general: BOARD,
+  finance: CASH,
+  penalties: CASH,
+  events: BOARD,
+  rulebook: BOARD,
+  members: BOARD_OR_CASH,
+  invite: BOARD,
 }
 
 export default function Settings() {
-  const { mockMode, activeGroupId, role, refresh } = useAuth()
+  const { mockMode, activeGroupId, roles, refresh } = useAuth()
 
   const tabs = useMemo(
-    () => (mockMode ? TABS : TABS.filter((t) => ACCESS[t.key].includes(role))),
-    [mockMode, role],
+    () => (mockMode ? TABS : TABS.filter((t) => hasRole(roles, ACCESS[t.key]))),
+    [mockMode, roles],
   )
 
   const [searchParams] = useSearchParams()
@@ -125,8 +126,8 @@ export default function Settings() {
           <MembersTab
             mockMode={mockMode}
             groupId={activeGroupId}
-            canEdit={mockMode || role === 'admin'}
-            canSetActive={mockMode || ['admin', 'präsident', 'kassenwart'].includes(role)}
+            canEdit={mockMode || hasRole(roles, ADMIN)}
+            canSetActive={mockMode || hasRole(roles, BOARD_OR_CASH)}
           />
         )}
         {tab === 'invite' && (
@@ -596,11 +597,12 @@ function Rulebook({ group, onSave }) {
 }
 
 function MembersTab({ mockMode, groupId, canEdit, canSetActive }) {
-  const { user } = useAuth()
+  const { user, refresh } = useAuth()
   const [list, setList] = useState(
-    mockMode ? mockMembers.map((m) => ({ id: m.id, userId: m.id, name: m.name, role: m.role })) : null,
+    mockMode ? mockMembers.map((m) => ({ id: m.id, userId: m.id, name: m.name, roles: [m.role] })) : null,
   )
   const [savingId, setSavingId] = useState(null)
+  const [roleOpenId, setRoleOpenId] = useState(null)
 
   const load = () => {
     if (mockMode || !groupId) return
@@ -632,12 +634,28 @@ function MembersTab({ mockMode, groupId, canEdit, canSetActive }) {
     }
   }
 
-  async function changeRole(memberId, role) {
-    setList((l) => l.map((m) => (m.id === memberId ? { ...m, role } : m)))
+  /* Rollen sind eine Mehrfachauswahl: Wer den Club gegründet hat, ist Admin
+     und oft zugleich Kassenwart. Ohne Rolle geht es nicht — wer die letzte
+     abwählt, ist wieder einfaches Mitglied. */
+  async function toggleRole(m, role) {
+    const next = m.roles.includes(role)
+      ? m.roles.filter((r) => r !== role)
+      : [...m.roles, role]
+    const clean = next.length ? next : ['mitglied']
+    const before = m.roles
+    setList((l) => l.map((x) => (x.id === m.id ? { ...x, roles: clean } : x)))
     if (mockMode) return
-    setSavingId(memberId)
+    setSavingId(m.id)
     try {
-      await updateMemberRole(memberId, role)
+      await setMemberRoles(groupId, m.userId, clean)
+      load()
+      // Eigene Rollen geändert? Dann stimmen Navigation und Rechte erst nach
+      // einem Nachladen der Mitgliedschaft wieder.
+      if (m.userId === user?.id) await refresh()
+    } catch (e) {
+      // Häufigster Fall: der Club würde seinen letzten Admin verlieren.
+      setList((l) => l.map((x) => (x.id === m.id ? { ...x, roles: before } : x)))
+      alert(e.message || 'Rolle konnte nicht geändert werden')
     } finally {
       setSavingId(null)
     }
@@ -665,18 +683,19 @@ function MembersTab({ mockMode, groupId, canEdit, canSetActive }) {
 
   const active = list.filter((m) => !m.isInactive)
   const inactive = list.filter((m) => m.isInactive)
+  const lastAdmin = list.filter((m) => m.roles?.includes('admin')).length <= 1
 
   /* Eine Zeile bricht auf dem Telefon bewusst um: Name oben, Rolle und
      Aktionen darunter. Nebeneinander wäre auf 360 px alles gequetscht. */
-  const row = (m, last, children) => (
-    <div
-      key={m.id}
-      className={cx('flex flex-wrap items-center gap-2 p-3', !last && 'border-b border-card-edge')}
-    >
-      <Avatar name={m.name} size={36} />
-      <span className="min-w-0 flex-1 truncate text-[14px] font-medium">{m.name}</span>
-      {savingId === m.id && <span className="text-[11px] text-ink-dim">…</span>}
-      <div className="flex w-full items-center justify-end gap-2 sm:w-auto">{children}</div>
+  const row = (m, last, children, below = null) => (
+    <div key={m.id} className={cx('p-3', !last && 'border-b border-card-edge')}>
+      <div className="flex flex-wrap items-center gap-2">
+        <Avatar name={m.name} size={36} />
+        <span className="min-w-0 flex-1 truncate text-[14px] font-medium">{m.name}</span>
+        {savingId === m.id && <span className="text-[11px] text-ink-dim">…</span>}
+        <div className="flex w-full items-center justify-end gap-2 sm:w-auto">{children}</div>
+      </div>
+      {below}
     </div>
   )
 
@@ -686,16 +705,19 @@ function MembersTab({ mockMode, groupId, canEdit, canSetActive }) {
         {active.map((m, i) =>
           row(m, i === active.length - 1, (
             <>
-              <Select
-                value={m.role}
+              <button
+                onClick={() => setRoleOpenId(roleOpenId === m.id ? null : m.id)}
                 disabled={!canEdit}
-                onChange={(e) => changeRole(m.id, e.target.value)}
-                className="w-32 py-2 text-[13px] disabled:opacity-60"
+                className={cx(
+                  'min-w-0 max-w-[60%] truncate rounded-xl border border-card-edge px-3 py-2',
+                  'text-left text-[13px] disabled:opacity-60',
+                  roleOpenId === m.id && 'border-sage',
+                )}
+                title="Rollen ändern"
               >
-                {Object.entries(ROLE_LABEL).map(([k, v]) => (
-                  <option key={k} value={k}>{v}</option>
-                ))}
-              </Select>
+                {roleLabels(m.roles).join(' · ')}
+                {canEdit && <span className="ml-1 text-ink-dim">▾</span>}
+              </button>
               {canSetActive && m.userId !== user?.id && (
                 <button
                   onClick={() => toggleActive(m)}
@@ -717,7 +739,32 @@ function MembersTab({ mockMode, groupId, canEdit, canSetActive }) {
                 </button>
               )}
             </>
-          )),
+          ),
+          canEdit && roleOpenId === m.id ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {ROLES.map((r) => {
+                const on = m.roles.includes(r)
+                // Den letzten Admin kann niemand abwählen — sonst steht der
+                // Club ohne Verwaltung da. Die Datenbank blockt es ohnehin.
+                const locked = r === 'admin' && on && lastAdmin
+                return (
+                  <button
+                    key={r}
+                    onClick={() => !locked && toggleRole(m, r)}
+                    disabled={savingId === m.id || locked}
+                    title={locked ? 'Der Club braucht mindestens einen Admin' : undefined}
+                    className={cx(
+                      'rounded-full border px-3 py-1.5 text-[12px] font-semibold',
+                      on ? 'border-sage bg-sage-bg text-sage' : 'border-card-edge text-ink-soft',
+                      locked && 'opacity-60',
+                    )}
+                  >
+                    {on ? '✓ ' : ''}{ROLE_LABEL[r]}
+                  </button>
+                )
+              })}
+            </div>
+          ) : null),
         )}
       </Card>
 
@@ -752,6 +799,14 @@ function MembersTab({ mockMode, groupId, canEdit, canSetActive }) {
             in der Statistik stehen sie weiter mit ihrer Historie.
           </p>
         </div>
+      )}
+
+      {canEdit && (
+        <p className="text-[11px] leading-relaxed text-ink-dim">
+          Tippe auf die Rolle, um sie zu ändern. Mehrere Rollen sind möglich — Vizepräsident
+          hat dieselben Rechte wie der Präsident, der Kassenprüfer dieselben wie der Kassenwart.
+          Der Geburtstagsbeauftragte hat die Rechte eines normalen Mitglieds.
+        </p>
       )}
 
       <div>

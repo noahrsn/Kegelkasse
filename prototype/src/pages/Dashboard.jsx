@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Card, Badge, Button, Avatar } from '../components/ui'
 import { pal, eur, eurBalance, balanceColor, creamLight, cx, accentsOnNavy } from '../design/calm'
 import { useAuth } from '../context/AuthContext.jsx'
+import { hasRole, CASH } from '../lib/roles.js'
 import {
   listMembers,
   listMemberDebts,
@@ -120,8 +121,8 @@ function buildMock() {
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const { mockMode, activeGroupId, role, user, profile, isInactive } = useAuth()
-  const canManage = role === 'admin' || role === 'kassenwart'
+  const { mockMode, activeGroupId, roles, user, profile, isInactive } = useAuth()
+  const canManage = hasRole(roles, CASH)
   const [vm, setVm] = useState(() => (mockMode ? buildMock() : null))
   const [importStatus, setImportStatus] = useState(null)
   // Barkasse: was steht zum Kassieren an? (Konto-Clubs bekommen open_total 0.)

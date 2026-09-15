@@ -87,7 +87,7 @@ export async function insertEvent(groupId, createdBy, row) {
 export async function listMembers(groupId, { includeInactive = false } = {}) {
   const { data, error } = await supabase
     .from('group_members')
-    .select('id, role, user_id, iban, inactive_since, profiles(first_name, last_name, is_placeholder)')
+    .select('id, role, roles, user_id, iban, inactive_since, profiles(first_name, last_name, is_placeholder)')
     .eq('group_id', groupId)
   if (error) throw error
   return (data ?? [])
@@ -95,6 +95,7 @@ export async function listMembers(groupId, { includeInactive = false } = {}) {
       id: m.id,
       userId: m.user_id,
       role: m.role,
+      roles: m.roles ?? (m.role ? [m.role] : []),
       iban: m.iban || '',
       name: m.profiles ? `${m.profiles.first_name} ${m.profiles.last_name}`.trim() : '—',
       isPlaceholder: !!m.profiles?.is_placeholder,
@@ -114,8 +115,15 @@ export async function setMemberActive(groupId, userId, active) {
   if (error) throw error
 }
 
-export async function updateMemberRole(memberId, role) {
-  const { error } = await supabase.from('group_members').update({ role }).eq('id', memberId)
+/* Rollen eines Mitglieds setzen (nur Admin). Läuft über eine RPC statt über
+   ein direktes UPDATE, weil dort der Katalog geprüft wird — und weil die
+   Datenbank verhindert, dass ein Club seinen letzten Admin verliert. */
+export async function setMemberRoles(groupId, userId, roles) {
+  const { error } = await supabase.rpc('set_member_roles', {
+    p_group_id: groupId,
+    p_user_id: userId,
+    p_roles: roles,
+  })
   if (error) throw error
 }
 
@@ -142,6 +150,7 @@ export async function listPlaceholders(groupId) {
       name: m.name,
       iban: m.iban || '',
       role: m.role,
+      roles: m.roles,
       claimed: false,
     }))
 }

@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Card, Button, PageTitle, Empty } from '../components/ui'
 import { useAuth } from '../context/AuthContext.jsx'
+import { hasRole, BOARD } from '../lib/roles.js'
 import { getRulebook } from '../lib/api.js'
 
-const EDIT_ROLES = ['admin', 'präsident']
+// Rechte siehe lib/roles.js
 
 const MOCK_CONTENT =
   '# Regelwerk KC Pin Royal\n\n## §1 Kegelabend\nJeder 4. Samstag im Monat um 19:00 Uhr.\n\n## §2 Strafen\nStrafen richten sich nach dem aktuellen **Strafenkatalog**. Wer zu spät kommt, zahlt extra.\n\n## §3 Beiträge\nDer Monatsbeitrag ist zum konfigurierten Stichtag fällig.'
@@ -64,8 +65,8 @@ function Markdown({ source }) {
 }
 
 export default function Rulebook() {
-  const { mockMode, activeGroupId, role } = useAuth()
-  const canEdit = mockMode || EDIT_ROLES.includes(role)
+  const { mockMode, activeGroupId, roles } = useAuth()
+  const canEdit = mockMode || hasRole(roles, BOARD)
 
   const [data, setData] = useState(
     mockMode ? { content: MOCK_CONTENT, editedAt: null, editedBy: null } : null,
