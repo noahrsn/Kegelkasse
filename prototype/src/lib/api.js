@@ -1092,11 +1092,10 @@ export async function sendInviteEmail(to, { message } = {}, groupId) {
   return { ok: true }
 }
 
-/* Club-weiter Schalter: Erinnerung an den Kontoauszug (Vorstand). */
-export async function setGroupNotifyCsv(groupId, enabled) {
-  const { error } = await supabase.rpc('set_group_notify_csv', { p_group: groupId, p_enabled: enabled })
-  if (error) throw error
-}
+/* Der Schalter „Erinnerung an den Kontoauszug" läuft über updateGroup() mit:
+   set_group_notify_csv() prüft noch group_role() aus der Zeit vor den
+   Mehrfachrollen und würde einen Kassenprüfer abweisen, den die
+   groups_update-Policy längst zulässt. */
 
 /* ──────────────────────────────────────────────────────────────────────────
  * Phase 8 — Abstimmungen & Umfragen

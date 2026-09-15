@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Card, Button, PageTitle, Field, Input, Select, Tabs, Avatar, Empty, Toggle } from '../components/ui'
-import { cx } from '../design/calm'
+import { Card, Button, PageTitle, Field, Input, Select, Avatar, Empty, Toggle } from '../components/ui'
+import { cx, eur } from '../design/calm'
 import { ROLE_LABEL, ROLES, roleLabels, hasRole, BOARD, CASH, BOARD_OR_CASH, ADMIN } from '../lib/roles.js'
 import { club as mockClub, members as mockMembers, penalties as mockPenalties } from '../mock/data'
 import { useAuth } from '../context/AuthContext.jsx'
@@ -19,50 +19,184 @@ import {
   listPlaceholders,
   addPlaceholder,
   removePlaceholder,
-  setGroupNotifyCsv,
 } from '../lib/api.js'
 import { InviteBox } from './Members'
 
-const TABS = [
-  { key: 'general', label: 'Allgemein' },
-  { key: 'finance', label: 'Finanzen' },
-  { key: 'penalties', label: 'Strafenkatalog' },
-  { key: 'events', label: 'Regeltermine' },
-  { key: 'rulebook', label: 'Regelwerk' },
-  { key: 'members', label: 'Mitglieder' },
-  { key: 'invite', label: 'Einladung' },
+/* ════════════════════════════════════════════════════════════════════════
+   Einstellungs-Hub
+   ──────────────────────────────────────────────────────────────────────
+   Statt einer Reihe gleichrangiger Tabs (von denen auf dem Telefon nie alle
+   zu sehen waren) gibt es eine Übersicht und dahinter je einen Bereich.
+   Jede Zeile der Übersicht zeigt, was dort gerade eingestellt IST — man muss
+   einen Bereich also nicht öffnen, um seinen Zustand zu kennen.
+
+   Zwei frühere Tabs waren reine Wegweiser ohne eigenen Inhalt (Strafenkatalog,
+   Regeltermine). Die stehen jetzt unten als Verknüpfungen und führen direkt an
+   ihren echten Ort, statt eine Zwischenseite einzuschieben.
+   ════════════════════════════════════════════════════════════════════════ */
+
+const SECTIONS = [
+  {
+    key: 'club',
+    group: 'Verein',
+    icon: '🎳',
+    title: 'Club-Profil',
+    desc: 'Name und Bild des Vereins — beides erscheint in der Navigation und in E-Mails.',
+    access: BOARD,
+    summary: ({ group }) => group.name || '—',
+  },
+  {
+    key: 'members',
+    group: 'Verein',
+    icon: '👥',
+    title: 'Mitglieder & Rollen',
+    desc: 'Wer gehört zum Club, wer darf was, und wie kommen neue Leute dazu.',
+    access: BOARD_OR_CASH,
+    summary: ({ counts }) => {
+      if (!counts) return 'Lädt…'
+      const parts = [`${counts.active} aktiv`]
+      if (counts.inactive) parts.push(`${counts.inactive} inaktiv`)
+      if (counts.placeholders) parts.push(`${counts.placeholders} vorangelegt`)
+      return parts.join(' · ')
+    },
+  },
+  {
+    key: 'rulebook',
+    group: 'Verein',
+    icon: '📖',
+    title: 'Regelwerk',
+    desc: 'Die Satzung des Clubs. Sie steht für alle Mitglieder in der Leseansicht.',
+    access: BOARD,
+    summary: ({ group }) => {
+      const len = (group.rulebook_content || '').trim().length
+      return len ? `${len.toLocaleString('de-DE')} Zeichen` : 'Noch nicht verfasst'
+    },
+  },
+  {
+    key: 'treasury',
+    group: 'Kasse & Abrechnung',
+    icon: '💰',
+    title: 'Kasse & Zahlungswege',
+    desc: 'Wie das Geld in die Kasse kommt und womit gerechnet wird.',
+    access: CASH,
+    summary: ({ group }) => {
+      const cash = group.treasury_mode === 'cash'
+      const start = cash ? group.cash_opening_balance : group.treasury_opening_balance
+      return `${cash ? 'Barkasse' : 'Vereinskonto'} · Start ${eur(Number(start) || 0)} €`
+    },
+  },
+  {
+    key: 'fees',
+    group: 'Kasse & Abrechnung',
+    icon: '🗓️',
+    title: 'Beiträge & Fristen',
+    desc: 'Monatsbeitrag, Buchungszeitpunkt und bis wann bezahlt sein muss.',
+    access: CASH,
+    summary: ({ group }) => {
+      const fee = `${eur(Number(group.monthly_fee) || 0)} €`
+      const when =
+        group.fee_booking_mode === 'day_after_last_event'
+          ? 'nach dem letzten Kegelabend'
+          : `am ${group.fee_day || 1}.`
+      return `${fee} ${when} · ${deadlineShort(group.payment_deadline_type, group.payment_deadline_days)}`
+    },
+  },
+  {
+    key: 'session',
+    group: 'Kasse & Abrechnung',
+    icon: '🎯',
+    title: 'Kegelabend-Regeln',
+    desc: 'Was beim Genehmigen eines Kegelabends zusätzlich passiert.',
+    access: CASH,
+    summary: ({ group }) => {
+      const on = []
+      if (group.charge_absent_avg) on.push('Durchschnitt für Abwesende')
+      if (group.round_up_penalties) on.push('Aufrunden')
+      return on.length ? on.join(' · ') : 'Keine Zusatzregel aktiv'
+    },
+  },
 ]
 
-// Zugriffsrechte je Sektion (Plan §Einstellungs-Hub).
-const ACCESS = {
-  general: BOARD,
-  finance: CASH,
-  penalties: CASH,
-  events: BOARD,
-  rulebook: BOARD,
-  members: BOARD_OR_CASH,
-  invite: BOARD,
+/* Orte außerhalb der Einstellungen, die man von hier aus sucht. */
+const LINKS = [
+  {
+    key: 'penalties',
+    to: '/penalties',
+    icon: '⚖️',
+    title: 'Strafenkatalog',
+    access: CASH,
+    summary: ({ counts }) =>
+      counts ? `${counts.penalties} aktive Strafen` : 'Strafen und Beträge pflegen',
+  },
+  {
+    key: 'calendar',
+    to: '/calendar',
+    icon: '📅',
+    title: 'Termine & Regeltermine',
+    access: BOARD,
+    summary: () => 'Kegelabende und Serien im Kalender',
+  },
+]
+
+const GROUP_ORDER = ['Verein', 'Kasse & Abrechnung']
+
+/* Alte ?tab=-Links (Lesezeichen, Regelwerk-Seite) landen im richtigen Bereich. */
+const LEGACY_TAB = {
+  general: 'club',
+  finance: 'treasury',
+  penalties: 'session',
+  events: null,
+  invite: 'members',
 }
+
+function deadlineShort(type, days) {
+  const n = Number(days) || 0
+  if (type === 'fixed_day_of_month') return `fällig am ${n || 1}.`
+  if (type === 'days_after_booking') return `fällig nach ${n} Tagen`
+  return `fällig ${n} Tage vor dem Kegeln`
+}
+
+function deadlineSentence(type, days) {
+  const n = Number(days) || 0
+  if (type === 'fixed_day_of_month')
+    return `Jeder offene Posten ist am ${n || 1}. des Monats fällig.`
+  if (type === 'days_after_booking')
+    return `Jeder offene Posten ist ${n} Tage nach seiner Buchung fällig.`
+  return `Jeder offene Posten ist ${n} Tage vor dem nächsten Kegeltermin fällig.`
+}
+
+/* ── Seite ───────────────────────────────────────────────────────────── */
 
 export default function Settings() {
   const { mockMode, activeGroupId, roles, refresh } = useAuth()
 
-  const tabs = useMemo(
-    () => (mockMode ? TABS : TABS.filter((t) => hasRole(roles, ACCESS[t.key]))),
+  const sections = useMemo(
+    () => (mockMode ? SECTIONS : SECTIONS.filter((s) => hasRole(roles, s.access))),
+    [mockMode, roles],
+  )
+  const links = useMemo(
+    () => (mockMode ? LINKS : LINKS.filter((l) => hasRole(roles, l.access))),
     [mockMode, roles],
   )
 
-  const [searchParams] = useSearchParams()
-  const wantTab = searchParams.get('tab')
-  const [tab, setTab] = useState(
-    tabs.some((t) => t.key === wantTab) ? wantTab : tabs[0]?.key,
-  )
-  useEffect(() => {
-    if (!tabs.some((t) => t.key === tab)) setTab(tabs[0]?.key)
-  }, [tabs, tab])
+  const [searchParams, setSearchParams] = useSearchParams()
+  const raw = searchParams.get('tab')
+  const wanted = raw && raw in LEGACY_TAB ? LEGACY_TAB[raw] : raw
+  const current = sections.find((s) => s.key === wanted) || null
 
   const [group, setGroup] = useState(mockMode ? mockGroupShape() : null)
   const [loading, setLoading] = useState(!mockMode)
+
+  // Ungespeicherte Änderungen des offenen Bereichs. Ohne diese Bremse wäre ein
+  // Fehlgriff auf „zurück" der kürzeste Weg, Eingaben zu verlieren.
+  const [dirty, setDirty] = useState(false)
+  useEffect(() => setDirty(false), [current?.key])
+
+  const go = (key) => {
+    if (dirty && !window.confirm('Es gibt ungespeicherte Änderungen. Wirklich verwerfen?')) return
+    setDirty(false)
+    setSearchParams(key ? { tab: key } : {})
+  }
 
   useEffect(() => {
     if (mockMode || !activeGroupId) return
@@ -72,12 +206,16 @@ export default function Settings() {
       .finally(() => setLoading(false))
   }, [mockMode, activeGroupId])
 
-  if (!mockMode && tabs.length === 0) {
+  if (!mockMode && sections.length === 0 && links.length === 0) {
     return (
       <div className="space-y-5">
         <PageTitle kicker="Club-Verwaltung" title="Einstellungen" />
         <Card>
-          <Empty icon="🔒" title="Keine Verwaltungsrechte" hint="Für Einstellungen brauchst du eine Verwalter-Rolle in diesem Club." />
+          <Empty
+            icon="🔒"
+            title="Keine Verwaltungsrechte"
+            hint="Für Einstellungen brauchst du eine Verwalter-Rolle in diesem Club."
+          />
         </Card>
       </div>
     )
@@ -87,7 +225,9 @@ export default function Settings() {
     return (
       <div className="space-y-5">
         <PageTitle kicker="Club-Verwaltung" title="Einstellungen" />
-        <Card><div className="py-8 text-center text-sm text-ink-dim">Lädt…</div></Card>
+        <Card>
+          <div className="py-8 text-center text-sm text-ink-dim">Lädt…</div>
+        </Card>
       </div>
     )
   }
@@ -100,50 +240,212 @@ export default function Settings() {
     refresh()
   }
 
+  if (!current) {
+    return <Hub group={group} sections={sections} links={links} onOpen={go} />
+  }
+
+  const shared = { group, onSave: save, onDirty: setDirty }
+
   return (
     <div className="space-y-5">
-      <PageTitle kicker="Club-Verwaltung" title="Einstellungen" />
-      <Tabs tabs={tabs} active={tab} onChange={setTab} />
+      <div>
+        <button
+          type="button"
+          onClick={() => go(null)}
+          className="mb-3 inline-flex items-center gap-1 text-[12px] font-semibold text-ink-soft transition hover:text-ink"
+        >
+          <span aria-hidden>‹</span> Alle Einstellungen
+        </button>
+        <PageTitle kicker={current.group} title={current.title} />
+        <p className="mt-2 max-w-prose text-[13px] leading-relaxed text-ink-soft">{current.desc}</p>
+      </div>
 
-      <div className="animate-fade">
-        {tab === 'general' && <General group={group} onSave={save} mockMode={mockMode} />}
-        {tab === 'finance' && <Finance group={group} onSave={save} mockMode={mockMode} />}
-        {tab === 'penalties' && <PenaltiesTab mockMode={mockMode} groupId={activeGroupId} />}
-        {tab === 'events' && <EventsTab />}
-        {tab === 'rulebook' && (
-          <Rulebook
-            group={group}
-            mockMode={mockMode}
-            onSave={async (patch) => {
-              if (mockMode) return
-              await saveRulebook(activeGroupId, patch.rulebook_content)
-              const g = await getGroup(activeGroupId)
-              setGroup(g)
-            }}
-          />
-        )}
-        {tab === 'members' && (
-          <MembersTab
-            mockMode={mockMode}
-            groupId={activeGroupId}
-            canEdit={mockMode || hasRole(roles, ADMIN)}
-            canSetActive={mockMode || hasRole(roles, BOARD_OR_CASH)}
-          />
-        )}
-        {tab === 'invite' && (
-          <Card>
-            <InviteBox
-              token={mockMode ? undefined : group.invite_token}
-              canReset={!mockMode}
-              onReset={async () => {
+      <div className="lg:grid lg:grid-cols-[236px_1fr] lg:gap-6">
+        <Rail sections={sections} active={current.key} onOpen={go} />
+        <div className="animate-fade">
+          {current.key === 'club' && <ClubSection {...shared} />}
+          {current.key === 'treasury' && <TreasurySection {...shared} />}
+          {current.key === 'fees' && <FeesSection {...shared} />}
+          {current.key === 'session' && <SessionSection {...shared} />}
+          {current.key === 'rulebook' && (
+            <RulebookSection
+              group={group}
+              onDirty={setDirty}
+              onSave={async (patch) => {
+                if (mockMode) return
+                await saveRulebook(activeGroupId, patch.rulebook_content)
+                const g = await getGroup(activeGroupId)
+                setGroup(g)
+              }}
+            />
+          )}
+          {current.key === 'members' && (
+            <MembersSection
+              mockMode={mockMode}
+              groupId={activeGroupId}
+              group={group}
+              canEdit={mockMode || hasRole(roles, ADMIN)}
+              canSetActive={mockMode || hasRole(roles, BOARD_OR_CASH)}
+              canInvite={mockMode || hasRole(roles, BOARD)}
+              onInviteReset={async () => {
                 const t = await resetInvite(activeGroupId)
                 setGroup((g) => ({ ...g, invite_token: t }))
               }}
             />
-          </Card>
-        )}
+          )}
+        </div>
       </div>
     </div>
+  )
+}
+
+/* ── Übersicht ───────────────────────────────────────────────────────── */
+
+function Hub({ group, sections, links, onOpen }) {
+  const { mockMode, activeGroupId } = useAuth()
+  const [counts, setCounts] = useState(
+    mockMode
+      ? {
+          active: mockMembers.length,
+          inactive: 0,
+          placeholders: 0,
+          penalties: mockPenalties.filter((p) => p.active).length,
+        }
+      : null,
+  )
+
+  // Die Kennzahlen der Übersicht sind der eigentliche Gewinn dieser Seite:
+  // ohne sie müsste man jeden Bereich öffnen, nur um zu sehen, was drinsteht.
+  useEffect(() => {
+    if (mockMode || !activeGroupId) return
+    let alive = true
+    Promise.all([
+      listMembers(activeGroupId, { includeInactive: true }).catch(() => []),
+      listPlaceholders(activeGroupId).catch(() => []),
+      listPenalties(activeGroupId).catch(() => []),
+    ]).then(([mem, ph, pen]) => {
+      if (!alive) return
+      setCounts({
+        active: mem.filter((m) => !m.isInactive).length,
+        inactive: mem.filter((m) => m.isInactive).length,
+        placeholders: ph.filter((p) => !p.claimed).length,
+        penalties: pen.filter((p) => p.active).length,
+      })
+    })
+    return () => {
+      alive = false
+    }
+  }, [mockMode, activeGroupId])
+
+  const ctx = { group, counts }
+  const groups = GROUP_ORDER.filter((g) => sections.some((s) => s.group === g))
+
+  return (
+    <div className="space-y-6">
+      <PageTitle kicker="Club-Verwaltung" title="Einstellungen" />
+
+      {groups.map((g) => (
+        <section key={g} className="space-y-2">
+          <h2 className="px-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-dim">
+            {g}
+          </h2>
+          <div className="rounded-[24px] border border-card-edge bg-card p-2">
+            {sections
+              .filter((s) => s.group === g)
+              .map((s, i, arr) => (
+                <HubRow
+                  key={s.key}
+                  icon={s.icon}
+                  title={s.title}
+                  value={s.summary(ctx)}
+                  last={i === arr.length - 1}
+                  onClick={() => onOpen(s.key)}
+                />
+              ))}
+          </div>
+        </section>
+      ))}
+
+      {links.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="px-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-dim">
+            Verknüpfungen
+          </h2>
+          <div className="rounded-[24px] border border-card-edge bg-card p-2">
+            {links.map((l, i) => (
+              <HubRow
+                key={l.key}
+                icon={l.icon}
+                title={l.title}
+                value={l.summary(ctx)}
+                last={i === links.length - 1}
+                to={l.to}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
+  )
+}
+
+/* Eine Zeile der Übersicht: Titel + der aktuelle Wert. Der Wert ersetzt die
+   Erklärung bewusst — die steht im Bereich selbst, hier zählt der Zustand. */
+function HubRow({ icon, title, value, onClick, to, last }) {
+  const inner = (
+    <>
+      <span
+        className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-bg text-[17px]"
+        aria-hidden
+      >
+        {icon}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[14px] font-semibold text-ink">{title}</span>
+        <span className="mt-0.5 block truncate text-[12px] text-ink-dim">{value}</span>
+      </span>
+      <span className="shrink-0 pr-1 text-[13px] text-ink-dim" aria-hidden>
+        {to ? '↗' : '›'}
+      </span>
+    </>
+  )
+  const cls = cx(
+    'flex w-full items-center gap-3 rounded-2xl p-3 text-left transition hover:bg-bg',
+    !last && 'border-b border-card-edge/60',
+  )
+  return to ? (
+    <Link to={to} className={cls}>
+      {inner}
+    </Link>
+  ) : (
+    <button type="button" onClick={onClick} className={cls}>
+      {inner}
+    </button>
+  )
+}
+
+/* Auf großen Schirmen bleibt die Bereichsliste stehen — dort ist Platz dafür,
+   auf dem Telefon nicht. */
+function Rail({ sections, active, onOpen }) {
+  return (
+    <nav className="hidden lg:block">
+      <div className="sticky top-8 space-y-1">
+        {sections.map((s) => (
+          <button
+            key={s.key}
+            type="button"
+            onClick={() => onOpen(s.key)}
+            className={cx(
+              'flex w-full items-center gap-2 rounded-2xl px-3 py-2.5 text-left text-[13px] font-semibold transition',
+              s.key === active ? 'bg-ink text-bg' : 'text-ink-soft hover:bg-card',
+            )}
+          >
+            <span aria-hidden>{s.icon}</span>
+            <span className="min-w-0 truncate">{s.title}</span>
+          </button>
+        ))}
+      </div>
+    </nav>
   )
 }
 
@@ -163,27 +465,29 @@ function mockGroupShape() {
     payment_deadline_type: mockClub.paymentDeadlineType,
     payment_deadline_days: mockClub.paymentDeadlineDays,
     late_payment_fee: mockClub.latePaymentFee,
+    notify_csv_import: true,
     rulebook_content: '# Regelwerk KC Pin Royal\n\n## §1 Kegelabend\nJeder 4. Samstag im Monat.',
     invite_token: mockClub.inviteToken,
   }
 }
 
-function SaveBar({ onDiscard, onSave, saving, saved }) {
-  return (
-    <div className="flex items-center justify-end gap-2">
-      {saved && <span className="mr-auto text-[12px] font-semibold text-sage">✓ Gespeichert</span>}
-      <Button variant="soft" onClick={onDiscard} disabled={saving}>Verwerfen</Button>
-      <Button onClick={onSave} disabled={saving}>{saving ? 'Speichert…' : 'Speichern'}</Button>
-    </div>
-  )
-}
+/* ── Bearbeiten: ein Modell für alle Bereiche ────────────────────────── */
 
-/* Generischer Editor-Wrapper mit lokalem State + Save-Bar. */
-function useEditor(initial, onSave) {
+/* Jeder Bereich hält seine Änderungen lokal und speichert sie in einem Rutsch.
+   Früher mischte sich darunter ein Schalter, der sofort schrieb — zwei Regeln
+   auf einer Seite, und man wusste bei keinem Feld sicher, welche gerade galt. */
+function useEditor(initial, onSave, onDirty) {
+  const base = JSON.stringify(initial)
   const [val, setVal] = useState(initial)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
-  useEffect(() => setVal(initial), [JSON.stringify(initial)]) // eslint-disable-line
+  useEffect(() => setVal(JSON.parse(base)), [base])
+
+  const dirty = JSON.stringify(val) !== base
+  useEffect(() => {
+    onDirty?.(dirty)
+  }, [dirty, onDirty])
+
   const field = (k) => (e) => {
     setSaved(false)
     setVal((v) => ({ ...v, [k]: e?.target ? e.target.value : e }))
@@ -197,12 +501,66 @@ function useEditor(initial, onSave) {
       setSaving(false)
     }
   }
-  return { val, setVal, field, save, saving, saved, discard: () => { setVal(initial); setSaved(false) } }
+  return {
+    val,
+    setVal,
+    field,
+    save,
+    saving,
+    saved,
+    dirty,
+    discard: () => {
+      setVal(JSON.parse(base))
+      setSaved(false)
+    },
+  }
 }
 
-function General({ group, onSave }) {
+/* Klebt über der Bottom-Navigation, sobald etwas geändert wurde. So bleibt
+   „noch nicht gespeichert" auch am Ende einer langen Seite sichtbar. */
+function SaveBar({ dirty, saving, saved, onDiscard, onSave }) {
+  if (!dirty) {
+    return saved ? (
+      <div className="flex justify-end pt-1 text-[12px] font-semibold text-sage">✓ Gespeichert</div>
+    ) : null
+  }
+  return (
+    <div className="sticky bottom-[calc(62px_+_env(safe-area-inset-bottom))] z-20 pt-1 lg:bottom-4">
+      <div className="flex items-center gap-2 rounded-full border border-card-edge bg-card/95 p-1.5 pl-4 shadow-lg backdrop-blur">
+        <span className="mr-auto truncate text-[12px] font-semibold text-ink-soft">
+          Nicht gespeichert
+        </span>
+        <Button variant="ghost" size="sm" onClick={onDiscard} disabled={saving}>
+          Verwerfen
+        </Button>
+        <Button size="sm" onClick={onSave} disabled={saving}>
+          {saving ? 'Speichert…' : 'Speichern'}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+/* Abschnitt innerhalb eines Bereichs — eine Karte, eine Frage. */
+function Group({ title, hint, children }) {
+  return (
+    <Card className="space-y-4">
+      <div>
+        <div className="text-[12px] font-semibold uppercase tracking-[0.08em] text-ink-dim">
+          {title}
+        </div>
+        {hint && <p className="mt-1 text-[12px] leading-relaxed text-ink-soft">{hint}</p>}
+      </div>
+      {children}
+    </Card>
+  )
+}
+
+/* ── Bereich: Club-Profil ────────────────────────────────────────────── */
+
+function ClubSection({ group, onSave, onDirty }) {
   const { mockMode, activeGroupId } = useAuth()
-  const ed = useEditor({ name: group.name || '' }, onSave)
+  const ed = useEditor({ name: group.name || '' }, onSave, onDirty)
   const [avatar, setAvatar] = useState(group.avatar_url || null)
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef(null)
@@ -227,7 +585,7 @@ function General({ group, onSave }) {
 
   return (
     <div className="space-y-4">
-      <Card className="space-y-4">
+      <Group title="Name & Bild">
         <div className="flex items-center gap-4">
           {avatar ? (
             <img src={avatar} alt="" className="h-16 w-16 rounded-2xl object-cover" />
@@ -245,17 +603,26 @@ function General({ group, onSave }) {
             >
               {uploading ? 'Lädt…' : 'Bild hochladen'}
             </button>
+            <div className="text-[11px] text-ink-dim">Wird sofort übernommen.</div>
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPick} />
           </div>
         </div>
         <Field label="Vereinsname">
           <Input value={ed.val.name} onChange={ed.field('name')} />
         </Field>
-      </Card>
-      <SaveBar onDiscard={ed.discard} onSave={() => ed.save((v) => ({ name: v.name.trim() }))} saving={ed.saving} saved={ed.saved} />
+      </Group>
+      <SaveBar
+        dirty={ed.dirty}
+        saving={ed.saving}
+        saved={ed.saved}
+        onDiscard={ed.discard}
+        onSave={() => ed.save((v) => ({ name: v.name.trim() }))}
+      />
     </div>
   )
 }
+
+/* ── Bereich: Kasse & Zahlungswege ───────────────────────────────────── */
 
 /* Die beiden Betriebsarten der Kasse. Beschreibung und Merkmale stehen hier
    beieinander, weil die Wahl mehr verstellt als ein Etikett: sie entscheidet,
@@ -321,56 +688,42 @@ function ModeOption({ icon, title, desc, points, active, onSelect }) {
   )
 }
 
-function Finance({ group, onSave }) {
+function TreasurySection({ group, onSave, onDirty }) {
   const ed = useEditor(
     {
-      monthly_fee: group.monthly_fee ?? '',
-      fee_booking_mode: group.fee_booking_mode ?? 'fixed_day',
-      fee_day: group.fee_day ?? '',
+      treasury_mode: group.treasury_mode ?? 'account',
       payment_iban: group.payment_iban ?? '',
       payment_paypal: group.payment_paypal ?? '',
-      treasury_mode: group.treasury_mode ?? 'account',
       treasury_opening_balance: group.treasury_opening_balance ?? '',
       treasury_opening_balance_date: group.treasury_opening_balance_date ?? '',
       cash_opening_balance: group.cash_opening_balance ?? '',
       cash_opening_balance_date: group.cash_opening_balance_date ?? '',
-      payment_deadline_type: group.payment_deadline_type ?? 'days_before_next_event',
-      payment_deadline_days: group.payment_deadline_days ?? '',
-      late_payment_fee: group.late_payment_fee ?? '',
-      charge_absent_avg: group.charge_absent_avg ?? false,
-      round_up_penalties: group.round_up_penalties ?? false,
     },
     onSave,
+    onDirty,
   )
-  const transform = (v) => ({
-    monthly_fee: Number(v.monthly_fee) || 0,
-    fee_booking_mode: v.fee_booking_mode || 'fixed_day',
-    fee_day: Number(v.fee_day) || 1,
-    // Ohne Konto keine IBAN: sonst stünde im Profil weiter eine Nummer, auf die
-    // niemand überweisen soll.
-    payment_iban: v.treasury_mode === 'cash' ? null : v.payment_iban || null,
-    payment_paypal: v.payment_paypal || null,
-    treasury_mode: v.treasury_mode || 'account',
-    treasury_opening_balance: Number(v.treasury_opening_balance) || 0,
-    treasury_opening_balance_date: v.treasury_opening_balance_date || null,
-    cash_opening_balance: Number(v.cash_opening_balance) || 0,
-    cash_opening_balance_date: v.cash_opening_balance_date || null,
-    payment_deadline_type: v.payment_deadline_type,
-    payment_deadline_days: Number(v.payment_deadline_days) || 0,
-    late_payment_fee: Number(v.late_payment_fee) || 0,
-    charge_absent_avg: !!v.charge_absent_avg,
-    round_up_penalties: !!v.round_up_penalties,
-  })
+
   // Ein Club führt entweder ein Konto ODER eine Barkasse. Daran hängt nicht nur
   // ein Etikett, sondern der halbe Geldweg: mit Konto kommen Zahlungen über den
   // Kontoauszug herein, ohne Konto werden sie eingesammelt. Entsprechend
   // verschwinden die Felder der jeweils anderen Welt.
-  const hasBank = ed.val.treasury_mode !== 'cash'
-  const hasCash = !hasBank
+  const cash = ed.val.treasury_mode === 'cash'
+
+  const transform = (v) => ({
+    treasury_mode: v.treasury_mode || 'account',
+    // Ohne Konto keine IBAN: sonst stünde im Profil weiter eine Nummer, auf die
+    // niemand überweisen soll.
+    payment_iban: v.treasury_mode === 'cash' ? null : v.payment_iban || null,
+    payment_paypal: v.payment_paypal || null,
+    treasury_opening_balance: Number(v.treasury_opening_balance) || 0,
+    treasury_opening_balance_date: v.treasury_opening_balance_date || null,
+    cash_opening_balance: Number(v.cash_opening_balance) || 0,
+    cash_opening_balance_date: v.cash_opening_balance_date || null,
+  })
+
   return (
     <div className="space-y-4">
-      <Card className="space-y-3">
-        <div className="text-[12px] font-semibold text-ink-soft">Wie führt ihr eure Kasse?</div>
+      <Group title="Wie führt ihr eure Kasse?">
         <div className="grid gap-2 sm:grid-cols-2">
           {TREASURY_MODES.map((m) => (
             <ModeOption
@@ -381,11 +734,108 @@ function Finance({ group, onSave }) {
             />
           ))}
         </div>
-      </Card>
+      </Group>
 
-      <Card className="space-y-4">
-        <Field label="Monatsbeitrag (€)"><Input type="number" step="0.5" value={ed.val.monthly_fee} onChange={ed.field('monthly_fee')} /></Field>
-        <Field label="Wann wird der Beitrag gebucht?">
+      <Group
+        title="Anfangsbestand"
+        hint="Der Kassenstand ist immer dieser Betrag plus alle Buchungen ab dem Stichtag."
+      >
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label={cash ? 'In der Kasse (€)' : 'Eröffnungssaldo (€)'}>
+            <Input
+              type="number"
+              step="0.01"
+              value={cash ? ed.val.cash_opening_balance : ed.val.treasury_opening_balance}
+              onChange={ed.field(cash ? 'cash_opening_balance' : 'treasury_opening_balance')}
+            />
+          </Field>
+          <Field label="Stichtag">
+            <Input
+              type="date"
+              value={
+                (cash ? ed.val.cash_opening_balance_date : ed.val.treasury_opening_balance_date) || ''
+              }
+              onChange={ed.field(
+                cash ? 'cash_opening_balance_date' : 'treasury_opening_balance_date',
+              )}
+            />
+          </Field>
+        </div>
+      </Group>
+
+      <Group
+        title="Zahlungswege"
+        hint={
+          cash
+            ? 'Bar wird vor Ort kassiert. Ein PayPal-Link ist trotzdem möglich — für alle, die nicht da waren.'
+            : 'Beide Angaben stehen jedem Mitglied im Profil, damit es weiß, wohin es zahlt.'
+        }
+      >
+        {!cash && (
+          <Field label="IBAN">
+            <Input
+              value={ed.val.payment_iban}
+              onChange={ed.field('payment_iban')}
+              className="font-mono"
+            />
+          </Field>
+        )}
+        <Field label="PayPal-Link" hint="optional">
+          <Input value={ed.val.payment_paypal} onChange={ed.field('payment_paypal')} />
+        </Field>
+      </Group>
+
+      <SaveBar
+        dirty={ed.dirty}
+        saving={ed.saving}
+        saved={ed.saved}
+        onDiscard={ed.discard}
+        onSave={() => ed.save(transform)}
+      />
+    </div>
+  )
+}
+
+/* ── Bereich: Beiträge & Fristen ─────────────────────────────────────── */
+
+function FeesSection({ group, onSave, onDirty }) {
+  const ed = useEditor(
+    {
+      monthly_fee: group.monthly_fee ?? '',
+      fee_booking_mode: group.fee_booking_mode ?? 'fixed_day',
+      fee_day: group.fee_day ?? '',
+      payment_deadline_type: group.payment_deadline_type ?? 'days_before_next_event',
+      payment_deadline_days: group.payment_deadline_days ?? '',
+      late_payment_fee: group.late_payment_fee ?? '',
+      notify_csv_import: group.notify_csv_import ?? true,
+    },
+    onSave,
+    onDirty,
+  )
+  const cash = group.treasury_mode === 'cash'
+
+  const transform = (v) => ({
+    monthly_fee: Number(v.monthly_fee) || 0,
+    fee_booking_mode: v.fee_booking_mode || 'fixed_day',
+    fee_day: Number(v.fee_day) || 1,
+    payment_deadline_type: v.payment_deadline_type,
+    payment_deadline_days: Number(v.payment_deadline_days) || 0,
+    late_payment_fee: Number(v.late_payment_fee) || 0,
+    notify_csv_import: !!v.notify_csv_import,
+  })
+
+  return (
+    <div className="space-y-4">
+      <Group title="Monatsbeitrag">
+        <Field label="Betrag (€)">
+          <Input
+            type="number"
+            step="0.5"
+            value={ed.val.monthly_fee}
+            onChange={ed.field('monthly_fee')}
+          />
+        </Field>
+        <Field label="Wann wird gebucht?">
           <Select value={ed.val.fee_booking_mode} onChange={ed.field('fee_booking_mode')}>
             <option value="fixed_day">An einem festen Tag im Monat</option>
             <option value="day_after_last_event">Am Tag nach dem letzten Kegelabend des Monats</option>
@@ -396,52 +846,15 @@ function Finance({ group, onSave }) {
             <Input type="number" min="1" max="28" value={ed.val.fee_day} onChange={ed.field('fee_day')} />
           </Field>
         ) : (
-          <p className="rounded-2xl bg-bg p-3 text-[12px] text-ink-soft">
+          <p className="rounded-2xl bg-bg p-3 text-[12px] leading-relaxed text-ink-soft">
             Der Beitrag wird automatisch am Tag nach dem letzten Kegeltermin des Monats auf alle
-            Konten gebucht. Die Zahlungsfrist richtet sich nach der Einstellung unten – z. B. „2 Tage
-            vor dem nächsten Kegeltermin". Gibt es in einem Monat keinen Kegeltermin, wird in dem
-            Monat nichts gebucht.
+            Konten gebucht. Gibt es in einem Monat keinen Kegeltermin, wird in dem Monat nichts
+            gebucht.
           </p>
         )}
-        {hasBank && (
-          <Field label="IBAN"><Input value={ed.val.payment_iban} onChange={ed.field('payment_iban')} className="font-mono" /></Field>
-        )}
-        <Field label="PayPal-Link"><Input value={ed.val.payment_paypal} onChange={ed.field('payment_paypal')} /></Field>
-      </Card>
+      </Group>
 
-      {/* Anfangsbestand der geführten Kasse. Der Kassenstand ist immer dieser
-          Betrag plus alle Buchungen ab dem Stichtag. */}
-      <Card className="space-y-4">
-        <div className="text-[12px] font-semibold text-ink-soft">
-          {hasCash ? 'Anfangsbestand der Barkasse' : 'Anfangsbestand'}
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label={hasCash ? 'In der Kasse (€)' : 'Eröffnungssaldo (€)'}>
-            <Input
-              type="number"
-              step="0.01"
-              value={hasCash ? ed.val.cash_opening_balance : ed.val.treasury_opening_balance}
-              onChange={ed.field(hasCash ? 'cash_opening_balance' : 'treasury_opening_balance')}
-            />
-          </Field>
-          <Field label="Stichtag">
-            <Input
-              type="date"
-              value={
-                (hasCash ? ed.val.cash_opening_balance_date : ed.val.treasury_opening_balance_date) || ''
-              }
-              onChange={ed.field(
-                hasCash ? 'cash_opening_balance_date' : 'treasury_opening_balance_date',
-              )}
-            />
-          </Field>
-        </div>
-      </Card>
-      <Card className="space-y-4">
-        <div className="text-[12px] font-semibold text-ink-soft">Zahlungsfristen & Verspätung</div>
-        <p className="text-[12px] text-ink-soft">
-          Diese Frist gilt gemeinsam für Monatsbeiträge und Strafen.
-        </p>
+      <Group title="Zahlungsfrist" hint="Diese Frist gilt gemeinsam für Monatsbeiträge und Strafen.">
         <Field label="Fristberechnung">
           <Select value={ed.val.payment_deadline_type} onChange={ed.field('payment_deadline_type')}>
             <option value="days_before_next_event">Tage vor dem nächsten Kegeltermin</option>
@@ -452,151 +865,154 @@ function Finance({ group, onSave }) {
         <div className="grid grid-cols-2 gap-3">
           <Field
             label={
-              ed.val.payment_deadline_type === 'fixed_day_of_month'
-                ? 'Tag im Monat'
-                : 'Frist (Tage)'
+              ed.val.payment_deadline_type === 'fixed_day_of_month' ? 'Tag im Monat' : 'Frist (Tage)'
             }
-            hint={
-              ed.val.payment_deadline_type === 'days_before_next_event'
-                ? 'Tage vor dem Kegeln'
-                : ed.val.payment_deadline_type === 'days_after_booking'
-                  ? 'Tage nach der Buchung'
-                  : '1–28'
-            }
+            hint={ed.val.payment_deadline_type === 'fixed_day_of_month' ? '1–28' : undefined}
           >
-            <Input type="number" value={ed.val.payment_deadline_days} onChange={ed.field('payment_deadline_days')} />
+            <Input
+              type="number"
+              value={ed.val.payment_deadline_days}
+              onChange={ed.field('payment_deadline_days')}
+            />
           </Field>
-          <Field label="Verspätungsstrafe (€)"><Input type="number" step="0.5" value={ed.val.late_payment_fee} onChange={ed.field('late_payment_fee')} /></Field>
+          <Field label="Verspätungsstrafe (€)" hint="je verstrichener Frist">
+            <Input
+              type="number"
+              step="0.5"
+              value={ed.val.late_payment_fee}
+              onChange={ed.field('late_payment_fee')}
+            />
+          </Field>
         </div>
-      </Card>
-      <Card className="space-y-4">
-        <div className="text-[12px] font-semibold text-ink-soft">Kegelabend</div>
+        {/* Die Einstellung in einem Satz — sonst muss man aus zwei Feldern
+            zusammenreimen, was am Ende tatsächlich fällig wird. */}
+        <p className="rounded-2xl bg-bg p-3 text-[12px] leading-relaxed text-ink-soft">
+          {deadlineSentence(ed.val.payment_deadline_type, ed.val.payment_deadline_days)}
+          {Number(ed.val.late_payment_fee) > 0 &&
+            ` Wer bis dahin nicht gezahlt hat, bekommt ${eur(Number(ed.val.late_payment_fee))} € Verspätungsstrafe.`}
+        </p>
+      </Group>
+
+      {/* Club-weite Erinnerung, wenn eine Frist verstrichen ist und das Geld
+          fehlt. Bewusst NICHT im Profil, sondern hier: sie richtet sich an das
+          Amt (Kassenwart/Präsident/Admin), nicht an eine Person. */}
+      <Group title="Erinnerung an den Vorstand">
+        <Toggle
+          checked={!!ed.val.notify_csv_import}
+          onChange={ed.field('notify_csv_import')}
+          label={cash ? 'An offenes Kassieren erinnern' : 'An fehlenden Kontoauszug erinnern'}
+          hint={
+            cash
+              ? 'Ist eine Zahlungsfrist verstrichen und steht noch Geld aus, bekommen Kassenwart, Präsident und Admin am Tag danach und dann alle 2 Tage eine Erinnerung.'
+              : 'Ist eine Zahlungsfrist verstrichen, ohne dass ein Kontoauszug bis zu diesem Datum importiert wurde, bekommen Kassenwart, Präsident und Admin am Tag danach und dann alle 2 Tage eine Erinnerung.'
+          }
+        />
+      </Group>
+
+      <SaveBar
+        dirty={ed.dirty}
+        saving={ed.saving}
+        saved={ed.saved}
+        onDiscard={ed.discard}
+        onSave={() => ed.save(transform)}
+      />
+    </div>
+  )
+}
+
+/* ── Bereich: Kegelabend-Regeln ──────────────────────────────────────── */
+
+function SessionSection({ group, onSave, onDirty }) {
+  const ed = useEditor(
+    {
+      charge_absent_avg: group.charge_absent_avg ?? false,
+      round_up_penalties: group.round_up_penalties ?? false,
+    },
+    onSave,
+    onDirty,
+  )
+  const transform = (v) => ({
+    charge_absent_avg: !!v.charge_absent_avg,
+    round_up_penalties: !!v.round_up_penalties,
+  })
+
+  return (
+    <div className="space-y-4">
+      <Group title="Beim Genehmigen">
         <Toggle
           checked={!!ed.val.charge_absent_avg}
           onChange={ed.field('charge_absent_avg')}
           label="Abwesende mit Durchschnitt belasten"
-          hint="Gilt für alle Kegelabende: Nach der Genehmigung bekommen abwesende Mitglieder den Schnitt aller echten Mitglieder (ohne Gäste) als offenen Beitrag."
+          hint="Nach der Genehmigung bekommen abwesende Mitglieder den Schnitt aller echten Mitglieder (ohne Gäste) als offenen Beitrag."
         />
         <div className="border-t border-card-edge pt-4">
           <Toggle
             checked={!!ed.val.round_up_penalties}
             onChange={ed.field('round_up_penalties')}
             label="Strafen auf den nächsten Euro aufrunden"
-            hint="Beim Genehmigen werden alle gebuchten Strafen – auch der Durchschnitt – auf den nächsten vollen Euro aufgerundet."
+            hint="Alle gebuchten Strafen – auch der Durchschnitt – werden auf den nächsten vollen Euro aufgerundet."
           />
         </div>
-      </Card>
-      <CsvReminderCard group={group} cash={hasCash} />
-      <SaveBar onDiscard={ed.discard} onSave={() => ed.save(transform)} saving={ed.saving} saved={ed.saved} />
-    </div>
-  )
-}
+      </Group>
 
-/* Club-weite Erinnerung, wenn eine Frist verstrichen ist und das Geld fehlt.
-   Bewusst NICHT im Profil, sondern hier: sie richtet sich an das Amt
-   (Kassenwart/Präsident/Admin), nicht an eine Person. Derselbe Schalter, zwei
-   Anlässe — je nachdem, wie der Club seine Kasse führt. Speichert sofort per
-   RPC, hängt also nicht an der SaveBar oben. */
-function CsvReminderCard({ group, cash }) {
-  const { mockMode, activeGroupId } = useAuth()
-  const [on, setOn] = useState(group?.notify_csv_import ?? true)
+      <p className="px-1 text-[12px] text-ink-dim">
+        Welche Strafen es gibt und was sie kosten, steht im{' '}
+        <Link to="/penalties" className="font-semibold text-sage">
+          Strafenkatalog
+        </Link>
+        .
+      </p>
 
-  const toggle = (v) => {
-    setOn(v)
-    if (mockMode || !activeGroupId) return
-    setGroupNotifyCsv(activeGroupId, v).catch((e) => {
-      console.error(e)
-      setOn(!v)
-    })
-  }
-
-  return (
-    <Card className="space-y-4">
-      <div className="text-[12px] font-semibold text-ink-soft">Benachrichtigungen des Vorstands</div>
-      <Toggle
-        checked={on}
-        onChange={toggle}
-        label={cash ? 'An offenes Kassieren erinnern' : 'An fehlenden Kontoauszug erinnern'}
-        hint={
-          cash
-            ? 'Ist eine Zahlungsfrist verstrichen und steht noch Geld aus, bekommen Kassenwart, Präsident und Admin am Tag danach und dann alle 2 Tage eine Erinnerung.'
-            : 'Ist eine Zahlungsfrist verstrichen, ohne dass ein Kontoauszug bis zu diesem Datum importiert wurde, bekommen Kassenwart, Präsident und Admin am Tag danach und dann alle 2 Tage eine Erinnerung.'
-        }
+      <SaveBar
+        dirty={ed.dirty}
+        saving={ed.saving}
+        saved={ed.saved}
+        onDiscard={ed.discard}
+        onSave={() => ed.save(transform)}
       />
-    </Card>
-  )
-}
-
-function PenaltiesTab({ mockMode, groupId }) {
-  const [list, setList] = useState(mockMode ? mockPenalties : null)
-  useEffect(() => {
-    if (mockMode || !groupId) return
-    listPenalties(groupId).then((p) =>
-      setList(p.map((x) => ({ ...x, manual: x.manual_amount }))),
-    )
-  }, [mockMode, groupId])
-
-  const active = (list || []).filter((p) => p.active)
-  return (
-    <Card className="space-y-3">
-      <div className="text-[13px] text-ink-soft">
-        {list ? `${active.length} aktive Strafen im Katalog.` : 'Lädt…'}
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {active.slice(0, 8).map((p) => (
-          <span key={p.id} className="flex items-center gap-1.5 rounded-full bg-bg px-3 py-1.5 text-[13px]">
-            {p.icon} {p.name}{p.manual ? '' : ` · ${Number(p.amount).toFixed(2)} €`}
-          </span>
-        ))}
-      </div>
-      <Link to="/penalties">
-        <Button className="w-full sm:w-auto">Katalog bearbeiten →</Button>
-      </Link>
-    </Card>
-  )
-}
-
-function EventsTab() {
-  return (
-    <div className="space-y-3">
-      <Card className="text-[13px] text-ink-soft">
-        Regeltermine werden im Kalender verwaltet. Lege wiederkehrende Termine an oder bearbeite bestehende.
-      </Card>
-      <Link to="/calendar">
-        <Button variant="soft" className="w-full">Zum Kalender →</Button>
-      </Link>
-      <Link to="/calendar/new">
-        <Button className="w-full">+ Regeltermin hinzufügen</Button>
-      </Link>
     </div>
   )
 }
 
-function Rulebook({ group, onSave }) {
-  const ed = useEditor({ rulebook_content: group.rulebook_content || '' }, onSave)
+/* ── Bereich: Regelwerk ──────────────────────────────────────────────── */
+
+function RulebookSection({ group, onSave, onDirty }) {
+  const ed = useEditor({ rulebook_content: group.rulebook_content || '' }, onSave, onDirty)
   return (
     <div className="space-y-4">
       <Card>
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-[12px] font-semibold text-ink-soft">Vereinsregelwerk (Markdown)</span>
-          <Link to="/rulebook" className="text-[12px] font-semibold text-sage">Leseansicht →</Link>
+          <span className="text-[12px] font-semibold uppercase tracking-[0.08em] text-ink-dim">
+            Markdown
+          </span>
+          <Link to="/rulebook" className="text-[12px] font-semibold text-sage">
+            Leseansicht →
+          </Link>
         </div>
         <textarea
-          className="h-64 w-full resize-none rounded-2xl border border-card-edge bg-card p-4 font-mono text-[13px] outline-none focus:border-ink"
+          className="h-72 w-full resize-none rounded-2xl border border-card-edge bg-card p-4 font-mono text-[13px] outline-none focus:border-ink"
           value={ed.val.rulebook_content}
           onChange={ed.field('rulebook_content')}
           placeholder="# Vereinsregelwerk&#10;&#10;## §1 …"
         />
         <p className="mt-2 text-[11px] text-ink-dim">
-          Markdown: <code># Überschrift</code>, <code>**fett**</code>, <code>- Liste</code>.
+          <code># Überschrift</code>, <code>**fett**</code>, <code>- Liste</code>
         </p>
       </Card>
-      <SaveBar onDiscard={ed.discard} onSave={() => ed.save()} saving={ed.saving} saved={ed.saved} />
+      <SaveBar
+        dirty={ed.dirty}
+        saving={ed.saving}
+        saved={ed.saved}
+        onDiscard={ed.discard}
+        onSave={() => ed.save()}
+      />
     </div>
   )
 }
 
-function MembersTab({ mockMode, groupId, canEdit, canSetActive }) {
+/* ── Bereich: Mitglieder & Rollen ────────────────────────────────────── */
+
+function MembersSection({ mockMode, groupId, group, canEdit, canSetActive, canInvite, onInviteReset }) {
   const { user, refresh } = useAuth()
   const [list, setList] = useState(
     mockMode ? mockMembers.map((m) => ({ id: m.id, userId: m.id, name: m.name, roles: [m.role] })) : null,
@@ -699,78 +1115,94 @@ function MembersTab({ mockMode, groupId, canEdit, canSetActive }) {
     </div>
   )
 
+  const heading = (text) => (
+    <h3 className="px-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-dim">
+      {text}
+    </h3>
+  )
+
   return (
-    <div className="space-y-5">
-      <Card className="p-0">
-        {active.map((m, i) =>
-          row(m, i === active.length - 1, (
-            <>
-              <button
-                onClick={() => setRoleOpenId(roleOpenId === m.id ? null : m.id)}
-                disabled={!canEdit}
-                className={cx(
-                  'min-w-0 max-w-[60%] truncate rounded-xl border border-card-edge px-3 py-2',
-                  'text-left text-[13px] disabled:opacity-60',
-                  roleOpenId === m.id && 'border-sage',
-                )}
-                title="Rollen ändern"
-              >
-                {roleLabels(m.roles).join(' · ')}
-                {canEdit && <span className="ml-1 text-ink-dim">▾</span>}
-              </button>
-              {canSetActive && m.userId !== user?.id && (
+    <div className="space-y-6">
+      <section className="space-y-2">
+        {heading(`Aktive Mitglieder (${active.length})`)}
+        <Card className="p-0">
+          {active.map((m, i) =>
+            row(m, i === active.length - 1, (
+              <>
                 <button
-                  onClick={() => toggleActive(m)}
-                  disabled={savingId === m.id}
-                  className="text-[12px] font-semibold text-ink-soft hover:underline"
-                  title="Nimmt nicht mehr am Clubleben teil, bleibt in der Statistik"
+                  onClick={() => setRoleOpenId(roleOpenId === m.id ? null : m.id)}
+                  disabled={!canEdit}
+                  className={cx(
+                    'min-w-0 max-w-[60%] truncate rounded-xl border border-card-edge px-3 py-2',
+                    'text-left text-[13px] disabled:opacity-60',
+                    roleOpenId === m.id && 'border-sage',
+                  )}
+                  title="Rollen ändern"
                 >
-                  Inaktiv setzen
+                  {roleLabels(m.roles).join(' · ')}
+                  {canEdit && <span className="ml-1 text-ink-dim">▾</span>}
                 </button>
-              )}
-              {canEdit && m.userId !== user?.id && (
-                <button
-                  onClick={() => remove(m)}
-                  disabled={savingId === m.id}
-                  className="text-[12px] font-semibold text-terra hover:underline"
-                  title="Mitglied entfernen — löscht auch die Historie"
-                >
-                  Entfernen
-                </button>
-              )}
-            </>
-          ),
-          canEdit && roleOpenId === m.id ? (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {ROLES.map((r) => {
-                const on = m.roles.includes(r)
-                // Den letzten Admin kann niemand abwählen — sonst steht der
-                // Club ohne Verwaltung da. Die Datenbank blockt es ohnehin.
-                const locked = r === 'admin' && on && lastAdmin
-                return (
+                {canSetActive && m.userId !== user?.id && (
                   <button
-                    key={r}
-                    onClick={() => !locked && toggleRole(m, r)}
-                    disabled={savingId === m.id || locked}
-                    title={locked ? 'Der Club braucht mindestens einen Admin' : undefined}
-                    className={cx(
-                      'rounded-full border px-3 py-1.5 text-[12px] font-semibold',
-                      on ? 'border-sage bg-sage-bg text-sage' : 'border-card-edge text-ink-soft',
-                      locked && 'opacity-60',
-                    )}
+                    onClick={() => toggleActive(m)}
+                    disabled={savingId === m.id}
+                    className="text-[12px] font-semibold text-ink-soft hover:underline"
+                    title="Nimmt nicht mehr am Clubleben teil, bleibt in der Statistik"
                   >
-                    {on ? '✓ ' : ''}{ROLE_LABEL[r]}
+                    Inaktiv setzen
                   </button>
-                )
-              })}
-            </div>
-          ) : null),
+                )}
+                {canEdit && m.userId !== user?.id && (
+                  <button
+                    onClick={() => remove(m)}
+                    disabled={savingId === m.id}
+                    className="text-[12px] font-semibold text-terra hover:underline"
+                    title="Mitglied entfernen — löscht auch die Historie"
+                  >
+                    Entfernen
+                  </button>
+                )}
+              </>
+            ),
+            canEdit && roleOpenId === m.id ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {ROLES.map((r) => {
+                  const on = m.roles.includes(r)
+                  // Den letzten Admin kann niemand abwählen — sonst steht der
+                  // Club ohne Verwaltung da. Die Datenbank blockt es ohnehin.
+                  const locked = r === 'admin' && on && lastAdmin
+                  return (
+                    <button
+                      key={r}
+                      onClick={() => !locked && toggleRole(m, r)}
+                      disabled={savingId === m.id || locked}
+                      title={locked ? 'Der Club braucht mindestens einen Admin' : undefined}
+                      className={cx(
+                        'rounded-full border px-3 py-1.5 text-[12px] font-semibold',
+                        on ? 'border-sage bg-sage-bg text-sage' : 'border-card-edge text-ink-soft',
+                        locked && 'opacity-60',
+                      )}
+                    >
+                      {on ? '✓ ' : ''}{ROLE_LABEL[r]}
+                    </button>
+                  )
+                })}
+              </div>
+            ) : null),
+          )}
+        </Card>
+        {canEdit && (
+          <p className="px-1 text-[11px] leading-relaxed text-ink-dim">
+            Tippe auf die Rolle, um sie zu ändern. Mehrere Rollen sind möglich — Vizepräsident
+            hat dieselben Rechte wie der Präsident, der Kassenprüfer dieselben wie der Kassenwart.
+            Der Geburtstagsbeauftragte hat die Rechte eines normalen Mitglieds.
+          </p>
         )}
-      </Card>
+      </section>
 
       {inactive.length > 0 && (
-        <div>
-          <h3 className="mb-2 text-[13px] font-semibold text-ink-soft">Inaktive Mitglieder</h3>
+        <section className="space-y-2">
+          {heading(`Inaktive Mitglieder (${inactive.length})`)}
           <Card className="p-0 opacity-70">
             {inactive.map((m, i) =>
               row(m, i === inactive.length - 1, (
@@ -793,26 +1225,31 @@ function MembersTab({ mockMode, groupId, canEdit, canSetActive }) {
               )),
             )}
           </Card>
-          <p className="mt-2 text-[11px] leading-relaxed text-ink-dim">
+          <p className="px-1 text-[11px] leading-relaxed text-ink-dim">
             Inaktive nehmen an Terminen, Kegelabenden und Abstimmungen nicht mehr teil und
             bekommen weder Monatsbeitrag noch neue Strafen. Offene Schulden bleiben bestehen,
             in der Statistik stehen sie weiter mit ihrer Historie.
           </p>
-        </div>
+        </section>
       )}
 
-      {canEdit && (
-        <p className="text-[11px] leading-relaxed text-ink-dim">
-          Tippe auf die Rolle, um sie zu ändern. Mehrere Rollen sind möglich — Vizepräsident
-          hat dieselben Rechte wie der Präsident, der Kassenprüfer dieselben wie der Kassenwart.
-          Der Geburtstagsbeauftragte hat die Rechte eines normalen Mitglieds.
-        </p>
-      )}
-
-      <div>
-        <h3 className="mb-2 text-[13px] font-semibold text-ink-soft">Vorab angelegte Mitglieder</h3>
+      <section className="space-y-2">
+        {heading('Vorab angelegte Mitglieder')}
         <PlaceholderManager mockMode={mockMode} groupId={groupId} canEdit={canEdit} />
-      </div>
+      </section>
+
+      {canInvite && (
+        <section className="space-y-2">
+          {heading('Neue Mitglieder einladen')}
+          <Card>
+            <InviteBox
+              token={mockMode ? undefined : group?.invite_token}
+              canReset={!mockMode}
+              onReset={onInviteReset}
+            />
+          </Card>
+        </section>
+      )}
     </div>
   )
 }
@@ -869,7 +1306,7 @@ export function PlaceholderManager({ mockMode, groupId, canEdit = true }) {
 
   return (
     <Card className="space-y-3">
-      <p className="text-[12px] text-ink-soft">
+      <p className="text-[12px] leading-relaxed text-ink-soft">
         Lege Mitglieder schon vor der Anmeldung an. Sie zählen sofort als vollwertige Mitglieder –
         du kannst ihnen Strafen und Kegelabende zuordnen –, sind aber als „nicht registriert"
         markiert. Beim Beitritt über den Einladungslink wählt jeder seinen Namen aus dieser Liste;
