@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { Button } from './ui'
+import BirthDateGate from './BirthDateGate.jsx'
 
 export default function ProtectedRoute({ children, requireGroup = true }) {
   const { mockMode, loading, authError, retryAuth, signOut, session, memberships } = useAuth()
@@ -40,7 +41,14 @@ export default function ProtectedRoute({ children, requireGroup = true }) {
     return <Navigate to="/groups/new" replace />
   }
 
-  return children
+  // Pflichtangaben, die im Bestand fehlen können, werden hier nachgeholt —
+  // vor jedem geschützten Screen, also auch vor dem Onboarding.
+  return (
+    <>
+      {children}
+      <BirthDateGate />
+    </>
+  )
 }
 
 /**

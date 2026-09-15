@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button, Field, Input } from '../../components/ui'
+import { MAX_BIRTH_DATE, validateBirthDate } from '../../lib/birthday.js'
 import AuthShell from './AuthShell'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { supabase } from '../../lib/supabase.js'
@@ -8,7 +9,7 @@ import { supabase } from '../../lib/supabase.js'
 export default function Register() {
   const navigate = useNavigate()
   const { mockMode } = useAuth()
-  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', password: '' })
+  const [form, setForm] = useState({ firstName: '', lastName: '', birthDate: '', email: '', password: '' })
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -21,6 +22,11 @@ export default function Register() {
       navigate('/setup/1')
       return
     }
+    const bdError = validateBirthDate(form.birthDate)
+    if (bdError) {
+      setError(bdError)
+      return
+    }
     if (form.password.length < 8) {
       setError('Das Passwort muss mindestens 8 Zeichen haben.')
       return
@@ -30,7 +36,11 @@ export default function Register() {
       email: form.email,
       password: form.password,
       options: {
-        data: { first_name: form.firstName, last_name: form.lastName },
+        data: {
+          first_name: form.firstName,
+          last_name: form.lastName,
+          birth_date: form.birthDate,
+        },
         emailRedirectTo: `${window.location.origin}/login`,
       },
     })
@@ -58,6 +68,16 @@ export default function Register() {
             <Input placeholder="Roosen" autoComplete="family-name" value={form.lastName} onChange={set('lastName')} required />
           </Field>
         </div>
+        <Field label="Geburtstag" hint="Dein Geburtstag erscheint im Clubkalender.">
+          <Input
+            type="date"
+            max={MAX_BIRTH_DATE}
+            autoComplete="bday"
+            value={form.birthDate}
+            onChange={set('birthDate')}
+            required
+          />
+        </Field>
         <Field label="E-Mail">
           <Input type="email" placeholder="du@beispiel.de" autoComplete="email" value={form.email} onChange={set('email')} required />
         </Field>

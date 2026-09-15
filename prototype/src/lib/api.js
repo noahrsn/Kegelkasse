@@ -349,6 +349,26 @@ export async function listEvents(groupId) {
   })
 }
 
+/* Geburtstage der Clubmitglieder. Quelle ist profiles.birth_date — die RLS
+   gibt Profile von Club-Kollegen frei, eine eigene View braucht es nicht.
+   Ghost-Profile (noch nicht registriert) und Ausgetretene bleiben draußen:
+   Erstere haben kein Datum, Letztere feiern nicht mehr mit dem Club. */
+export async function listBirthdays(groupId) {
+  const { data, error } = await supabase
+    .from('group_members')
+    .select('user_id, inactive_since, profiles(first_name, last_name, birth_date, is_placeholder)')
+    .eq('group_id', groupId)
+    .is('inactive_since', null)
+  if (error) throw error
+  return (data ?? [])
+    .filter((m) => m.profiles?.birth_date && !m.profiles.is_placeholder)
+    .map((m) => ({
+      userId: m.user_id,
+      name: `${m.profiles.first_name} ${m.profiles.last_name}`.trim(),
+      birthDate: m.profiles.birth_date,
+    }))
+}
+
 /* Vollständiges Event-Detail inkl. Rückmeldungen + Gäste (für RSVP-Ansicht/Edit). */
 export async function getEvent(eventId) {
   const { data, error } = await supabase
@@ -950,6 +970,17 @@ export async function uploadAvatar(path, file) {
 /* Eigenes Profilbild speichern (profiles self-update Policy). */
 export async function setMyAvatar(userId, url) {
   const { error } = await supabase.from('profiles').update({ avatar_url: url }).eq('id', userId)
+  if (error) throw error
+}
+
+/* Eigene Stammdaten speichern (RLS: profiles_update_self — nur das eigene Profil).
+   `birthDate` als leerer String bedeutet „nicht angegeben" und wird zu NULL. */
+export async function saveMyProfile(userId, { firstName, lastName, birthDate }) {
+  const row = {}
+  if (firstName !== undefined) row.first_name = firstName.trim()
+  if (lastName !== undefined) row.last_name = lastName.trim()
+  if (birthDate !== undefined) row.birth_date = birthDate || null
+  const { error } = await supabase.from('profiles').update(row).eq('id', userId)
   if (error) throw error
 }
 

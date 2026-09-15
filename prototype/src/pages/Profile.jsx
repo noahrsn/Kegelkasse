@@ -15,9 +15,11 @@ import {
   getMyAvatar,
   uploadAvatar,
   setMyAvatar,
+  saveMyProfile,
 } from '../lib/api.js'
 import { currentUser, club, myDebts, awards } from '../mock/data'
 import { getTheme, setTheme } from '../theme'
+import { MAX_BIRTH_DATE, validateBirthDate } from '../lib/birthday.js'
 
 const mockTitles = awards.filter((a) => a.holder === 'Martin Haas' || a.type === 'Goldesel')
 
@@ -205,23 +207,11 @@ export default function Profile() {
       )}
 
       {/* Eigene Daten */}
-      <Card className="space-y-4">
-        <div className="text-[12px] font-semibold text-ink-soft">Persönliche Daten</div>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Vorname">
-            <Input defaultValue={mockMode ? currentUser.firstName : first} />
-          </Field>
-          <Field label="Nachname">
-            <Input defaultValue={mockMode ? currentUser.lastName : rest.join(' ')} />
-          </Field>
-        </div>
-        <Field label="E-Mail">
-          <Input defaultValue={email} />
-        </Field>
-        <div className="flex justify-end">
-          <Button>Speichern</Button>
-        </div>
-      </Card>
+      <PersonalDataCard
+        firstName={mockMode ? currentUser.firstName : first}
+        lastName={mockMode ? currentUser.lastName : rest.join(' ')}
+        email={email}
+      />
 
       {/* Clubs */}
       <Card className="space-y-3">
@@ -236,6 +226,79 @@ export default function Profile() {
 
       <NotificationsCard />
     </div>
+  )
+}
+
+/* ── Persönliche Daten ────────────────────────────────────────────────────
+ * Name und Geburtstag liegen in profiles und dürfen nur vom User selbst
+ * geändert werden (Policy profiles_update_self). Die E-Mail hängt dagegen am
+ * Auth-Konto und wird hier nur angezeigt — sie zu ändern hieße, den Wechsel
+ * per Bestätigungsmail abzusichern; das ist ein eigenes Thema.
+ */
+function PersonalDataCard({ firstName, lastName, email }) {
+  const { mockMode, user, profile, refresh } = useAuth()
+  const [form, setForm] = useState({ firstName, lastName, birthDate: profile?.birthDate || '' })
+  const [state, setState] = useState({ busy: false, error: '', saved: false })
+
+  // Ändern sich die Stammdaten von außen (Speichern, Geburtstags-Dialog,
+  // Clubwechsel), ziehen die Felder nach. Tippen löst das nicht aus — die
+  // Abhängigkeiten sind ausschließlich die Werte aus dem Kontext.
+  useEffect(() => {
+    setForm({ firstName, lastName, birthDate: profile?.birthDate || '' })
+  }, [firstName, lastName, profile?.birthDate])
+
+  const set = (k) => (e) => {
+    setForm((f) => ({ ...f, [k]: e.target.value }))
+    setState((s) => ({ ...s, saved: false }))
+  }
+
+  const onSave = async () => {
+    if (mockMode || !user) return
+    if (!form.firstName.trim() || !form.lastName.trim()) {
+      setState({ busy: false, error: 'Vor- und Nachname dürfen nicht leer sein.', saved: false })
+      return
+    }
+    const bdError = validateBirthDate(form.birthDate)
+    if (bdError) {
+      setState({ busy: false, error: bdError, saved: false })
+      return
+    }
+    setState({ busy: true, error: '', saved: false })
+    try {
+      await saveMyProfile(user.id, form)
+      await refresh()
+      setState({ busy: false, error: '', saved: true })
+    } catch (err) {
+      console.error(err)
+      setState({ busy: false, error: err.message || 'Speichern fehlgeschlagen.', saved: false })
+    }
+  }
+
+  return (
+    <Card className="space-y-4">
+      <div className="text-[12px] font-semibold text-ink-soft">Persönliche Daten</div>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Vorname">
+          <Input value={form.firstName} onChange={set('firstName')} />
+        </Field>
+        <Field label="Nachname">
+          <Input value={form.lastName} onChange={set('lastName')} />
+        </Field>
+      </div>
+      <Field label="Geburtstag" hint="Erscheint im Clubkalender.">
+        <Input type="date" max={MAX_BIRTH_DATE} value={form.birthDate} onChange={set('birthDate')} />
+      </Field>
+      <Field label="E-Mail">
+        <Input value={email} disabled readOnly />
+      </Field>
+      {state.error && <p className="text-[12px] font-medium text-terra">{state.error}</p>}
+      <div className="flex items-center justify-end gap-3">
+        {state.saved && <span className="text-[12px] font-semibold text-sage">Gespeichert ✓</span>}
+        <Button onClick={onSave} disabled={state.busy || mockMode}>
+          {state.busy ? 'Speichert…' : 'Speichern'}
+        </Button>
+      </div>
+    </Card>
   )
 }
 

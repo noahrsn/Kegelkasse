@@ -99,6 +99,7 @@ const mockValue = {
     id: currentUser.id,
     firstName: currentUser.firstName,
     lastName: currentUser.lastName,
+    birthDate: currentUser.birthDate ?? '1991-04-17',
     name: currentUser.name,
     email: currentUser.email,
   },
@@ -200,7 +201,7 @@ function SupabaseProvider({ children }) {
           Promise.all([
             supabase
               .from('profiles')
-              .select('id, first_name, last_name')
+              .select('id, first_name, last_name, birth_date')
               .eq('id', uid)
               .maybeSingle(),
             supabase
@@ -233,6 +234,9 @@ function SupabaseProvider({ children }) {
             id: prof.id,
             firstName: prof.first_name,
             lastName: prof.last_name,
+            // null = noch nie angegeben (Altbestand). Darauf reagiert der
+            // Pflicht-Dialog in <BirthDateGate>.
+            birthDate: prof.birth_date ?? null,
             name: `${prof.first_name} ${prof.last_name}`.trim(),
           })
         }
