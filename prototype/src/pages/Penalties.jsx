@@ -13,10 +13,13 @@ const EDIT_ROLES = ['admin', 'kassenwart']
 // Feste Spielvarianten (Schnell-Strafen). Je Club genau eine Katalog-Zeile pro
 // Variante (game_kind); Betrag wird im Kegelabend berechnet/eingegeben, darum
 // fest manual. Hier nur aktivieren/deaktivieren, nicht frei bearbeiten.
+/* `free: true` heißt: das Spiel kostet nichts. Die Katalogzeile ist dann reiner
+   Schalter — „Betrag manuell" wäre dort eine falsche Angabe. */
 const GAMES = [
   { kind: 'einzel', name: 'Einzelspiel', icon: '🏅', desc: 'Platzierung antippen · ab Platz 4 in 0,25-€-Schritten' },
   { kind: 'teams', name: '2-Teams-Spiel', icon: '👥', desc: 'Fester Betrag je Verlierer' },
   { kind: 'progressive', name: '3,50 €-Spiel', icon: '💰', desc: 'Laufender Betrag · bekommen/vergeben' },
+  { kind: 'football', name: 'Fußball', icon: '⚽', desc: 'Torschützen zählen · ohne Strafe', free: true },
 ]
 
 function priceLabel(p) {
@@ -133,15 +136,19 @@ export default function Penalties() {
       if (mockMode) {
         setList((l) => [
           ...l,
-          { id: 'g' + Date.now(), name: g.name, icon: g.icon, amount: null, manual: true, chargeOthers: false, gameKind: g.kind, active: true },
+          {
+            id: 'g' + Date.now(), name: g.name, icon: g.icon,
+            amount: g.free ? 0 : null, manual: !g.free,
+            chargeOthers: false, gameKind: g.kind, active: true,
+          },
         ])
       } else {
         const row = fromDb(
           await insertPenalty(activeGroupId, {
             name: g.name,
             icon: g.icon,
-            manual_amount: true,
-            amount: null,
+            manual_amount: !g.free,
+            amount: g.free ? 0 : null,
             game_kind: g.kind,
             active: true,
           }),

@@ -1190,8 +1190,9 @@ Kassenwart muss mitkommen.
 Kegelabend gestartet; solange es läuft, bekommt jedes Tor einen Schützen aus der
 Runde. Daraus wird eine eigene Kennzahl — bis hin zum Torschützenkönig.
 
-> **Status — umgesetzt ✅:** Migration `036_football_goals.sql` + Frontend
-> (Kegelabend erfassen, Einreichung prüfen, Statistik).
+> **Status — umgesetzt ✅:** Migrationen `036_football_goals.sql` und
+> `037_football_catalog_entry.sql` + Frontend (Strafenkatalog, Kegelabend
+> erfassen, Einreichung prüfen, Statistik).
 
 ### Warum keine Katalogposition
 
@@ -1203,15 +1204,27 @@ Abends um keinen Cent. Der Zähler reist ohne Sonderbehandlung durch den
 bestehenden Speicherweg: `save_session` schreibt die Teilnehmerliste bei jedem
 Autosave neu und nimmt `goals` einfach mit.
 
+### An- und abschalten
+
+Fußball steht als Katalogzeile (`penalties_catalog.game_kind = 'football'`) an
+derselben Stelle wie die anderen Spiele: **Strafen → Spiele · Schnell-Strafen**,
+mit „Aktivieren" / „Deaktivieren". Ist es deaktiviert, ist der Eintrag im
+Spiele-Menü des Kegelabends ausgegraut. Die Zeile trägt bewusst keinen Betrag
+(`amount = 0`, `manual_amount = false`) — sie ist reiner Schalter; gebucht wird
+über sie nie.
+
 ### Erfassung
 
 - **Starten** im Spiele-Menü („⚽ Fußball"). Ob das Spiel läuft, ist reiner
   UI-Zustand und liegt wie beim 3,50-€-Spiel im `localStorage` je Entwurf.
 - **Banner** über der Teilnehmerliste, solange gespielt wird: es zeigt den
-  Spielstand samt Führendem, und der ganze Streifen ist der Knopf — beim Kegeln
-  zählt Trefferfläche, nicht Feinmotorik.
-- **Torschützen-Sheet:** alle Anwesenden mit ihrem Stand, „+" zählt hoch, „−"
-  nimmt zurück. Es bleibt offen, weil Tore selten einzeln fallen.
+  Spielstand, und der ganze Streifen ist der Knopf — beim Kegeln zählt
+  Trefferfläche, nicht Feinmotorik.
+- **Torschützen-Sheet** folgt demselben Erfassungsmodus wie die Strafen:
+  - **Schnell** — Raster aller Anwesenden mit Torzähler als Ecke; ein Tap auf
+    den Namen ist ein Tor, danach schließt das Sheet. Genau die Geste, mit der
+    auch Strafen verteilt werden.
+  - **Detailliert** — Liste mit „+" und „−" je Person, das Sheet bleibt offen.
 - **Gäste** dürfen treffen (sie stehen ja mit auf der Bahn), tauchen aber wie
   überall sonst nicht in der Statistik auf.
 - In der Teilnehmerkarte und in der Einreichungsprüfung steht ⚽ n **neben** der

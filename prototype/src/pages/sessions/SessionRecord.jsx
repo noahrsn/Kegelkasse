@@ -227,6 +227,9 @@ export default function SessionRecord() {
     einzel: allCat.find((p) => p.gameKind === 'einzel'),
     teams: allCat.find((p) => p.gameKind === 'teams'),
     progressive: allCat.find((p) => p.gameKind === 'progressive'),
+    // Fußball trägt keinen Betrag, steht aber im selben Katalog — nur so lässt
+    // es sich im Strafenkatalog an- und abschalten wie jedes andere Spiel.
+    football: allCat.find((p) => p.gameKind === 'football'),
   }
   const findPen = (penId) => allCat.find((p) => p.id === penId)
 
@@ -416,6 +419,7 @@ export default function SessionRecord() {
    * Entry und keine Katalogposition: das Tor soll in der Endsumme des Abends
    * nichts verändern, aber in der Statistik zählen. */
   const startFootball = () => {
+    if (!games.football) return // Club führt das Spiel nicht
     setFootball({ active: true })
     setGamesOpen(false)
   }
@@ -428,12 +432,12 @@ export default function SessionRecord() {
     setRoster((r) =>
       r.map((p, i) => (i === idx ? { ...p, goals: Math.max(0, (p.goals || 0) + delta) } : p)),
     )
+  // Im Schnell-Modus ist ein Tap das ganze Tor — inklusive Schließen.
+  const scoreFast = (idx) => {
+    addGoal(idx)
+    setScorerOpen(false)
+  }
   const goalsTotal = roster.reduce((a, p) => a + (p.goals || 0), 0)
-  // Wer gerade vorn liegt — die Zahl, die beim Spielen interessiert.
-  const topScorer = roster.reduce(
-    (best, p) => ((p.goals || 0) > (best?.goals || 0) ? p : best),
-    null,
-  )
 
   const advanceProgressive = () => setProgressive((g) => ({ ...g, amount: round2(g.amount + 0.25) }))
   const progBekommen = () => {
@@ -702,9 +706,7 @@ export default function SessionRecord() {
                 Fußball läuft · {goalsTotal} {goalsTotal === 1 ? 'Tor' : 'Tore'}
               </span>
               <span className="block truncate text-[12px] opacity-75">
-                {topScorer && topScorer.goals > 0
-                  ? `Vorn: ${topScorer.name} (${topScorer.goals})`
-                  : 'Tippen und Torschützen eintragen'}
+                Tippen und Torschützen eintragen
               </span>
             </span>
             <span
@@ -1006,31 +1008,51 @@ export default function SessionRecord() {
         </div>
       </Sheet>
 
-      {/* Torschützen */}
+      {/* Torschützen — dieselbe Bedienung wie beim Strafenverteilen:
+          schnell heißt ein Tap, detailliert heißt Plus/Minus. */}
       <Sheet
         open={scorerOpen}
         onClose={() => setScorerOpen(false)}
         title="Wer hat getroffen?"
         subtitle={`${goalsTotal} ${goalsTotal === 1 ? 'Tor' : 'Tore'} in diesem Spiel`}
         footer={
-          <Button className="w-full" onClick={() => setScorerOpen(false)}>
-            Fertig
+          <Button variant="soft" className="w-full" onClick={() => setScorerOpen(false)}>
+            {mode === 'fast' ? 'Schließen' : 'Fertig'}
           </Button>
         }
       >
-        <div className="space-y-2">
-          {roster.map((p, i) => (
-            <div
-              key={p.id}
-              className={cx(
-                'flex items-center gap-3 rounded-2xl border p-2.5',
-                p.goals > 0 ? 'border-navy bg-navy-bg' : 'border-card-edge',
-              )}
-            >
+        {mode === 'fast' ? (
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {roster.map((p, i) => (
               <button
-                type="button"
-                onClick={() => addGoal(i)}
-                className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                key={p.id}
+                onClick={() => scoreFast(i)}
+                className={cx(
+                  'relative flex flex-col items-center gap-1.5 rounded-2xl border p-3 text-center transition active:scale-95',
+                  p.goals > 0
+                    ? 'border-navy/40 bg-navy-bg/60'
+                    : 'border-card-edge bg-card hover:border-ink/20',
+                )}
+              >
+                {p.goals > 0 && (
+                  <span className="absolute right-2 top-2 grid h-5 min-w-5 place-items-center rounded-full bg-navy px-1 text-[11px] font-bold text-bg tnum">
+                    {p.goals}
+                  </span>
+                )}
+                <Avatar name={p.name} size={36} />
+                <span className="text-[12px] font-semibold leading-tight">{p.name}</span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {roster.map((p, i) => (
+              <div
+                key={p.id}
+                className={cx(
+                  'flex items-center gap-3 rounded-2xl border p-2.5',
+                  p.goals > 0 ? 'border-navy bg-navy-bg' : 'border-card-edge',
+                )}
               >
                 <Avatar name={p.name} size={36} />
                 <span className="min-w-0 flex-1">
@@ -1043,30 +1065,31 @@ export default function SessionRecord() {
                         : 'Noch kein Tor'}
                   </span>
                 </span>
-              </button>
-              {p.goals > 0 && (
                 <button
                   type="button"
                   onClick={() => addGoal(i, -1)}
+                  disabled={!p.goals}
                   aria-label={`Ein Tor von ${p.name} zurücknehmen`}
-                  className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-card text-[15px] font-bold text-ink-soft"
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-card text-[15px] font-bold text-ink-soft disabled:opacity-30"
                 >
                   −
                 </button>
-              )}
-              <button
-                type="button"
-                onClick={() => addGoal(i)}
-                aria-label={`Tor für ${p.name}`}
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-ink text-[15px] font-bold text-bg transition active:scale-95"
-              >
-                +
-              </button>
-            </div>
-          ))}
-        </div>
+                <button
+                  type="button"
+                  onClick={() => addGoal(i)}
+                  aria-label={`Tor für ${p.name}`}
+                  className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-ink text-[15px] font-bold text-bg transition active:scale-95"
+                >
+                  +
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         <p className="mt-3 text-[12px] text-ink-dim">
-          Tore kosten nichts — sie zählen nur für die Statistik und den Torschützenkönig.
+          {mode === 'fast'
+            ? 'Ein Tap auf den Namen ist ein Tor. Korrigieren geht im Modus „Detailliert".'
+            : 'Tore kosten nichts — sie zählen nur für die Statistik und den Torschützenkönig.'}
         </p>
       </Sheet>
 
@@ -1123,6 +1146,7 @@ export default function SessionRecord() {
               icon="⚽"
               title="Fußball"
               desc="Starten · Torschützen zählen (ohne Strafe)"
+              disabled={!games.football}
               onClick={startFootball}
             />
           )}

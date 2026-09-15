@@ -61,6 +61,7 @@ export const penalties = [
   { id: 'g1', name: 'Einzelspiel', amount: null, icon: '🏅', active: true, manual: true, gameKind: 'einzel' },
   { id: 'g2', name: '2-Teams-Spiel', amount: null, icon: '👥', active: true, manual: true, gameKind: 'teams' },
   { id: 'g3', name: '3,50 €-Spiel', amount: null, icon: '💰', active: true, manual: true, gameKind: 'progressive' },
+  { id: 'g4', name: 'Fußball', amount: 0, icon: '⚽', active: true, manual: false, gameKind: 'football' },
 ]
 
 export const sessions = [
