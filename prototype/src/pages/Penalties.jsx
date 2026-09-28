@@ -5,9 +5,22 @@ import { cx, eur } from '../design/calm'
 import { penalties as seed } from '../mock/data'
 import { useAuth } from '../context/AuthContext.jsx'
 import { hasRole, CASH } from '../lib/roles.js'
-import { listPenalties, insertPenalty, updatePenalty } from '../lib/api.js'
+import { listPenalties, insertPenalty, updatePenalty, reorderPenalties } from '../lib/api.js'
+import { SortableList } from '../components/Sortable.jsx'
 
+// Nur Vorschläge — über das Eingabefeld darunter geht jedes beliebige Emoji.
 const ICONS = ['🎳', '🌊', '🎯', '⏰', '📱', '↔️', '🤬', '👟', '🍺', '🎂', '🥃', '💸']
+
+/* Text in sichtbare Zeichen (Grapheme) zerlegen — so bleiben auch
+   zusammengesetzte Emojis wie 👨‍👩‍👧 oder 🏳️‍🌈 und Hautfarben-Varianten ganz. */
+function graphemes(text) {
+  const t = (text || '').trim()
+  if (!t) return []
+  if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+    return [...new Intl.Segmenter('de', { granularity: 'grapheme' }).segment(t)].map((x) => x.segment)
+  }
+  return Array.from(t)
+}
 
 // Rechte siehe lib/roles.js
 
@@ -17,7 +30,7 @@ const ICONS = ['🎳', '🌊', '🎯', '⏰', '📱', '↔️', '🤬', '👟', 
 /* `free: true` heißt: das Spiel kostet nichts. Die Katalogzeile ist dann reiner
    Schalter — „Betrag manuell" wäre dort eine falsche Angabe. */
 const GAMES = [
-  { kind: 'einzel', name: 'Einzelspiel', icon: '🏅', desc: 'Platzierung antippen · ab Platz 4 in 0,25-€-Schritten' },
+  { kind: 'einzel', name: 'Einzelspiel', icon: '🏅', desc: 'Vom letzten zum ersten Platz antippen · ab Platz 4 in 0,25-€-Schritten' },
   { kind: 'teams', name: '2-Teams-Spiel', icon: '👥', desc: 'Fester Betrag je Verlierer' },
   { kind: 'progressive', name: '3,50 €-Spiel', icon: '💰', desc: 'Laufender Betrag · bekommen/vergeben' },
   { kind: 'football', name: 'Fußball', icon: '⚽', desc: 'Torschützen zählen · ohne Strafe', free: true },
@@ -39,6 +52,7 @@ function fromDb(p) {
     manual: p.manual_amount,
     chargeOthers: p.charge_others ?? false,
     gameKind: p.game_kind || null,
+    sortOrder: p.sort_order ?? 0,
   }
 }
 function toDb(draft) {
@@ -65,6 +79,7 @@ export default function Penalties() {
   const [sheet, setSheet] = useState(null) // null | 'new' | penalty
   const [draft, setDraft] = useState({ name: '', amount: '', icon: '🎳', manual: false, chargeOthers: false })
   const [saving, setSaving] = useState(false)
+  const [emojiInput, setEmojiInput] = useState('')
 
   useEffect(() => {
     if (mockMode || !activeGroupId) return
@@ -74,10 +89,12 @@ export default function Penalties() {
 
   const openNew = () => {
     setDraft({ name: '', amount: '', icon: '🎳', manual: false, chargeOthers: false })
+    setEmojiInput('')
     setSheet('new')
   }
   const openEdit = (p) => {
     setDraft({ ...p, amount: p.amount == null ? '' : String(p.amount) })
+    setEmojiInput(ICONS.includes(p.icon) ? '' : p.icon || '')
     setSheet(p)
   }
   const valid =
@@ -113,6 +130,21 @@ export default function Penalties() {
       alert('Speichern fehlgeschlagen: ' + (err?.message || err))
     } finally {
       setSaving(false)
+    }
+  }
+
+  // Neue Reihenfolge des Katalogs (nur normale Strafen; Spiele haben ihren
+  // eigenen, festen Block). Optimistisch anzeigen, bei Fehler zurückrollen.
+  const reorder = async (next) => {
+    const prev = list
+    const games = (list || []).filter((p) => p.gameKind)
+    setList([...next.map((p, i) => ({ ...p, sortOrder: i + 1 })), ...games])
+    if (mockMode) return
+    try {
+      await reorderPenalties(activeGroupId, next.map((p) => p.id))
+    } catch (err) {
+      setList(prev)
+      alert('Reihenfolge konnte nicht gespeichert werden: ' + (err?.message || err))
     }
   }
 
@@ -191,45 +223,58 @@ export default function Penalties() {
           />
         </Card>
       ) : (
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {catalog.map((p) => (
-            <Card key={p.id} className={cx('flex items-center gap-3', !p.active && 'opacity-55')}>
-              <span className="grid h-12 w-12 place-items-center rounded-2xl bg-bg text-2xl">{p.icon}</span>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold">{p.name}</span>
-                  {p.chargeOthers && <Badge tone="sage">an alle anderen</Badge>}
-                  {p.manual && !p.chargeOthers && <Badge tone="amber">manuell</Badge>}
-                  {!p.active && <Badge tone="neutral">inaktiv</Badge>}
+        <>
+          {edit && canEdit && catalog.length > 1 && (
+            <p className="text-[12px] text-ink-dim">
+              Über ≡ die Reihenfolge ändern — so erscheinen die Strafen auch im Kegelabend.
+            </p>
+          )}
+          <SortableList
+            items={catalog}
+            getKey={(p) => p.id}
+            disabled={!(edit && canEdit)}
+            onReorder={reorder}
+            className="grid grid-cols-1 gap-2 sm:grid-cols-2"
+            renderItem={(p, { handle }) => (
+              <Card className={cx('flex items-center gap-3', handle && 'pl-2', !p.active && 'opacity-55')}>
+                {handle}
+                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-bg text-2xl">{p.icon}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="min-w-0 break-words font-semibold">{p.name}</span>
+                    {p.chargeOthers && <Badge tone="sage">an alle anderen</Badge>}
+                    {p.manual && !p.chargeOthers && <Badge tone="amber">manuell</Badge>}
+                    {!p.active && <Badge tone="neutral">inaktiv</Badge>}
+                  </div>
+                  <div className="font-mono text-[13px] text-ink-soft">{priceLabel(p)}</div>
                 </div>
-                <div className="font-mono text-[13px] text-ink-soft">{priceLabel(p)}</div>
-              </div>
-              {edit && canEdit ? (
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => openEdit(p)}
-                    className="rounded-full bg-bg px-3 py-1.5 text-[12px] font-semibold text-ink-soft"
-                  >
-                    Bearbeiten
-                  </button>
-                  <button
-                    onClick={() => toggleActive(p)}
-                    className={cx(
-                      'rounded-full px-3 py-1.5 text-[12px] font-semibold',
-                      p.active ? 'bg-terra-bg text-terra' : 'bg-sage-bg text-sage',
-                    )}
-                  >
-                    {p.active ? 'Deaktivieren' : 'Aktivieren'}
-                  </button>
-                </div>
-              ) : p.manual ? (
-                <span className="text-[12px] font-semibold text-amber">€ ?</span>
-              ) : (
-                <span className="font-mono text-lg font-semibold tnum">{eur(p.amount)}</span>
-              )}
-            </Card>
-          ))}
-        </div>
+                {edit && canEdit ? (
+                  <div className="flex flex-col items-end gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+                    <button
+                      onClick={() => openEdit(p)}
+                      className="rounded-full bg-bg px-3 py-1.5 text-[12px] font-semibold text-ink-soft"
+                    >
+                      Bearbeiten
+                    </button>
+                    <button
+                      onClick={() => toggleActive(p)}
+                      className={cx(
+                        'rounded-full px-3 py-1.5 text-[12px] font-semibold',
+                        p.active ? 'bg-terra-bg text-terra' : 'bg-sage-bg text-sage',
+                      )}
+                    >
+                      {p.active ? 'Deaktivieren' : 'Aktivieren'}
+                    </button>
+                  </div>
+                ) : p.manual ? (
+                  <span className="text-[12px] font-semibold text-amber">€ ?</span>
+                ) : (
+                  <span className="font-mono text-lg font-semibold tnum">{eur(p.amount)}</span>
+                )}
+              </Card>
+            )}
+          />
+        </>
       )}
 
       {/* Spiele · Schnell-Strafen — feste Varianten, einzeln aktivierbar. */}
@@ -309,11 +354,38 @@ export default function Penalties() {
       >
         <div className="space-y-4">
           <Field label="Symbol">
+            <div className="mb-2 flex items-center gap-3">
+              <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-ink text-3xl">
+                {draft.icon || '🎳'}
+              </span>
+              <div className="min-w-0 flex-1">
+                <Input
+                  value={emojiInput}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    setEmojiInput(v)
+                    // Das zuletzt getippte Zeichen zählt — so lässt sich ein Emoji
+                    // einfach durch ein neues ersetzen, ohne erst zu löschen.
+                    const segs = graphemes(v)
+                    const ic = segs[segs.length - 1]
+                    if (ic && !/^[\p{L}\p{N}\s]$/u.test(ic)) setDraft((d) => ({ ...d, icon: ic }))
+                  }}
+                  placeholder="Eigenes Emoji eingeben 😀"
+                  aria-label="Eigenes Emoji"
+                />
+                <div className="mt-1 text-[11px] text-ink-dim">
+                  Beliebiges Emoji über die Emoji-Tastatur — oder unten einen Vorschlag wählen.
+                </div>
+              </div>
+            </div>
             <div className="flex flex-wrap gap-2">
               {ICONS.map((ic) => (
                 <button
                   key={ic}
-                  onClick={() => setDraft((d) => ({ ...d, icon: ic }))}
+                  onClick={() => {
+                    setDraft((d) => ({ ...d, icon: ic }))
+                    setEmojiInput('')
+                  }}
                   className={cx(
                     'grid h-11 w-11 place-items-center rounded-xl text-xl transition',
                     draft.icon === ic ? 'bg-ink' : 'bg-bg',

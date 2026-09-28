@@ -6,10 +6,31 @@ import { cx, eur, pal, creamLight, navyInk } from '../../design/calm'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { listPenalties, listMembers, getSession, saveSession, deleteSession } from '../../lib/api.js'
 import { members as mockMembers, penalties as mockPenalties } from '../../mock/data'
+import { SortableList } from '../../components/Sortable.jsx'
 
 let entrySeq = 1
+let historySeq = 1
 
 const round2 = (x) => Math.round(x * 100) / 100
+const sameAmount = (a, b) => Math.abs(a - b) < 0.005
+
+/* Stabiler Schlüssel eines Teilnehmers für den Verlauf. Die roster-ids ändern
+   sich nach einem Neuladen des Entwurfs (DB-ids), userId bzw. Gastname nicht. */
+const pkOf = (p) => (p.isGuest ? `g:${p.name}` : `u:${p.userId}`)
+
+/* Jüngsten passenden Entry (Strafe + Betrag) entfernen. Der Verlauf merkt sich
+   Buchungen bewusst über Strafe + Betrag statt über Entry-ids: die werden beim
+   Neuladen neu vergeben, Strafe und Betrag bleiben. */
+function dropEntry(entries, penId, amount) {
+  let idx = -1
+  for (let i = entries.length - 1; i >= 0; i--) {
+    if (entries[i].penId === penId && sameAmount(entries[i].amount, amount)) {
+      idx = i
+      break
+    }
+  }
+  return idx === -1 ? null : entries.filter((_, i) => i !== idx)
+}
 
 /* Katalog-DB-Zeile → UI-Form. (manual/gameKind tolerieren DB- und Mock-Felder.) */
 function normCatalog(rows) {
@@ -106,7 +127,13 @@ export default function SessionRecord() {
   const [einzelRanks, setEinzelRanks] = useState([]) // roster-ids in Tap-Reihenfolge
   const [teamLosers, setTeamLosers] = useState([]) // roster-ids
   const [teamAmount, setTeamAmount] = useState('')
-  const [progressive, setProgressive] = useState({ active: false, amount: 0.25 })
+  // `game` unterscheidet mehrere 3,50-€-Spiele an einem Abend — der Verlauf darf
+  // den laufenden Betrag nur für das Spiel zurückdrehen, zu dem eine Buchung gehört.
+  const [progressive, setProgressive] = useState({ active: false, amount: 0.25, game: null })
+  // Verlauf dieses Geräts: jede Buchung mit allem, was zum Rückgängigmachen nötig ist.
+  const [history, setHistory] = useState([])
+  const [historyAll, setHistoryAll] = useState(false)
+  const [undoTarget, setUndoTarget] = useState(null)
   // Fußball: das erste Spiel ohne Geld. Solange es läuft, bekommt jedes Tor
   // einen Schützen aus der Runde. `active` ist reiner UI-Zustand — gezählt wird
   // in roster[].goals, und das reist über den normalen Autosave mit.
@@ -232,6 +259,27 @@ export default function SessionRecord() {
     football: allCat.find((p) => p.gameKind === 'football'),
   }
   const findPen = (penId) => allCat.find((p) => p.id === penId)
+  const penLabel = (penId) => {
+    const pen = findPen(penId)
+    return pen ? `${pen.icon ? pen.icon + ' ' : ''}${pen.name}` : 'Strafe'
+  }
+
+  /* ── Verlauf ───────────────────────────────────────────────────────────────
+   * Jede Buchung landet als Eintrag mit einer Liste von Operationen (ops) im
+   * Verlauf. Rückgängig wendet die Umkehrung genau dieser Operationen an:
+   *   add   → eine passende Strafe wieder abziehen
+   *   del   → die entfernte Strafe wieder anlegen
+   *   prog  → 3,50-€-Buchung abziehen UND den laufenden Betrag zurückdrehen
+   *   late  → Nachzügler wieder entfernen
+   *   early → „Ab jetzt abwesend" umkehren
+   *   remove→ entferntes Mitglied samt Strafen wieder einsetzen
+   *   goal  → Tor zurücknehmen bzw. wieder geben
+   * Rückgängig-Machen ist selbst keine neue Buchung; der Eintrag bleibt
+   * durchgestrichen im Verlauf stehen. */
+  const logAction = (label, sub, ops) =>
+    setHistory((h) =>
+      [{ hid: `${Date.now().toString(36)}-${historySeq++}`, at: new Date().toISOString(), label, sub, ops, undone: false }, ...h].slice(0, 300),
+    )
 
   const addEntry = (idx, penId, amount) =>
     setRoster((r) =>
@@ -239,18 +287,37 @@ export default function SessionRecord() {
         i === idx ? { ...p, entries: [...p.entries, { id: entrySeq++, penId, amount }] } : p,
       ),
     )
-  const removeEntryId = (idx, entryId) =>
+  const removeEntryId = (idx, entryId) => {
+    const p = roster[idx]
+    const e = p?.entries.find((x) => x.id === entryId)
+    if (!e) return
     setRoster((r) =>
-      r.map((p, i) => (i === idx ? { ...p, entries: p.entries.filter((e) => e.id !== entryId) } : p)),
+      r.map((q, i) => (i === idx ? { ...q, entries: q.entries.filter((x) => x.id !== entryId) } : q)),
     )
-  const removeLastPen = (idx, penId) =>
+    logAction(`${penLabel(e.penId)} entfernt`, `${p.name} · −${eur(e.amount)} €`, [
+      { t: 'del', pk: pkOf(p), penId: e.penId, amount: e.amount },
+    ])
+  }
+  const removeLastPen = (idx, penId) => {
+    const p = roster[idx]
+    const last = p ? [...p.entries].reverse().find((e) => e.penId === penId) : null
+    if (!last) return
     setRoster((r) =>
-      r.map((p, i) => {
-        if (i !== idx) return p
-        const last = [...p.entries].reverse().find((e) => e.penId === penId)
-        return last ? { ...p, entries: p.entries.filter((e) => e.id !== last.id) } : p
-      }),
+      r.map((q, i) => (i === idx ? { ...q, entries: q.entries.filter((e) => e.id !== last.id) } : q)),
     )
+    logAction(`${penLabel(penId)} entfernt`, `${p.name} · −${eur(last.amount)} €`, [
+      { t: 'del', pk: pkOf(p), penId, amount: last.amount },
+    ])
+  }
+  // Strafe für eine Person buchen und im Verlauf vermerken.
+  const bookPenalty = (idx, penId, amount) => {
+    const p = roster[idx]
+    if (!p) return
+    addEntry(idx, penId, amount)
+    logAction(penLabel(penId), `${p.name} · ${eur(amount)} €`, [
+      { t: 'add', pk: pkOf(p), penId, amount },
+    ])
+  }
 
   const tap = (penId) => {
     const pen = findPen(penId)
@@ -260,7 +327,7 @@ export default function SessionRecord() {
       setManualFor(penId)
       return
     }
-    addEntry(active, penId, pen.amount)
+    bookPenalty(active, penId, pen.amount)
     if (mode === 'fast') setActive(null)
   }
   // Rundenstrafe: die angetippte Person löst aus, der feste Betrag wird allen
@@ -280,13 +347,18 @@ export default function SessionRecord() {
           : p,
       ),
     )
+    logAction(
+      penLabel(penId),
+      `Ausgelöst von ${roster[active].name} · ${eur(pen.amount)} € an ${recipients.length} ${recipients.length === 1 ? 'Person' : 'Personen'}`,
+      recipients.map((i) => ({ t: 'add', pk: pkOf(roster[i]), penId, amount: pen.amount })),
+    )
     if (mode === 'fast') setActive(null)
   }
 
   const confirmManual = () => {
     const amount = parseFloat((manualVal || '').replace(',', '.'))
     if (!(amount > 0)) return
-    addEntry(active, manualFor, amount)
+    bookPenalty(active, manualFor, round2(amount))
     setManualFor(null)
     setManualVal('')
     if (mode === 'fast') setActive(null)
@@ -303,21 +375,22 @@ export default function SessionRecord() {
     const base = roster.filter((p) => !p.isGuest)
     const sum = base.reduce((a, p) => a + entriesSum(p), 0)
     const lateAvg = base.length > 0 ? Math.round((sum / base.length) * 100) / 100 : 0
-    setRoster((r) => [
-      ...r,
-      {
-        id: 'late-' + m.userId,
-        userId: m.userId,
-        name: m.name,
-        isGuest: false,
-        late: true,
-        lateAvg,
-        early: false,
-        earlyAtSeq: null,
-        earlyAvg: 0,
-        goals: 0,
-        entries: [],
-      },
+    const late = {
+      id: 'late-' + m.userId,
+      userId: m.userId,
+      name: m.name,
+      isGuest: false,
+      late: true,
+      lateAvg,
+      early: false,
+      earlyAtSeq: null,
+      earlyAvg: 0,
+      goals: 0,
+      entries: [],
+    }
+    setRoster((r) => [...r, late])
+    logAction('🕐 Nachzügler', `${m.name} · Start-Schnitt ${eur(lateAvg)} €`, [
+      { t: 'late', pk: pkOf(late) },
     ])
     setLateOpen(false)
   }
@@ -325,23 +398,47 @@ export default function SessionRecord() {
   // Frühgeher: ab Klick „Ab jetzt abwesend" werden weitere Strafen gemerkt
   // (Sequenzstand earlyAtSeq); am Ende bekommt die Person den Schnitt davon.
   // Reversibel (Fehlklick-Korrektur).
-  const markEarly = (idx) =>
-    setRoster((r) => r.map((p, i) => (i === idx ? { ...p, early: true, earlyAtSeq: entrySeq } : p)))
-  const unmarkEarly = (idx) =>
+  const markEarly = (idx) => {
+    const p = roster[idx]
+    if (!p) return
+    const seq = entrySeq
+    setRoster((r) => r.map((q, i) => (i === idx ? { ...q, early: true, earlyAtSeq: seq } : q)))
+    logAction('🚪 Ab jetzt abwesend', p.name, [{ t: 'early', pk: pkOf(p), on: true, seq }])
+  }
+  const unmarkEarly = (idx) => {
+    const p = roster[idx]
+    if (!p) return
     setRoster((r) =>
-      r.map((p, i) => (i === idx ? { ...p, early: false, earlyAtSeq: null, earlyAvg: 0 } : p)),
+      r.map((q, i) => (i === idx ? { ...q, early: false, earlyAtSeq: null, earlyAvg: 0 } : q)),
     )
-  // Nachzügler wieder aus der Liste entfernen (z. B. versehentlich hinzugefügt).
+    logAction('🚪 Abwesenheit zurückgenommen', p.name, [
+      { t: 'early', pk: pkOf(p), on: false, seq: p.earlyAtSeq, avg: p.earlyAvg || 0 },
+    ])
+  }
+  // Mitglied wieder aus der Liste entfernen (z. B. versehentlich hinzugefügt).
   const removeParticipant = (idx) => {
+    const p = roster[idx]
+    if (!p) return
     setActive(null)
     setRoster((r) => r.filter((_, i) => i !== idx))
+    logAction('✕ Aus der Runde entfernt', `${p.name} · ${eur(effectiveSum(p))} €`, [
+      { t: 'remove', pk: pkOf(p), index: idx, participant: p },
+    ])
   }
 
   /* ── Spiele (Schnell-Strafen) ─────────────────────────────────────────────
    * Spiel-Strafen sind normale Entries mit dem jeweiligen Spiel-catalog_id und
    * laufen darum unverändert durch Autosave/Einreichen/Genehmigen. */
 
-  // Einzelspiel: Teilnehmer in Platzierungs-Reihenfolge antippen (Toggle).
+  // Einzelspiel: Mitspieler vom LETZTEN Platz zum ersten antippen (Toggle).
+  // Mitspieler sind alle, die noch da sind — Frühgeher spielen nicht mehr mit.
+  // Der erste Tap ist also Platz N, der nächste N−1 usw.
+  const einzelPlayers = roster.filter((p) => !p.early)
+  const einzelPlace = (id) => {
+    const i = einzelRanks.indexOf(id)
+    return i === -1 ? 0 : einzelPlayers.length - i
+  }
+  const einzelAmount = (place) => (place <= 3 ? 0 : round2((place - 3) * 0.25))
   const einzelTap = (id) =>
     setEinzelRanks((rk) => (rk.includes(id) ? rk.filter((x) => x !== id) : [...rk, id]))
 
@@ -349,15 +446,29 @@ export default function SessionRecord() {
   const applyEinzel = () => {
     const gid = games.einzel?.id
     if (!gid || einzelRanks.length === 0) return
+    const ops = []
+    for (const p of roster) {
+      const place = einzelPlace(p.id)
+      if (place === 0) continue
+      const amount = einzelAmount(place)
+      if (amount > 0) ops.push({ t: 'add', pk: pkOf(p), penId: gid, amount })
+    }
+    const byPk = new Map(ops.map((o) => [o.pk, o.amount]))
     setRoster((r) =>
       r.map((p) => {
-        const place = einzelRanks.indexOf(p.id) + 1
-        if (place === 0) return p
-        const amount = place <= 3 ? 0 : round2((place - 3) * 0.25)
-        if (amount <= 0) return p
+        const amount = byPk.get(pkOf(p))
+        if (!amount) return p
         return { ...p, entries: [...p.entries, { id: entrySeq++, penId: gid, amount }] }
       }),
     )
+    if (ops.length > 0) {
+      const sum = ops.reduce((a, o) => a + o.amount, 0)
+      logAction(
+        '🏅 Einzelspiel',
+        `${ops.length} ${ops.length === 1 ? 'Person zahlt' : 'Personen zahlen'} · ${eur(sum)} €`,
+        ops,
+      )
+    }
     setGameForm(null)
     setEinzelRanks([])
   }
@@ -371,12 +482,18 @@ export default function SessionRecord() {
     const amt = parseFloat((teamAmount || '').replace(',', '.'))
     if (!gid || !(amt > 0) || teamLosers.length === 0) return
     const amount = round2(amt)
+    const losers = roster.filter((p) => teamLosers.includes(p.id))
     setRoster((r) =>
       r.map((p) =>
         teamLosers.includes(p.id)
           ? { ...p, entries: [...p.entries, { id: entrySeq++, penId: gid, amount }] }
           : p,
       ),
+    )
+    logAction(
+      '👥 2-Teams-Spiel',
+      `${losers.map((p) => p.name.split(' ')[0]).join(', ')} · je ${eur(amount)} €`,
+      losers.map((p) => ({ t: 'add', pk: pkOf(p), penId: gid, amount })),
     )
     setGameForm(null)
     setTeamLosers([])
@@ -386,7 +503,7 @@ export default function SessionRecord() {
   // 3,50-€-Spiel: laufender Betrag. Bekommen/Vergeben rechnen sofort auf das/die
   // Konto/Konten und erhöhen je Teilnehmer GENAU EINE Position (Akkumulation).
   const startProgressive = () => {
-    setProgressive({ active: true, amount: 0.25 })
+    setProgressive({ active: true, amount: 0.25, game: Date.now().toString(36) })
     setGamesOpen(false)
   }
   const endProgressive = () => {
@@ -428,10 +545,16 @@ export default function SessionRecord() {
     setScorerOpen(false)
     setGamesOpen(false)
   }
-  const addGoal = (idx, delta = 1) =>
+  const addGoal = (idx, delta = 1) => {
+    const p = roster[idx]
+    if (!p || (delta < 0 && !(p.goals > 0))) return
     setRoster((r) =>
-      r.map((p, i) => (i === idx ? { ...p, goals: Math.max(0, (p.goals || 0) + delta) } : p)),
+      r.map((q, i) => (i === idx ? { ...q, goals: Math.max(0, (q.goals || 0) + delta) } : q)),
     )
+    logAction(delta > 0 ? '⚽ Tor' : '⚽ Tor zurückgenommen', p.name, [
+      { t: 'goal', pk: pkOf(p), delta },
+    ])
+  }
   // Im Schnell-Modus ist ein Tap das ganze Tor — inklusive Schließen.
   const scoreFast = (idx) => {
     addGoal(idx)
@@ -440,18 +563,148 @@ export default function SessionRecord() {
   const goalsTotal = roster.reduce((a, p) => a + (p.goals || 0), 0)
 
   const advanceProgressive = () => setProgressive((g) => ({ ...g, amount: round2(g.amount + 0.25) }))
-  const progBekommen = () => {
-    applyProgressive([active], progressive.amount)
+  // Nach Bekommen/Vergeben schließt das Fenster immer (auch im Detailliert-Modus):
+  // eine 3,50-€-Buchung ist pro Person ein abgeschlossener Vorgang.
+  const progBook = (indices, label) => {
+    const gid = games.progressive?.id
+    if (!gid || indices.length === 0) return
+    const delta = progressive.amount
+    applyProgressive(indices, delta)
     advanceProgressive()
-    if (mode === 'fast') setActive(null)
+    logAction(label, `${eur(delta)} € · nächster Betrag ${eur(round2(delta + 0.25))} €`, [
+      {
+        t: 'prog',
+        pks: indices.map((i) => pkOf(roster[i])),
+        penId: gid,
+        delta,
+        game: progressive.game ?? null,
+        amountBefore: delta,
+      },
+    ])
+    setActive(null)
   }
+  const progBekommen = () => progBook([active], `💰 3,50 €-Spiel · ${roster[active].name} bekommt`)
   const progVergeben = () => {
     const recipients = roster
       .map((_, i) => i)
       .filter((i) => i !== active && !roster[i].early)
-    applyProgressive(recipients, progressive.amount)
-    advanceProgressive()
-    if (mode === 'fast') setActive(null)
+    progBook(recipients, `💰 3,50 €-Spiel · ${roster[active].name} vergibt an ${recipients.length}`)
+  }
+
+  /* Kann ein Verlaufseintrag (noch) rückgängig gemacht werden? Liefert null,
+     wenn ja, sonst den Grund — der steht dann statt des Buttons im Verlauf. */
+  const undoBlocker = (item) => {
+    if (item.undone) return 'Rückgängig gemacht'
+    const byPk = new Map(roster.map((p) => [pkOf(p), p]))
+    // Mehrere gleiche Buchungen in einem Eintrag (z. B. zweimal dieselbe Person)
+    // brauchen entsprechend viele passende Strafen.
+    const need = new Map()
+    for (const op of item.ops) {
+      if (op.t === 'add') {
+        const p = byPk.get(op.pk)
+        if (!p) return 'Person nicht mehr in der Runde'
+        const k = `${op.pk}|${op.penId}|${op.amount}`
+        need.set(k, (need.get(k) || 0) + 1)
+        const have = p.entries.filter((e) => e.penId === op.penId && sameAmount(e.amount, op.amount)).length
+        if (have < need.get(k)) return 'Strafe schon entfernt'
+      } else if (op.t === 'del') {
+        if (!byPk.get(op.pk)) return 'Person nicht mehr in der Runde'
+      } else if (op.t === 'prog') {
+        // Der laufende Betrag baut auf jeder Buchung auf. Rückgängig nur für die
+        // jüngste noch gültige Buchung desselben Spiels — sonst stimmten die
+        // Beträge der späteren Buchungen nicht mehr.
+        // Der Verlauf ist neueste-zuerst sortiert: alles vor `item` ist später.
+        const later = history
+          .slice(0, history.indexOf(item))
+          .some((h) => !h.undone && h.ops.some((o) => o.t === 'prog' && o.game === op.game))
+        if (later) return 'Erst die spätere 3,50 €-Buchung zurücknehmen'
+        for (const pk of op.pks) {
+          const p = byPk.get(pk)
+          if (!p) return 'Person nicht mehr in der Runde'
+          const e = p.entries.find((x) => x.penId === op.penId)
+          if (!e || e.amount < op.delta - 0.004) return 'Betrag schon geändert'
+        }
+      } else if (op.t === 'late') {
+        const p = byPk.get(op.pk)
+        if (!p) return 'Schon entfernt'
+        if (p.entries.length > 0 || p.goals > 0) return 'Hat schon Strafen/Tore — im Strafen-Fenster entfernen'
+      } else if (op.t === 'early') {
+        const p = byPk.get(op.pk)
+        if (!p) return 'Person nicht mehr in der Runde'
+        if (!!p.early !== op.on) return 'Schon geändert'
+      } else if (op.t === 'remove') {
+        if (byPk.get(op.pk)) return 'Person ist wieder dabei'
+      } else if (op.t === 'goal') {
+        const p = byPk.get(op.pk)
+        if (!p) return 'Person nicht mehr in der Runde'
+        if (op.delta > 0 && !(p.goals >= op.delta)) return 'Tor schon zurückgenommen'
+      }
+    }
+    return null
+  }
+
+  const undo = (item) => {
+    if (undoBlocker(item)) return
+    setRoster((r0) => {
+      let r = r0
+      const at = (pk) => r.findIndex((p) => pkOf(p) === pk)
+      const patch = (pk, fn) => {
+        const i = at(pk)
+        if (i === -1) return
+        r = r.map((p, j) => (j === i ? fn(p) : p))
+      }
+      for (const op of item.ops) {
+        if (op.t === 'add') {
+          patch(op.pk, (p) => ({ ...p, entries: dropEntry(p.entries, op.penId, op.amount) ?? p.entries }))
+        } else if (op.t === 'del') {
+          patch(op.pk, (p) => ({
+            ...p,
+            entries: [...p.entries, { id: entrySeq++, penId: op.penId, amount: op.amount }],
+          }))
+        } else if (op.t === 'prog') {
+          for (const pk of op.pks) {
+            patch(pk, (p) => {
+              const e = p.entries.find((x) => x.penId === op.penId)
+              if (!e) return p
+              const rest = round2(e.amount - op.delta)
+              return {
+                ...p,
+                entries:
+                  rest > 0.004
+                    ? p.entries.map((x) => (x === e ? { ...x, amount: rest } : x))
+                    : p.entries.filter((x) => x !== e),
+              }
+            })
+          }
+        } else if (op.t === 'late') {
+          r = r.filter((p) => pkOf(p) !== op.pk)
+        } else if (op.t === 'early') {
+          patch(op.pk, (p) =>
+            op.on
+              ? { ...p, early: false, earlyAtSeq: null, earlyAvg: 0 }
+              : { ...p, early: true, earlyAtSeq: op.seq ?? null, earlyAvg: op.avg || 0 },
+          )
+        } else if (op.t === 'remove') {
+          if (at(op.pk) === -1) {
+            const next = [...r]
+            next.splice(Math.min(op.index, next.length), 0, op.participant)
+            r = next
+          }
+        } else if (op.t === 'goal') {
+          patch(op.pk, (p) => ({ ...p, goals: Math.max(0, (p.goals || 0) - op.delta) }))
+        }
+      }
+      return r
+    })
+    // 3,50 €: die Erhöhung, die diese Buchung ausgelöst hat, wieder zurücknehmen.
+    const prog = item.ops.find((o) => o.t === 'prog')
+    if (prog) {
+      setProgressive((g) =>
+        (g.game ?? null) === prog.game ? { ...g, amount: prog.amountBefore } : g,
+      )
+    }
+    setActive(null)
+    setHistory((h) => h.map((x) => (x.hid === item.hid ? { ...x, undone: true } : x)))
   }
 
   // Roster → save_session-Payload (von Autosave und manuellem Speichern genutzt).
@@ -581,6 +834,37 @@ export default function SessionRecord() {
     }
   }, [mockMode, fbKey, football])
 
+  // Verlauf ebenfalls je Gerät sichern. Er verweist über Personen-Schlüssel und
+  // Strafe + Betrag auf die Buchungen, nicht über Entry-ids — deshalb funktioniert
+  // Rückgängig auch nach einem Neuladen des Entwurfs noch.
+  const histKey = savedId ? `kegel:history:${savedId}` : null
+  useEffect(() => {
+    if (mockMode || !histKey) return
+    try {
+      const raw = localStorage.getItem(histKey)
+      if (raw) setHistory(JSON.parse(raw))
+    } catch (e) {
+      console.error(e)
+    }
+  }, [mockMode, histKey])
+  useEffect(() => {
+    if (mockMode || !histKey) return
+    try {
+      if (history.length > 0) localStorage.setItem(histKey, JSON.stringify(history))
+    } catch (e) {
+      console.error(e)
+    }
+  }, [mockMode, histKey, history])
+  const clearLocalState = () => {
+    const sid = savedIdRef.current
+    if (!sid) return
+    try {
+      for (const k of ['history', 'progressive', 'football']) localStorage.removeItem(`kegel:${k}:${sid}`)
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
   // Speichern / Einreichen.
   const persist = async (status) => {
     if (mockMode) {
@@ -600,6 +884,7 @@ export default function SessionRecord() {
         participants: buildParticipants(),
         absent: absentMembers.map((m) => m.userId),
       })
+      if (status === 'submitted') clearLocalState()
       setSubmitOpen(false)
       navigate('/sessions')
     } catch (e) {
@@ -620,6 +905,7 @@ export default function SessionRecord() {
     setDiscarding(true)
     try {
       if (savedIdRef.current) await deleteSession(savedIdRef.current)
+      clearLocalState()
       navigate('/sessions')
     } catch (e) {
       closingRef.current = false
@@ -744,12 +1030,23 @@ export default function SessionRecord() {
       {isEditor && (
         <p className="text-[13px] text-ink-soft">
           Tippe auf eine Person, um Strafen zu erfassen{progressive.active ? ' oder das 3,50 €-Spiel zu vergeben' : ''}.
+          {roster.length > 1 && ' Über ≡ änderst du die Reihenfolge — sie gilt dann auch für die Spiele.'}
         </p>
       )}
 
-      {/* Teilnehmerliste */}
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        {roster.map((p, i) => {
+      {/* Teilnehmerliste — im Bearbeiten-Modus per Griff (≡) sortierbar. Diese
+          Reihenfolge gilt für den ganzen Abend: Spiele, Torschützen, Liste. */}
+      <SortableList
+        items={roster}
+        getKey={(p) => p.id}
+        disabled={!isEditor}
+        onReorder={(next) => {
+          setActive(null)
+          setRoster(next)
+        }}
+        className="grid grid-cols-1 gap-2 sm:grid-cols-2"
+        renderItem={(p, { handle, dragging }) => {
+          const i = roster.indexOf(p)
           const s = effectiveSum(p)
           const n = p.entries.length
           const sub = p.late
@@ -760,37 +1057,46 @@ export default function SessionRecord() {
                 ? 'Noch nichts erfasst'
                 : ''
           return (
-            <button
-              key={p.id}
-              onClick={() => isEditor && setActive(i)}
+            <div
               className={cx(
-                'flex items-center gap-3 rounded-2xl border border-card-edge bg-card p-3 text-left transition',
-                isEditor ? 'hover:border-ink/20 active:scale-[0.99]' : 'cursor-default',
+                'flex items-center rounded-2xl border bg-card transition',
+                dragging ? 'border-ink/30' : 'border-card-edge',
+                isEditor && 'hover:border-ink/20',
               )}
             >
-              <Avatar name={p.name} size={40} />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="truncate font-semibold">{p.name}</span>
-                  {p.goals > 0 && <Badge tone="navy">⚽ {p.goals}</Badge>}
-                  {p.late && <Badge tone="amber">Nachzügler</Badge>}
-                  {p.early && <Badge tone="amber">Geht früher</Badge>}
-                  {p.isGuest && <Badge tone="cream">Gast</Badge>}
+              {handle && <div className="pl-1.5">{handle}</div>}
+              <button
+                onClick={() => isEditor && setActive(i)}
+                className={cx(
+                  'flex min-w-0 flex-1 items-center gap-3 p-3 text-left',
+                  handle && 'pl-1.5',
+                  isEditor ? 'active:scale-[0.99]' : 'cursor-default',
+                )}
+              >
+                <Avatar name={p.name} size={40} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate font-semibold">{p.name}</span>
+                    {p.goals > 0 && <Badge tone="navy">⚽ {p.goals}</Badge>}
+                    {p.late && <Badge tone="amber">Nachzügler</Badge>}
+                    {p.early && <Badge tone="amber">Geht früher</Badge>}
+                    {p.isGuest && <Badge tone="cream">Gast</Badge>}
+                  </div>
+                  {sub && <div className="mt-0.5 text-[12px] text-ink-dim">{sub}</div>}
                 </div>
-                {sub && <div className="mt-0.5 text-[12px] text-ink-dim">{sub}</div>}
-              </div>
-              <div className="text-right">
-                <div
-                  className={cx('font-mono text-base font-semibold tnum', s > 0 ? 'text-terra' : 'text-ink-dim')}
-                >
-                  {eur(s)} €
+                <div className="text-right">
+                  <div
+                    className={cx('font-mono text-base font-semibold tnum', s > 0 ? 'text-terra' : 'text-ink-dim')}
+                  >
+                    {eur(s)} €
+                  </div>
+                  {isEditor && <div className="text-[11px] font-semibold text-sage">+ Strafe</div>}
                 </div>
-                {isEditor && <div className="text-[11px] font-semibold text-sage">+ Strafe</div>}
-              </div>
-            </button>
+              </button>
+            </div>
           )
-        })}
-      </div>
+        }}
+      />
 
       {/* Nachzügler */}
       {isEditor && (
@@ -801,6 +1107,17 @@ export default function SessionRecord() {
           + Nachzügler hinzufügen
         </button>
       )}
+
+      {/* Verlauf — jüngste Buchung oben, jede einzeln rückgängig zu machen. */}
+      <HistoryCard
+        items={historyAll ? history : history.slice(0, 8)}
+        total={history.length}
+        showAll={historyAll}
+        onToggleAll={() => setHistoryAll((v) => !v)}
+        canEdit={isEditor}
+        blocker={undoBlocker}
+        onUndo={(item) => setUndoTarget(item)}
+      />
 
       {/* Sticky-Abschluss bzw. Wechsel in den Bearbeiten-Modus */}
       {isEditor ? (
@@ -1103,7 +1420,7 @@ export default function SessionRecord() {
           <GameOption
             icon="🏅"
             title="Einzelspiel"
-            desc="Platzierung antippen · ab Platz 4 in 0,25-€-Schritten"
+            desc="Vom letzten zum ersten Platz antippen · ab Platz 4 in 0,25-€-Schritten"
             disabled={!games.einzel}
             onClick={() => {
               setGamesOpen(false)
@@ -1188,7 +1505,7 @@ export default function SessionRecord() {
           setEinzelRanks([])
         }}
         title="Einzelspiel"
-        subtitle="Teilnehmer in Reihenfolge der Platzierung antippen."
+        subtitle={`Vom letzten Platz (${einzelPlayers.length}) zum ersten antippen.`}
         footer={
           <div className="flex gap-2">
             <Button
@@ -1206,10 +1523,18 @@ export default function SessionRecord() {
         }
       >
         <div className="space-y-2">
-          {roster.map((p) => {
-            const place = einzelRanks.indexOf(p.id) + 1
+          {einzelRanks.length < einzelPlayers.length && (
+            <div className="rounded-2xl bg-bg px-3 py-2 text-[12px] text-ink-soft">
+              Als Nächstes: <span className="font-semibold">Platz {einzelPlayers.length - einzelRanks.length}</span>
+              {einzelAmount(einzelPlayers.length - einzelRanks.length) > 0
+                ? ` · ${eur(einzelAmount(einzelPlayers.length - einzelRanks.length))} €`
+                : ' · frei'}
+            </div>
+          )}
+          {einzelPlayers.map((p) => {
+            const place = einzelPlace(p.id)
             const ranked = place > 0
-            const amount = !ranked ? null : place <= 3 ? 0 : round2((place - 3) * 0.25)
+            const amount = !ranked ? null : einzelAmount(place)
             return (
               <button
                 key={p.id}
@@ -1241,7 +1566,8 @@ export default function SessionRecord() {
             )
           })}
           <p className="text-[11px] text-ink-dim">
-            Plätze 1–3 zahlen nichts. Nicht angetippte Teilnehmer bekommen keine Strafe.
+            Der erste Tipp ist der letzte Platz. Plätze 1–3 zahlen nichts, nicht angetippte
+            Teilnehmer bekommen keine Strafe. Nochmal tippen nimmt die Platzierung zurück.
           </p>
         </div>
       </Sheet>
@@ -1351,6 +1677,48 @@ export default function SessionRecord() {
         <div className="rounded-2xl bg-bg p-4">
           <Row label="Summe" value={`${eur(total)} €`} strong />
         </div>
+      </Sheet>
+
+      {/* Rückgängig-Bestätigung */}
+      <Sheet
+        open={undoTarget != null}
+        onClose={() => setUndoTarget(null)}
+        title="Rückgängig machen?"
+        subtitle="Die Buchung wird zurückgenommen und bleibt durchgestrichen im Verlauf stehen."
+        footer={
+          <div className="flex gap-2">
+            <Button variant="soft" className="flex-1" onClick={() => setUndoTarget(null)}>
+              Abbrechen
+            </Button>
+            <Button
+              variant="danger"
+              className="flex-1"
+              disabled={!undoTarget || !!undoBlocker(undoTarget)}
+              onClick={() => {
+                undo(undoTarget)
+                setUndoTarget(null)
+              }}
+            >
+              Rückgängig
+            </Button>
+          </div>
+        }
+      >
+        {undoTarget && (
+          <div className="rounded-2xl bg-bg p-4">
+            <div className="text-[14px] font-semibold">{undoTarget.label}</div>
+            {undoTarget.sub && <div className="mt-0.5 text-[12px] text-ink-soft">{undoTarget.sub}</div>}
+            {undoTarget.ops.some((o) => o.t === 'prog') && (
+              <p className="mt-2 text-[12px] text-ink-dim">
+                Der laufende Betrag des 3,50 €-Spiels geht dabei wieder auf{' '}
+                <span className="font-mono font-semibold">
+                  {eur(undoTarget.ops.find((o) => o.t === 'prog').amountBefore)} €
+                </span>{' '}
+                zurück.
+              </p>
+            )}
+          </div>
+        )}
       </Sheet>
 
       {/* Wechsel Lese- → Bearbeiten-Modus (bewusste Geste) */}
@@ -1555,6 +1923,67 @@ function GameOption({ icon, title, desc, disabled, onClick }) {
       </div>
       <span className="shrink-0 text-[12px] font-semibold text-sage">Wählen</span>
     </button>
+  )
+}
+
+/* ── Verlauf ─────────────────────────────────────────────────────────── */
+function HistoryCard({ items, total, showAll, onToggleAll, canEdit, blocker, onUndo }) {
+  return (
+    <Card className="space-y-2">
+      <div className="flex items-center justify-between">
+        <h2 className="text-[13px] font-semibold text-ink-soft">
+          🕘 Verlauf{total > 0 && <span className="font-normal text-ink-dim"> · {total}</span>}
+        </h2>
+        {total > 8 && (
+          <button onClick={onToggleAll} className="text-[12px] font-semibold text-sage">
+            {showAll ? 'Weniger' : 'Alle anzeigen'}
+          </button>
+        )}
+      </div>
+      {total === 0 ? (
+        <p className="py-3 text-center text-[12px] text-ink-dim">
+          Noch keine Buchungen. Alles, was du erfasst, erscheint hier und lässt sich zurücknehmen.
+        </p>
+      ) : (
+        <ul className="divide-y divide-card-edge">
+          {items.map((h) => {
+            const reason = blocker(h)
+            return (
+              <li key={h.hid} className="flex items-center gap-3 py-2">
+                <span className="w-10 shrink-0 font-mono text-[11px] text-ink-dim tnum">
+                  {new Date(h.at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+                <div className={cx('min-w-0 flex-1', h.undone && 'opacity-50')}>
+                  <div className={cx('break-words text-[13px] font-semibold', h.undone && 'line-through')}>
+                    {h.label}
+                  </div>
+                  {h.sub && (
+                    <div className={cx('break-words text-[11px] text-ink-dim', h.undone && 'line-through')}>
+                      {h.sub}
+                    </div>
+                  )}
+                </div>
+                {h.undone ? (
+                  <span className="shrink-0 text-[11px] text-ink-dim">zurückgenommen</span>
+                ) : canEdit && !reason ? (
+                  <button
+                    onClick={() => onUndo(h)}
+                    className="shrink-0 rounded-full bg-bg px-3 py-1.5 text-[12px] font-semibold text-ink-soft transition hover:text-terra"
+                  >
+                    ↶ Rückgängig
+                  </button>
+                ) : canEdit && reason ? (
+                  <span className="max-w-[45%] shrink-0 text-right text-[11px] leading-tight text-ink-dim">
+                    {reason}
+                  </span>
+                ) : null}
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      <p className="text-[11px] text-ink-dim">Der Verlauf wird auf diesem Gerät gespeichert.</p>
+    </Card>
   )
 }
 

@@ -229,16 +229,20 @@ export default function Dashboard() {
         let attendees = []
         let decliners = []
         if (ev) {
+          // Inaktive Mitglieder zählen bei Terminen nicht mit — wie überall sonst
+          // (event_summaries, Kegelabend). `mem` enthält sie nur wegen der
+          // Mitgliederkachel weiter unten.
+          const activeMem = mem.filter((m) => !m.isInactive)
           const byUser = new Map((ev.rsvps || []).map((r) => [r.user_id, r.status]))
           const yesMembers =
             ev.rsvp_mode === 'opt_out'
-              ? mem.filter((m) => {
+              ? activeMem.filter((m) => {
                   const st = byUser.get(m.userId)
                   return st !== 'no' && st !== 'maybe'
                 })
-              : mem.filter((m) => byUser.get(m.userId) === 'yes')
+              : activeMem.filter((m) => byUser.get(m.userId) === 'yes')
           attendees = yesMembers.map((m) => ({ name: m.name.split(' ')[0], full: m.name }))
-          decliners = mem
+          decliners = activeMem
             .filter((m) => byUser.get(m.userId) === 'no')
             .map((m) => ({ name: m.name.split(' ')[0], full: m.name }))
         }

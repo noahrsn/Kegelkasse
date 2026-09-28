@@ -19,9 +19,18 @@ export async function listPenalties(groupId) {
     .from('penalties_catalog')
     .select('*')
     .eq('group_id', groupId)
+    .order('sort_order', { ascending: true })
     .order('name')
   if (error) throw error
   return data ?? []
+}
+
+/* Reihenfolge des Strafenkatalogs speichern (Drag & Drop). ids = Katalog-ids in
+   der neuen Reihenfolge; die RPC läuft mit den Rechten des Aufrufers, es gilt
+   also dieselbe Policy wie beim Bearbeiten einer Strafe. */
+export async function reorderPenalties(groupId, ids) {
+  const { error } = await supabase.rpc('reorder_penalties', { p_group_id: groupId, p_ids: ids })
+  if (error) throw error
 }
 
 /* Einzelne Strafe anlegen und mit DB-Werten (inkl. id) zurückgeben. */
@@ -240,9 +249,18 @@ export async function getSession(sessionId) {
        )`,
     )
     .eq('id', sessionId)
+    // Teilnehmer in der Reihenfolge, in der sie am Abend sortiert wurden
+    // (seq = Einfügereihenfolge in save_session).
+    .order('seq', { referencedTable: 'participants', ascending: true })
     .maybeSingle()
   if (error) throw error
   return data
+}
+
+function startOfToday() {
+  const d = new Date()
+  d.setHours(0, 0, 0, 0)
+  return d
 }
 
 /* Nächsten anstehenden Termin samt Zusagen + Gästen laden (Start aus Termin). */
@@ -257,7 +275,9 @@ export async function getNextEvent(groupId) {
     .eq('group_id', groupId)
     .eq('is_bowling', true) // nur Kegel-Termine als Kegelabend vorschlagen
     .neq('status', 'cancelled')
-    .gte('start_date', new Date().toISOString())
+    // Ab Beginn des heutigen Tages (lokale Zeit): der Kegelabend bleibt den
+    // ganzen Tag über der „nächste" — auch nachdem er angefangen hat.
+    .gte('start_date', startOfToday().toISOString())
     .order('start_date', { ascending: true })
     .limit(1)
     .maybeSingle()
