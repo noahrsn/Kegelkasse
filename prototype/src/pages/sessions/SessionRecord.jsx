@@ -195,7 +195,7 @@ export default function SessionRecord() {
             lateAvg: p.is_late ? Number(p.avg_amount) || 0 : null,
             early: p.is_early_leave,
             earlyAvg: p.is_early_leave ? Number(p.avg_amount) || 0 : 0,
-            earlyAtSeq: null,
+            earlyBase: p.is_early_leave ? p.early_baseline ?? null : null,
             goals: Number(p.goals) || 0,
             entries: (p.penalties || []).flatMap((sp) =>
               Array.from({ length: sp.count }, () => ({
@@ -225,17 +225,20 @@ export default function SessionRecord() {
   const entriesSum = (p) => p.entries.reduce((a, e) => a + e.amount, 0)
   const countPen = (p, penId) => p.entries.filter((e) => e.penId === penId).length
 
-  // Frühgeher: Schnitt der Strafen, die seit seinem Weggang (Sequenzstand earlyAtSeq)
-  // bei den übrigen Anwesenden anfielen. Nach Reload (earlyAtSeq == null) der fixe Wert.
+  // Frühgeher: Schnitt der Strafen, die seit seinem Weggang bei den übrigen
+  // Anwesenden anfielen. earlyBase hält beim Weggang Zeitpunkt + Strafensumme
+  // jedes Mitglieds fest und wird mitgespeichert — so rechnet der Schnitt auch
+  // nach einem Neuladen weiter. Ohne earlyBase (alte Entwürfe) der fixe Wert.
   const earlyAvgLive = (p) => {
     if (!p.early) return 0
-    if (p.earlyAtSeq == null) return p.earlyAvg || 0
-    const cut = p.earlyAtSeq
-    const goneBefore = (q) => q.early && q.earlyAtSeq != null && q.earlyAtSeq <= cut
+    const base = p.earlyBase
+    if (!base) return p.earlyAvg || 0
+    const goneBefore = (q) => q.early && (!q.earlyBase || q.earlyBase.at <= base.at)
     let sumPost = 0
     for (const q of roster) {
       if (q === p || q.isGuest || goneBefore(q)) continue
-      for (const e of q.entries) if (e.id >= cut) sumPost += e.amount
+      // Wer nach dem Weggang dazukam, steht nicht in der Basis → zählt voll.
+      sumPost += Math.max(0, entriesSum(q) - (base.sums?.[q.userId] || 0))
     }
     const n = roster.filter((q) => q !== p && !q.isGuest && !goneBefore(q)).length
     return n > 0 ? Math.round((sumPost / n) * 100) / 100 : 0
@@ -383,7 +386,7 @@ export default function SessionRecord() {
       late: true,
       lateAvg,
       early: false,
-      earlyAtSeq: null,
+      earlyBase: null,
       earlyAvg: 0,
       goals: 0,
       entries: [],
@@ -395,24 +398,29 @@ export default function SessionRecord() {
     setLateOpen(false)
   }
 
-  // Frühgeher: ab Klick „Ab jetzt abwesend" werden weitere Strafen gemerkt
-  // (Sequenzstand earlyAtSeq); am Ende bekommt die Person den Schnitt davon.
-  // Reversibel (Fehlklick-Korrektur).
+  // Frühgeher: ab Klick „Ab jetzt abwesend" zählen weitere Strafen der anderen
+  // (Basis = Stand beim Klick, siehe earlyAvgLive); am Ende bekommt die Person
+  // den Schnitt davon. Reversibel (Fehlklick-Korrektur).
   const markEarly = (idx) => {
     const p = roster[idx]
     if (!p) return
-    const seq = entrySeq
-    setRoster((r) => r.map((q, i) => (i === idx ? { ...q, early: true, earlyAtSeq: seq } : q)))
-    logAction('🚪 Ab jetzt abwesend', p.name, [{ t: 'early', pk: pkOf(p), on: true, seq }])
+    const base = {
+      at: new Date().toISOString(),
+      sums: Object.fromEntries(
+        roster.filter((q) => q !== p && !q.isGuest).map((q) => [q.userId, round2(entriesSum(q))]),
+      ),
+    }
+    setRoster((r) => r.map((q, i) => (i === idx ? { ...q, early: true, earlyBase: base } : q)))
+    logAction('🚪 Ab jetzt abwesend', p.name, [{ t: 'early', pk: pkOf(p), on: true, base }])
   }
   const unmarkEarly = (idx) => {
     const p = roster[idx]
     if (!p) return
     setRoster((r) =>
-      r.map((q, i) => (i === idx ? { ...q, early: false, earlyAtSeq: null, earlyAvg: 0 } : q)),
+      r.map((q, i) => (i === idx ? { ...q, early: false, earlyBase: null, earlyAvg: 0 } : q)),
     )
     logAction('🚪 Abwesenheit zurückgenommen', p.name, [
-      { t: 'early', pk: pkOf(p), on: false, seq: p.earlyAtSeq, avg: p.earlyAvg || 0 },
+      { t: 'early', pk: pkOf(p), on: false, base: p.earlyBase ?? null, avg: p.earlyAvg || 0 },
     ])
   }
   // Mitglied wieder aus der Liste entfernen (z. B. versehentlich hinzugefügt).
@@ -518,9 +526,8 @@ export default function SessionRecord() {
         if (!indices.includes(i)) return p
         const existing = p.entries.find((e) => e.penId === gid)
         if (existing)
-          // id auf den aktuellen Sequenzstand heben, damit die akkumulierende
-          // Position für den Frühgeher-Schnitt (earlyAvgLive nutzt e.id >= cut)
-          // als jüngste Aktivität zählt.
+          // id auf den aktuellen Sequenzstand heben: die akkumulierende Position
+          // gilt als jüngste Aktivität.
           return {
             ...p,
             entries: p.entries.map((e) =>
@@ -681,8 +688,8 @@ export default function SessionRecord() {
         } else if (op.t === 'early') {
           patch(op.pk, (p) =>
             op.on
-              ? { ...p, early: false, earlyAtSeq: null, earlyAvg: 0 }
-              : { ...p, early: true, earlyAtSeq: op.seq ?? null, earlyAvg: op.avg || 0 },
+              ? { ...p, early: false, earlyBase: null, earlyAvg: 0 }
+              : { ...p, early: true, earlyBase: op.base ?? null, earlyAvg: op.avg || 0 },
           )
         } else if (op.t === 'remove') {
           if (at(op.pk) === -1) {
@@ -716,6 +723,7 @@ export default function SessionRecord() {
       is_late: !!p.late,
       is_early_leave: !!p.early,
       avg_amount: p.late ? p.lateAvg || 0 : p.early ? earlyAvgLive(p) : null,
+      early_baseline: p.early ? p.earlyBase ?? null : null,
       goals: p.goals || 0,
       penalties: aggregatePenalties(p.entries),
     }))
